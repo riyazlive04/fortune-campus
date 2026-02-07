@@ -1,0 +1,454 @@
+// This is your Prisma schema file
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum UserRole {
+  ADMIN
+  BRANCH_HEAD
+  TRAINER
+  STUDENT
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  NEGOTIATING
+  CONVERTED
+  LOST
+}
+
+enum LeadSource {
+  WEBSITE
+  PHONE
+  WALK_IN
+  REFERRAL
+  SOCIAL_MEDIA
+  ADVERTISEMENT
+  OTHER
+}
+
+enum AdmissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+}
+
+enum PlacementStatus {
+  NOT_ELIGIBLE
+  ELIGIBLE
+  APPLIED
+  SHORTLISTED
+  INTERVIEWED
+  OFFERED
+  PLACED
+  REJECTED
+}
+
+enum IncentiveType {
+  ADMISSION
+  PLACEMENT
+  PERFORMANCE
+  BONUS
+}
+
+// Models
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  password      String
+  firstName     String
+  lastName      String
+  phone         String?
+  role          UserRole
+  isActive      Boolean  @default(true)
+  branchId      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  branch        Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  
+  // Role-specific relations
+  leadsCreated  Lead[]   @relation("LeadCreator")
+  leadsAssigned Lead[]   @relation("LeadAssignee")
+  studentsAsUser Student? @relation("StudentUser")
+  trainerProfile Trainer?
+  incentives    Incentive[]
+  
+  @@index([email])
+  @@index([branchId])
+  @@map("users")
+}
+
+model Branch {
+  id          String   @id @default(uuid())
+  name        String
+  code        String   @unique
+  address     String?
+  city        String?
+  state       String?
+  phone       String?
+  email       String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  users       User[]
+  leads       Lead[]
+  admissions  Admission[]
+  students    Student[]
+  trainers    Trainer[]
+  courses     Course[]
+  
+  @@map("branches")
+}
+
+model Lead {
+  id              String     @id @default(uuid())
+  firstName       String
+  lastName        String
+  email           String?
+  phone           String
+  source          LeadSource @default(OTHER)
+  status          LeadStatus @default(NEW)
+  interestedCourse String?
+  notes           String?
+  followUpDate    DateTime?
+  
+  branchId        String
+  createdById     String
+  assignedToId    String?
+  
+  convertedToAdmissionId String?   @unique
+  
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  // Relations
+  branch          Branch     @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  createdBy       User       @relation("LeadCreator", fields: [createdById], references: [id])
+  assignedTo      User?      @relation("LeadAssignee", fields: [assignedToId], references: [id])
+  admission       Admission? @relation("LeadConversion")
+  whatsappLogs    WhatsAppLog[]
+  
+  @@index([branchId])
+  @@index([createdById])
+  @@index([assignedToId])
+  @@index([status])
+  @@map("leads")
+}
+
+model Admission {
+  id              String          @id @default(uuid())
+  admissionNumber String          @unique
+  
+  firstName       String
+  lastName        String
+  email           String?
+  phone           String
+  dateOfBirth     DateTime?
+  gender          String?
+  address         String?
+  
+  courseId        String
+  batchName       String?
+  feeAmount       Decimal         @db.Decimal(10, 2)
+  feePaid         Decimal         @default(0) @db.Decimal(10, 2)
+  feeBalance      Decimal         @default(0) @db.Decimal(10, 2)
+  
+  status          AdmissionStatus @default(PENDING)
+  admissionDate   DateTime        @default(now())
+  
+  branchId        String
+  leadId          String?         @unique
+  
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Relations
+  branch          Branch          @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  course          Course          @relation(fields: [courseId], references: [id])
+  lead            Lead?           @relation("LeadConversion", fields: [leadId], references: [id])
+  student         Student?
+  whatsappLogs    WhatsAppLog[]
+  
+  @@index([branchId])
+  @@index([courseId])
+  @@index([status])
+  @@map("admissions")
+}
+
+model Student {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  admissionId     String   @unique
+  enrollmentNumber String  @unique
+  
+  currentSemester Int?
+  cgpa            Decimal? @db.Decimal(4, 2)
+  
+  branchId        String
+  courseId        String
+  
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  user            User     @relation("StudentUser", fields: [userId], references: [id], onDelete: Cascade)
+  admission       Admission @relation(fields: [admissionId], references: [id], onDelete: Cascade)
+  branch          Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  course          Course   @relation(fields: [courseId], references: [id])
+  
+  attendances     Attendance[]
+  portfolios      Portfolio[]
+  placements      Placement[]
+  
+  @@index([branchId])
+  @@index([courseId])
+  @@map("students")
+}
+
+model Trainer {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  employeeId      String   @unique
+  
+  specialization  String?
+  experience      Int?     // years
+  qualification   String?
+  
+  branchId        String
+  
+  isActive        Boolean  @default(true)
+  joiningDate     DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch          Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  
+  courses         CourseTrainer[]
+  attendances     Attendance[]
+  incentives      Incentive[]
+  
+  @@index([branchId])
+  @@map("trainers")
+}
+
+model Course {
+  id              String   @id @default(uuid())
+  name            String
+  code            String   @unique
+  description     String?
+  duration        Int      // in months
+  fees            Decimal  @db.Decimal(10, 2)
+  
+  syllabus        String?  // JSON or text
+  prerequisites   String?
+  
+  branchId        String
+  
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  branch          Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  
+  trainers        CourseTrainer[]
+  admissions      Admission[]
+  students        Student[]
+  attendances     Attendance[]
+  
+  @@index([branchId])
+  @@map("courses")
+}
+
+model CourseTrainer {
+  id              String   @id @default(uuid())
+  courseId        String
+  trainerId       String
+  
+  assignedAt      DateTime @default(now())
+  isActive        Boolean  @default(true)
+
+  // Relations
+  course          Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  trainer         Trainer  @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  
+  @@unique([courseId, trainerId])
+  @@index([courseId])
+  @@index([trainerId])
+  @@map("course_trainers")
+}
+
+model Attendance {
+  id              String           @id @default(uuid())
+  date            DateTime
+  status          AttendanceStatus
+  remarks         String?
+  
+  studentId       String
+  courseId        String
+  trainerId       String?
+  
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  // Relations
+  student         Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course          Course           @relation(fields: [courseId], references: [id])
+  trainer         Trainer?         @relation(fields: [trainerId], references: [id], onDelete: SetNull)
+  
+  @@unique([studentId, courseId, date])
+  @@index([studentId])
+  @@index([courseId])
+  @@index([date])
+  @@map("attendances")
+}
+
+model Portfolio {
+  id              String   @id @default(uuid())
+  studentId       String
+  
+  title           String
+  description     String?
+  projectUrl      String?
+  githubUrl       String?
+  technologies    String[] // Array of tech stack
+  
+  completedAt     DateTime?
+  isVerified      Boolean  @default(false)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  
+  @@index([studentId])
+  @@map("portfolios")
+}
+
+model Company {
+  id              String   @id @default(uuid())
+  name            String
+  industry        String?
+  website         String?
+  contactPerson   String?
+  contactEmail    String?
+  contactPhone    String?
+  address         String?
+  
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  placements      Placement[]
+  
+  @@map("companies")
+}
+
+model Placement {
+  id              String          @id @default(uuid())
+  studentId       String
+  companyId       String
+  
+  position        String
+  package         Decimal?        @db.Decimal(10, 2)
+  joiningDate     DateTime?
+  
+  status          PlacementStatus @default(ELIGIBLE)
+  remarks         String?
+  
+  appliedAt       DateTime        @default(now())
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  // Relations
+  student         Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  
+  @@index([studentId])
+  @@index([companyId])
+  @@index([status])
+  @@map("placements")
+}
+
+model Incentive {
+  id              String        @id @default(uuid())
+  type            IncentiveType
+  amount          Decimal       @db.Decimal(10, 2)
+  description     String?
+  
+  userId          String
+  trainerId       String?
+  
+  referenceId     String?       // Can link to admission, placement, etc.
+  referenceType   String?       // "ADMISSION", "PLACEMENT", etc.
+  
+  month           Int
+  year            Int
+  
+  isPaid          Boolean       @default(false)
+  paidAt          DateTime?
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trainer         Trainer?      @relation(fields: [trainerId], references: [id], onDelete: SetNull)
+  
+  @@index([userId])
+  @@index([trainerId])
+  @@index([month, year])
+  @@map("incentives")
+}
+
+model WhatsAppLog {
+  id              String   @id @default(uuid())
+  to              String
+  message         String
+  messageType     String   // "text", "template", etc.
+  
+  leadId          String?
+  admissionId     String?
+  
+  status          String   // "sent", "delivered", "failed"
+  errorMessage    String?
+  
+  sentAt          DateTime @default(now())
+  deliveredAt     DateTime?
+
+  // Relations
+  lead            Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  admission       Admission? @relation(fields: [admissionId], references: [id], onDelete: SetNull)
+  
+  @@index([leadId])
+  @@index([admissionId])
+  @@index([sentAt])
+  @@map("whatsapp_logs")
+}
