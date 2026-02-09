@@ -157,7 +157,7 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId }: LeadModalProps) => {
                     </div>
                 ) : (
                     <form onSubmit={handleSubmit} className="space-y-4 py-4">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div className="space-y-2">
                                 <Label htmlFor="firstName">First Name</Label>
                                 <Input
@@ -178,7 +178,7 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId }: LeadModalProps) => {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div className="space-y-2">
                                 <Label htmlFor="email">Email</Label>
                                 <Input
@@ -199,7 +199,7 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId }: LeadModalProps) => {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div className="space-y-2">
                                 <Label htmlFor="source">Source</Label>
                                 <Select
@@ -241,7 +241,7 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId }: LeadModalProps) => {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div className="space-y-2">
                                 <Label htmlFor="course">Interested Course</Label>
                                 <Select
