@@ -25,7 +25,12 @@ const Attendance = () => (
 
     <div className="mb-4 flex gap-3">
       <Select><SelectTrigger className="w-40"><SelectValue placeholder="Select Date" /></SelectTrigger><SelectContent><SelectItem value="today">Today</SelectItem><SelectItem value="yesterday">Yesterday</SelectItem></SelectContent></Select>
-      <Select><SelectTrigger className="w-40"><SelectValue placeholder="Branch" /></SelectTrigger><SelectContent><SelectItem value="all">All Branches</SelectItem><SelectItem value="main">Main Branch</SelectItem></SelectContent></Select>
+      <Select><SelectTrigger className="w-40"><SelectValue placeholder="Branch" /></SelectTrigger><SelectContent>
+        <SelectItem value="salem">Salem</SelectItem>
+        <SelectItem value="coimbatore">Coimbatore</SelectItem>
+        <SelectItem value="trichy">Trichy</SelectItem>
+        <SelectItem value="erode">Erode</SelectItem>
+      </SelectContent></Select>
     </div>
 
     <div className="mb-8">

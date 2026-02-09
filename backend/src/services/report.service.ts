@@ -1,5 +1,6 @@
+import { UserRole } from '../types/enums';;
 import { prisma } from '../config/database';
-import { UserRole } from '@prisma/client';
+;
 
 class ReportService {
   /**

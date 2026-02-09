@@ -14,9 +14,16 @@ interface DataTableProps<T> {
   data: T[];
   searchPlaceholder?: string;
   pageSize?: number;
+  isLoading?: boolean;
 }
 
-function DataTable<T extends Record<string, any>>({ columns, data, searchPlaceholder = "Search...", pageSize = 10 }: DataTableProps<T>) {
+function DataTable<T extends Record<string, any>>({
+  columns,
+  data,
+  searchPlaceholder = "Search...",
+  pageSize = 10,
+  isLoading = false
+}: DataTableProps<T>) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
 
@@ -44,7 +51,12 @@ function DataTable<T extends Record<string, any>>({ columns, data, searchPlaceho
         <span className="text-sm text-muted-foreground">{filtered.length} records</span>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto min-h-[400px] relative">
+        {isLoading && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/50 backdrop-blur-[1px]">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+          </div>
+        )}
         <table className="data-table">
           <thead>
             <tr>

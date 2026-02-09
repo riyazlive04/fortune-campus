@@ -1,9 +1,10 @@
+import { UserRole } from '../types/enums';;
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { prisma } from '../config/database';
 import { errorResponse } from '../utils/response';
-import { UserRole } from '@prisma/client';
+;
 
 export interface AuthRequest extends Request {
   user?: {

@@ -1,10 +1,11 @@
+import { UserRole } from '../../types/enums';;
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../../config/database';
 import { successResponse, errorResponse } from '../../utils/response';
 import { config } from '../../config';
-import { UserRole } from '@prisma/client';
+;
 
 /**
  * Check if initial setup is required

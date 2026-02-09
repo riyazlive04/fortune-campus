@@ -47,7 +47,7 @@ const Users = () => {
   const [error, setError] = useState<string | null>(null);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
   const [passwordCopied, setPasswordCopied] = useState(false);
-  
+
   const currentUser = storage.getUser();
   const isAdmin = currentUser?.role === 'ADMIN';
 
@@ -166,7 +166,7 @@ const Users = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
@@ -205,7 +205,7 @@ const Users = () => {
           role: "",
           branchId: "",
         });
-        
+
         toast({
           title: "Success",
           description: "User created successfully",
@@ -260,16 +260,18 @@ const Users = () => {
     { key: "email", label: "Email" },
     { key: "phone", label: "Phone", render: (r: User) => r.phone || "-" },
     { key: "role", label: "Role", render: (r: User) => <StatusBadge status={r.role} variant={roleVariant(r.role)} /> },
-    { key: "branch", label: "Branch", render: (r: User) => r.branch?.name || "All Branches" },
-    { key: "status", label: "Status", render: (r: User) => (
-      <StatusBadge 
-        status={r.isActive ? "Active" : "Inactive"} 
-        variant={r.isActive ? "success" : "neutral"} 
-      />
-    )},
-    { 
-      key: "actions", 
-      label: "", 
+    { key: "branch", label: "Branch", render: (r: User) => r.branch?.name || "-" },
+    {
+      key: "status", label: "Status", render: (r: User) => (
+        <StatusBadge
+          status={r.isActive ? "Active" : "Inactive"}
+          variant={r.isActive ? "success" : "neutral"}
+        />
+      )
+    },
+    {
+      key: "actions",
+      label: "",
       render: (r: User) => (
         <div className="flex gap-2">
           <Button variant="ghost" size="sm">
@@ -330,9 +332,9 @@ const Users = () => {
               <div className="space-y-2">
                 <Label>Temporary Password</Label>
                 <div className="flex gap-2">
-                  <Input 
-                    value={tempPassword} 
-                    readOnly 
+                  <Input
+                    value={tempPassword}
+                    readOnly
                     className="font-mono"
                   />
                   <Button

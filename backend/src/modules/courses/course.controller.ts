@@ -1,5 +1,6 @@
+import { UserRole } from '../../types/enums';
 import { Response } from 'express';
-import { UserRole } from '@prisma/client';
+
 import { prisma } from '../../config/database';
 import { successResponse, errorResponse, paginationHelper, getPaginationMeta } from '../../utils/response';
 import { AuthRequest } from '../../middlewares/auth.middleware';
@@ -7,12 +8,12 @@ import { AuthRequest } from '../../middlewares/auth.middleware';
 export const getCourses = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
     const { page = 1, limit = 10, branchId, isActive, search } = req.query;
-    
+
     const { skip, take } = paginationHelper(Number(page), Number(limit));
 
     const where: any = {};
 
-    if (req.user?.role !== UserRole.ADMIN) {
+    if (req.user?.role !== UserRole.ADMIN && req.user?.role !== UserRole.CEO) {
       where.branchId = req.user?.branchId;
     } else if (branchId) {
       where.branchId = branchId as string;
@@ -102,7 +103,7 @@ export const getCourseById = async (req: AuthRequest, res: Response): Promise<Re
       return errorResponse(res, 'Course not found', 404);
     }
 
-    if (req.user?.role !== UserRole.ADMIN && course.branchId !== req.user?.branchId) {
+    if (req.user?.role !== UserRole.ADMIN && req.user?.role !== UserRole.CEO && course.branchId !== req.user?.branchId) {
       return errorResponse(res, 'Access denied', 403);
     }
 
@@ -150,7 +151,7 @@ export const updateCourse = async (req: AuthRequest, res: Response): Promise<Res
       return errorResponse(res, 'Course not found', 404);
     }
 
-    if (req.user?.role !== UserRole.ADMIN && existingCourse.branchId !== req.user?.branchId) {
+    if (req.user?.role !== UserRole.ADMIN && req.user?.role !== UserRole.CEO && existingCourse.branchId !== req.user?.branchId) {
       return errorResponse(res, 'Access denied', 403);
     }
 
@@ -196,7 +197,7 @@ export const deleteCourse = async (req: AuthRequest, res: Response): Promise<Res
       return errorResponse(res, 'Course not found', 404);
     }
 
-    if (req.user?.role !== UserRole.ADMIN && existingCourse.branchId !== req.user?.branchId) {
+    if (req.user?.role !== UserRole.ADMIN && req.user?.role !== UserRole.CEO && existingCourse.branchId !== req.user?.branchId) {
       return errorResponse(res, 'Access denied', 403);
     }
 
@@ -222,7 +223,7 @@ export const assignTrainerToCourse = async (req: AuthRequest, res: Response): Pr
       return errorResponse(res, 'Course not found', 404);
     }
 
-    if (req.user?.role !== UserRole.ADMIN && course.branchId !== req.user?.branchId) {
+    if (req.user?.role !== UserRole.ADMIN && req.user?.role !== UserRole.CEO && course.branchId !== req.user?.branchId) {
       return errorResponse(res, 'Access denied', 403);
     }
 
@@ -266,7 +267,7 @@ export const removeTrainerFromCourse = async (req: AuthRequest, res: Response): 
       return errorResponse(res, 'Course not found', 404);
     }
 
-    if (req.user?.role !== UserRole.ADMIN && course.branchId !== req.user?.branchId) {
+    if (req.user?.role !== UserRole.ADMIN && req.user?.role !== UserRole.CEO && course.branchId !== req.user?.branchId) {
       return errorResponse(res, 'Access denied', 403);
     }
 

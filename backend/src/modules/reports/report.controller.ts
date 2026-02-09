@@ -1,5 +1,6 @@
+import { UserRole, LeadStatus, AdmissionStatus, PlacementStatus } from '../../types/enums';;
 import { Response } from 'express';
-import { UserRole, LeadStatus, AdmissionStatus, PlacementStatus } from '@prisma/client';
+;
 import { prisma } from '../../config/database';
 import { successResponse, errorResponse } from '../../utils/response';
 import { AuthRequest } from '../../middlewares/auth.middleware';

@@ -3,16 +3,17 @@ import KPICard from "@/components/KPICard";
 import { Award, Users, Building2 } from "lucide-react";
 
 const trainerIncentives = [
-  { trainer: "Priya Sharma", branch: "Main Branch", students: 45, placements: 18, incentive: "₹54,000", status: "Paid" },
-  { trainer: "Rahul Verma", branch: "North Branch", students: 38, placements: 14, incentive: "₹42,000", status: "Pending" },
-  { trainer: "Sneha Patel", branch: "Main Branch", students: 32, placements: 12, incentive: "₹36,000", status: "Paid" },
-  { trainer: "Vikram Singh", branch: "South Branch", students: 28, placements: 8, incentive: "₹24,000", status: "Pending" },
+  { trainer: "Priya Sharma", branch: "Salem", students: 45, placements: 18, incentive: "₹54,000", status: "Paid" },
+  { trainer: "Rahul Verma", branch: "Coimbatore", students: 38, placements: 14, incentive: "₹42,000", status: "Pending" },
+  { trainer: "Sneha Patel", branch: "Salem", students: 32, placements: 12, incentive: "₹36,000", status: "Paid" },
+  { trainer: "Vikram Singh", branch: "Trichy", students: 28, placements: 8, incentive: "₹24,000", status: "Pending" },
 ];
 
 const branchIncentives = [
-  { branch: "Main Branch", trainers: 3, totalIncentive: "₹1,14,000", paid: "₹90,000", pending: "₹24,000" },
-  { branch: "North Branch", trainers: 2, totalIncentive: "₹72,000", paid: "₹30,000", pending: "₹42,000" },
-  { branch: "South Branch", trainers: 1, totalIncentive: "₹24,000", paid: "₹0", pending: "₹24,000" },
+  { branch: "Salem", trainers: 3, totalIncentive: "₹1,14,000", paid: "₹90,000", pending: "₹24,000" },
+  { branch: "Coimbatore", trainers: 2, totalIncentive: "₹72,000", paid: "₹30,000", pending: "₹42,000" },
+  { branch: "Trichy", trainers: 1, totalIncentive: "₹24,000", paid: "₹0", pending: "₹24,000" },
+  { branch: "Erode", trainers: 1, totalIncentive: "₹24,000", paid: "₹10,000", pending: "₹14,000" },
 ];
 
 const Incentives = () => (

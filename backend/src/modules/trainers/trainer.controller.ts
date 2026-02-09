@@ -1,6 +1,7 @@
+import { UserRole } from '../../types/enums';
 import { Response } from 'express';
 import bcrypt from 'bcryptjs';
-import { UserRole } from '@prisma/client';
+
 import { prisma } from '../../config/database';
 import { successResponse, errorResponse, paginationHelper, getPaginationMeta } from '../../utils/response';
 import { AuthRequest } from '../../middlewares/auth.middleware';
@@ -8,12 +9,12 @@ import { AuthRequest } from '../../middlewares/auth.middleware';
 export const getTrainers = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
     const { page = 1, limit = 10, branchId, isActive, search } = req.query;
-    
+
     const { skip, take } = paginationHelper(Number(page), Number(limit));
 
     const where: any = {};
 
-    if (req.user?.role !== UserRole.CEO) {
+    if (req.user?.role !== UserRole.CEO && req.user?.role !== UserRole.ADMIN) {
       where.branchId = req.user?.branchId;
     } else if (branchId) {
       where.branchId = branchId as string;
@@ -87,6 +88,7 @@ export const getTrainerById = async (req: AuthRequest, res: Response): Promise<R
             firstName: true,
             lastName: true,
             phone: true,
+            role: true, // sending role might be useful
           },
         },
         branch: true,
@@ -106,7 +108,7 @@ export const getTrainerById = async (req: AuthRequest, res: Response): Promise<R
       return errorResponse(res, 'Trainer not found', 404);
     }
 
-    if (req.user?.role !== UserRole.CEO && trainer.branchId !== req.user?.branchId) {
+    if (req.user?.role !== UserRole.CEO && req.user?.role !== UserRole.ADMIN && trainer.branchId !== req.user?.branchId) {
       return errorResponse(res, 'Access denied', 403);
     }
 
@@ -138,7 +140,7 @@ export const createTrainer = async (req: AuthRequest, res: Response): Promise<Re
 
     // Create user account for trainer
     const defaultPassword = await bcrypt.hash('Trainer@123', 10);
-    
+
     const result = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
@@ -196,7 +198,7 @@ export const updateTrainer = async (req: AuthRequest, res: Response): Promise<Re
       return errorResponse(res, 'Trainer not found', 404);
     }
 
-    if (req.user?.role !== UserRole.CEO && existingTrainer.branchId !== req.user?.branchId) {
+    if (req.user?.role !== UserRole.CEO && req.user?.role !== UserRole.ADMIN && existingTrainer.branchId !== req.user?.branchId) {
       return errorResponse(res, 'Access denied', 403);
     }
 
@@ -238,7 +240,7 @@ export const deleteTrainer = async (req: AuthRequest, res: Response): Promise<Re
       return errorResponse(res, 'Trainer not found', 404);
     }
 
-    if (req.user?.role !== UserRole.CEO && existingTrainer.branchId !== req.user?.branchId) {
+    if (req.user?.role !== UserRole.CEO && req.user?.role !== UserRole.ADMIN && existingTrainer.branchId !== req.user?.branchId) {
       return errorResponse(res, 'Access denied', 403);
     }
 

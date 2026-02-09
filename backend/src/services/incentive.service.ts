@@ -1,5 +1,6 @@
+import { IncentiveType } from '../types/enums';;
 import { prisma } from '../config/database';
-import { IncentiveType } from '@prisma/client';
+;
 
 interface IncentiveRule {
   type: IncentiveType;

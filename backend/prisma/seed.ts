@@ -1,10 +1,5 @@
-/// <reference types="node" />
-import {
-  UserRole,
-  LeadStatus,
-  LeadSource,
-  AdmissionStatus,
-} from "@prisma/client";
+
+// Enums removed for SQLite compatibility, using string literals instead
 import bcrypt from "bcryptjs";
 import { prisma } from "../src/config/database";
 
@@ -14,7 +9,7 @@ async function main() {
   // --------------------
   // Branches
   // --------------------
-  console.log("📍 Creating branches...");
+  console.log("🏢 Creating branches...");
 
   const mainBranch = await prisma.branch.upsert({
     where: { code: "FC-MAIN" },
@@ -22,37 +17,25 @@ async function main() {
     create: {
       name: "Fortune Campus - Main",
       code: "FC-MAIN",
-      address: "123 Tech Street",
+      address: "123 Education Lane, Tech Park",
       city: "Bangalore",
       state: "Karnataka",
-      phone: "+91-9876543210",
-      email: "main@fortunecampus.com",
-    },
-  });
-
-  const secondBranch = await prisma.branch.upsert({
-    where: { code: "FC-NORTH" },
-    update: {},
-    create: {
-      name: "Fortune Campus - North",
-      code: "FC-NORTH",
-      address: "456 Innovation Road",
-      city: "Delhi",
-      state: "Delhi",
-      phone: "+91-9876543211",
-      email: "north@fortunecampus.com",
+      phone: "+91-80-23456789",
+      email: "contact@fortunecampus.com",
+      isActive: true,
     },
   });
 
   console.log("✅ Branches ready");
 
   // --------------------
-  // Users
+  // Core Users (Admin, Head, Trainer)
   // --------------------
   console.log("👥 Creating users...");
 
   const adminPassword = await bcrypt.hash("Admin@123", 10);
 
+  // CEO / Super Admin
   const ceo = await prisma.user.upsert({
     where: { email: "ceo@fortunecampus.com" },
     update: {},
@@ -62,11 +45,12 @@ async function main() {
       firstName: "Rajesh",
       lastName: "Kumar",
       phone: "+91-9876543200",
-      role: UserRole.CEO,
+      role: "CEO",
       isActive: true,
     },
   });
 
+  // Branch Head
   const branchHead = await prisma.user.upsert({
     where: { email: "head.main@fortunecampus.com" },
     update: {},
@@ -76,12 +60,13 @@ async function main() {
       firstName: "Priya",
       lastName: "Sharma",
       phone: "+91-9876543201",
-      role: UserRole.BRANCH_HEAD,
+      role: "BRANCH_HEAD",
       branchId: mainBranch.id,
       isActive: true,
     },
   });
 
+  // Trainer
   const trainerUser = await prisma.user.upsert({
     where: { email: "trainer1@fortunecampus.com" },
     update: {},
@@ -91,7 +76,7 @@ async function main() {
       firstName: "Amit",
       lastName: "Verma",
       phone: "+91-9876543202",
-      role: UserRole.TRAINER,
+      role: "TRAINER",
       branchId: mainBranch.id,
       isActive: true,
     },
@@ -190,15 +175,14 @@ async function main() {
   console.log("🎯 Creating leads...");
 
   await prisma.lead.createMany({
-    skipDuplicates: true,
     data: [
       {
         firstName: "Rahul",
         lastName: "Singh",
         email: "rahul.singh@example.com",
         phone: "+91-9876543300",
-        source: LeadSource.WEBSITE,
-        status: LeadStatus.NEW,
+        source: "WEBSITE",
+        status: "NEW",
         interestedCourse: "Full Stack Web Development",
         notes: "Interested in evening batch",
         branchId: mainBranch.id,
@@ -210,8 +194,8 @@ async function main() {
         lastName: "Patel",
         email: "sneha.patel@example.com",
         phone: "+91-9876543301",
-        source: LeadSource.REFERRAL,
-        status: LeadStatus.CONTACTED,
+        source: "REFERRAL",
+        status: "CONTACTED",
         interestedCourse: "Data Science & Machine Learning",
         notes: "Referred by alumni",
         branchId: mainBranch.id,
@@ -241,7 +225,7 @@ async function main() {
       feeAmount: 50000,
       feePaid: 25000,
       feeBalance: 25000,
-      status: AdmissionStatus.APPROVED,
+      status: "APPROVED",
       branchId: mainBranch.id,
     },
   });
@@ -255,13 +239,13 @@ async function main() {
       firstName: "Vikram",
       lastName: "Reddy",
       phone: "+91-9876543400",
-      role: UserRole.STUDENT,
+      role: "STUDENT",
       branchId: mainBranch.id,
       isActive: true,
     },
   });
 
-  await prisma.student.create({
+  const student = await prisma.student.create({
     data: {
       userId: studentUser.id,
       admissionId: admission.id,
@@ -280,12 +264,12 @@ async function main() {
 
   await prisma.portfolio.create({
     data: {
-      studentId: admission.id,
+      studentId: student.id,
       title: "E-commerce Website",
       description: "MERN stack e-commerce platform",
       projectUrl: "https://myproject.example.com",
       githubUrl: "https://github.com/vikram/ecommerce-project",
-      technologies: ["React", "Node.js", "MongoDB"],
+      technologies: "React, Node.js, MongoDB",
       completedAt: new Date(),
       isVerified: true,
     },

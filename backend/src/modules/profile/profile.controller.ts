@@ -1,9 +1,10 @@
+import { UserRole } from '../../types/enums';;
 import { Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../../config/database';
 import { successResponse, errorResponse } from '../../utils/response';
 import { AuthRequest } from '../../middlewares/auth.middleware';
-import { UserRole } from '@prisma/client';
+;
 
 /**
  * Get user profile

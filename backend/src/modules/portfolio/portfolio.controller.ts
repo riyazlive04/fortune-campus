@@ -1,5 +1,6 @@
+import { UserRole } from '../../types/enums';;
 import { Response } from 'express';
-import { UserRole } from '@prisma/client';
+;
 import { prisma } from '../../config/database';
 import { successResponse, errorResponse, paginationHelper, getPaginationMeta } from '../../utils/response';
 import { AuthRequest } from '../../middlewares/auth.middleware';

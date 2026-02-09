@@ -28,11 +28,11 @@ export const setupApi = {
     });
 
     const result = await response.json();
-    
+
     if (!response.ok) {
       throw new Error(result.message || 'Failed to initialize setup');
     }
-    
+
     return result;
   },
 };
@@ -49,11 +49,11 @@ export const authApi = {
     });
 
     const result = await response.json();
-    
+
     if (!response.ok) {
       throw new Error(result.message || 'Login failed');
     }
-    
+
     return result;
   },
 
@@ -65,11 +65,422 @@ export const authApi = {
     });
 
     const result = await response.json();
-    
+
     if (!response.ok) {
       throw new Error(result.message || 'Failed to get user');
     }
-    
+
+    return result;
+  },
+};
+
+// Leads API Service
+export const leadsApi = {
+  getLeads: async (params: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    branchId?: string;
+    search?: string;
+  } = {}) => {
+    const token = storage.getToken();
+    const query = new URLSearchParams(params as any).toString();
+    const response = await fetch(`${API_BASE_URL}/leads?${query}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to fetch leads');
+    }
+
+    return result;
+  },
+
+  deleteLead: async (id: string) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/leads/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to delete lead');
+    }
+
+    return result;
+  },
+
+  getLeadById: async (id: string) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/leads/${id}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to fetch lead');
+    }
+
+    return result;
+  },
+
+  createLead: async (data: any) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/leads`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to create lead');
+    }
+
+    return result;
+  },
+
+  updateLead: async (id: string, data: any) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/leads/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to update lead');
+    }
+
+    return result;
+  },
+};
+
+// Courses API Service
+export const coursesApi = {
+  getCourses: async () => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/courses`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to fetch courses');
+    }
+
+    return result;
+  },
+
+  getCourseById: async (id: string) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/courses/${id}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to fetch course details');
+    }
+
+    return result;
+  },
+
+  createCourse: async (data: any) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/courses`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to create course');
+    }
+
+    return result;
+  },
+
+  updateCourse: async (id: string, data: any) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/courses/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to update course');
+    }
+
+    return result;
+  },
+};
+
+// Trainers API Service
+export const trainersApi = {
+  getTrainers: async (params?: any) => {
+    const token = storage.getToken();
+    const queryString = params ? new URLSearchParams(params).toString() : '';
+    const response = await fetch(`${API_BASE_URL}/trainers?${queryString}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to fetch trainers');
+    }
+
+    return result;
+  },
+
+  getTrainerById: async (id: string) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/trainers/${id}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to fetch trainer details');
+    }
+
+    return result;
+  },
+
+  createTrainer: async (data: any) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/trainers`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to create trainer');
+    }
+
+    return result;
+  },
+
+  updateTrainer: async (id: string, data: any) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/trainers/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to update trainer');
+    }
+
+    return result;
+  },
+
+  deleteTrainer: async (id: string) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/trainers/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to delete trainer');
+    }
+
+    return result;
+  },
+};
+
+// Branches API Service
+export const branchesApi = {
+  getBranches: async () => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/branches`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to fetch branches');
+    }
+
+    return result;
+  },
+};
+
+// Dashboard API Service
+export const dashboardApi = {
+  getStats: async () => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/dashboard/stats`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to fetch dashboard stats');
+    }
+
+    return result;
+  },
+};
+
+// Admissions API Service
+export const admissionsApi = {
+  getAdmissions: async (params?: any) => {
+    const token = storage.getToken();
+    const queryString = params ? new URLSearchParams(params).toString() : '';
+    const response = await fetch(`${API_BASE_URL}/admissions?${queryString}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to fetch admissions');
+    }
+
+    return result;
+  },
+
+  getAdmissionById: async (id: string) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/admissions/${id}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to fetch admission');
+    }
+
+    return result;
+  },
+
+  createAdmission: async (data: any) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/admissions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to create admission');
+    }
+
+    return result;
+  },
+
+  updateAdmission: async (id: string, data: any) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/admissions/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to update admission');
+    }
+
+    return result;
+  },
+
+  deleteAdmission: async (id: string) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/admissions/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to delete admission');
+    }
+
     return result;
   },
 };
