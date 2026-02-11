@@ -26,4 +26,3 @@ services:
 databases:
   - name: fortune-campus-db
     plan: free
-    postgresRole: fortune_admin
