@@ -1,5 +1,9 @@
 // API Base URL
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const rawUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+// Ensure it ends with /api (but only if it's the base URL)
+export const API_BASE_URL = rawUrl.endsWith('/api') ? rawUrl : `${rawUrl.replace(/\/$/, '')}/api`;
+
+console.log('🌐 API connection initialized at:', API_BASE_URL);
 
 // Setup API Service
 export const setupApi = {
@@ -40,6 +44,7 @@ export const setupApi = {
 // Auth API Service
 export const authApi = {
   login: async (email: string, password: string) => {
+    console.log(`🔑 Attempting login at: ${API_BASE_URL}/auth/login`);
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
       headers: {
