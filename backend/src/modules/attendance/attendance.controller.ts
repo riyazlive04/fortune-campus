@@ -1,6 +1,6 @@
-import { UserRole, AttendanceStatus } from '../../types/enums';;
+import { UserRole, AttendanceStatus } from '../../types/enums';
 import { Response } from 'express';
-;
+
 import { prisma } from '../../config/database';
 import { successResponse, errorResponse, paginationHelper, getPaginationMeta } from '../../utils/response';
 import { AuthRequest } from '../../middlewares/auth.middleware';
@@ -8,7 +8,7 @@ import { AuthRequest } from '../../middlewares/auth.middleware';
 export const getAttendance = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
     const { page = 1, limit = 10, studentId, courseId, date, status } = req.query;
-    
+
     const { skip, take } = paginationHelper(Number(page), Number(limit));
 
     const where: any = {};
@@ -275,5 +275,60 @@ export const deleteAttendance = async (req: AuthRequest, res: Response): Promise
     return successResponse(res, null, 'Attendance deleted successfully');
   } catch (error) {
     return errorResponse(res, 'Failed to delete attendance', 500, error);
+  }
+};
+
+export const getAttendanceStats = async (req: AuthRequest, res: Response): Promise<Response> => {
+  try {
+    // Get all attendance records grouped by student and status
+    const stats = await prisma.attendance.groupBy({
+      by: ['studentId', 'status'],
+      _count: {
+        status: true
+      },
+      where: {
+        student: {
+          branchId: req.user?.role !== UserRole.CEO ? (req.user?.branchId || undefined) : undefined
+        }
+      }
+    });
+
+    // Get student details for the IDs found
+    const studentIds = [...new Set(stats.map(s => s.studentId))];
+    const students = await prisma.student.findMany({
+      where: {
+        id: { in: studentIds }
+      },
+      include: {
+        user: {
+          select: { firstName: true, lastName: true }
+        },
+        course: {
+          select: { name: true }
+        }
+      }
+    });
+
+    // Process data to match frontend requirements
+    const summary = students.map(student => {
+      const studentStats = stats.filter(s => s.studentId === student.id);
+      const present = (studentStats.find(s => s.status === AttendanceStatus.PRESENT) as any)?._count?.status || 0;
+      const absent = (studentStats.find(s => s.status === AttendanceStatus.ABSENT) as any)?._count?.status || 0;
+      const total = present + absent;
+      const percentage = total > 0 ? Math.round((present / total) * 100) : 0;
+
+      return {
+        id: student.id,
+        student: `${student.user?.firstName} ${student.user?.lastName}`,
+        course: student.course?.name || 'N/A',
+        present,
+        absent,
+        percentage: `${percentage}%`
+      };
+    });
+
+    return successResponse(res, summary);
+  } catch (error) {
+    return errorResponse(res, 'Failed to fetch attendance stats', 500, error);
   }
 };

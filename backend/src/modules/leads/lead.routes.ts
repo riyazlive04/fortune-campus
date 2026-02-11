@@ -6,11 +6,14 @@ import {
   updateLead,
   deleteLead,
   convertLeadToAdmission,
+  createPublicLead,
 } from './lead.controller';
 import { authenticateToken } from '../../middlewares/auth.middleware';
 import { enforceBranchAccess, attachUserBranch } from '../../middlewares/branch.middleware';
 
 const router = Router();
+
+router.post('/public', createPublicLead);
 
 router.use(authenticateToken);
 router.use(enforceBranchAccess);

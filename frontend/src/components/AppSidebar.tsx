@@ -21,6 +21,7 @@ const navSections = [
       { title: "Trainers", path: "/trainers", icon: GraduationCap },
       { title: "Students", path: "/students", icon: Users },
       { title: "Attendance", path: "/attendance", icon: Calendar },
+      { title: "Student Growth", path: "/growth", icon: BarChart3 },
     ],
   },
   {
@@ -35,6 +36,7 @@ const navSections = [
     label: "Analytics",
     items: [
       { title: "Reports", path: "/reports", icon: BarChart3 },
+      { title: "Branch Insights", path: "/branch-insights", icon: LayoutDashboard },
       { title: "Notifications", path: "/notifications", icon: Bell },
     ],
   },
@@ -74,7 +76,7 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-4">
+      <nav className="flex-1 overflow-y-auto py-4 scrollbar-hide">
         {navSections.map((section) => (
           <div key={section.label} className="mb-4">
             {!collapsed && (
@@ -88,11 +90,10 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
                 <NavLink
                   key={item.path}
                   to={item.path}
-                  className={`mx-2 mb-0.5 flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
-                    isActive
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
-                  } ${collapsed ? "justify-center px-2" : ""}`}
+                  className={`mx-2 mb-0.5 flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${isActive
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                    } ${collapsed ? "justify-center px-2" : ""}`}
                 >
                   <item.icon className="h-4 w-4 shrink-0" />
                   {!collapsed && <span>{item.title}</span>}

@@ -1,0 +1,8 @@
+Count: 7
+ID: 89c4d366-b215-4569-8b78-1ff85ae8f306, Role: TRAINER, Name: Erode Trainer 1
+ID: 56812ae8-7c85-4d22-a66b-cf905c9c670a, Role: TRAINER, Name: Erode Trainer 2
+ID: 5bcba701-f5a6-4780-9675-d8fbbebddf9d, Role: STUDENT, Name: Student FC-ERD-1
+ID: 9a95c88e-b24f-41d4-aced-88938bf16e36, Role: STUDENT, Name: Student FC-ERD-2
+ID: ffcd027c-8939-4efb-93d5-0a2efea70226, Role: STUDENT, Name: Student FC-ERD-3
+ID: 04a98d62-c0ed-4d09-9aee-780790e81fe0, Role: STUDENT, Name: Student FC-ERD-4
+ID: 60393656-3730-4e7a-9d8a-27c6273aac8a, Role: STUDENT, Name: Student FC-ERD-5

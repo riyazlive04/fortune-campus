@@ -5,7 +5,6 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../../config/database';
 import { successResponse, errorResponse } from '../../utils/response';
 import { config } from '../../config';
-;
 
 /**
  * Check if initial setup is required
@@ -14,7 +13,7 @@ import { config } from '../../config';
 export const getSetupStatus = async (_req: Request, res: Response): Promise<Response> => {
   try {
     const userCount = await prisma.user.count();
-    
+
     return successResponse(res, {
       setupRequired: userCount === 0,
     }, 'Setup status retrieved successfully');
@@ -40,7 +39,7 @@ export const initializeSetup = async (req: Request, res: Response): Promise<Resp
 
     // Check if any users already exist
     const userCount = await prisma.user.count();
-    
+
     if (userCount > 0) {
       return errorResponse(res, 'Setup has already been completed. Please use the login page.', 403);
     }
@@ -119,12 +118,12 @@ export const initializeSetup = async (req: Request, res: Response): Promise<Resp
     }, 'Admin account and branches created successfully', 201);
   } catch (error) {
     console.error('Initialize setup error:', error);
-    
+
     // Handle duplicate email error
     if ((error as any).code === 'P2002') {
       return errorResponse(res, 'An account with this email already exists', 409);
     }
-    
+
     return errorResponse(res, 'Failed to initialize setup', 500);
   }
 };

@@ -3,6 +3,7 @@ import {
   getProfile,
   updateProfile,
   changePassword,
+  deleteProfile,
   adminUpdateUserProfile,
   adminResetUserPassword,
 } from './profile.controller';
@@ -17,6 +18,7 @@ router.use(authenticateToken);
 router.get('/', getProfile);
 router.put('/', updateProfile);
 router.put('/password', changePassword);
+router.delete('/', deleteProfile);
 
 // Admin operations
 router.put('/users/:id', requireAdmin, adminUpdateUserProfile);

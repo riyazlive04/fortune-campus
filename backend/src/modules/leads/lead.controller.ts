@@ -1,5 +1,5 @@
 import { UserRole, LeadStatus } from '../../types/enums';;
-import { Response } from 'express';
+import { Response, Request } from 'express';
 ;
 import { prisma } from '../../config/database';
 import { successResponse, errorResponse, paginationHelper, getPaginationMeta } from '../../utils/response';
@@ -9,7 +9,7 @@ import { whatsappService } from '../../services/whatsapp.service';
 export const getLeads = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
     const { page = 1, limit = 10, status, branchId, assignedToId, search } = req.query;
-    
+
     const { skip, take } = paginationHelper(Number(page), Number(limit));
 
     const where: any = {};
@@ -170,6 +170,7 @@ export const updateLead = async (req: AuthRequest, res: Response): Promise<Respo
       source,
       status,
       interestedCourse,
+      branchId,
       notes,
       followUpDate,
       assignedToId,
@@ -195,6 +196,7 @@ export const updateLead = async (req: AuthRequest, res: Response): Promise<Respo
         source,
         status,
         interestedCourse,
+        branchId,
         notes,
         followUpDate: followUpDate ? new Date(followUpDate) : undefined,
         assignedToId,
@@ -307,3 +309,71 @@ export const convertLeadToAdmission = async (req: AuthRequest, res: Response): P
     return errorResponse(res, 'Failed to convert lead', 500, error);
   }
 };
+
+export const createPublicLead = async (req: Request, res: Response): Promise<Response> => {
+  try {
+    console.log('createPublicLead: processing request', req.body);
+    const {
+      firstName,
+      lastName,
+      email,
+      phone,
+      courseId,
+      message,
+    } = req.body;
+
+    // Find default branch (first one) and default user (CEO)
+    const [defaultBranch, defaultUser] = await Promise.all([
+      prisma.branch.findFirst(),
+      prisma.user.findFirst({ where: { role: UserRole.CEO } }),
+    ]);
+
+    console.log('createPublicLead: defaultBranch', defaultBranch?.id);
+    console.log('createPublicLead: defaultUser', defaultUser?.id);
+
+    if (!defaultBranch || !defaultUser) {
+      console.error('createPublicLead: Missing default branch or user');
+      return errorResponse(res, 'System configuration error: Missing default branch or user', 500);
+    }
+
+    // Get course name if courseId provided
+    let interestedCourse = 'General Enquiry';
+    if (courseId) {
+      try {
+        const course = await prisma.course.findUnique({ where: { id: courseId } });
+        if (course) interestedCourse = course.name;
+      } catch (err) {
+        console.error('createPublicLead: Error fetching course', err);
+      }
+    }
+
+    console.log('createPublicLead: Creating lead...');
+    const lead = await prisma.lead.create({
+      data: {
+        firstName,
+        lastName,
+        email,
+        phone,
+        source: 'Website Enquiry',
+        interestedCourse,
+        notes: message,
+        branchId: defaultBranch.id,
+        createdById: defaultUser.id,
+        assignedToId: defaultUser.id,
+        status: LeadStatus.NEW,
+      },
+    });
+    console.log('createPublicLead: Lead created', lead.id);
+
+    // Send WhatsApp notification
+    whatsappService.sendNewLeadNotification(lead).catch(err => {
+      console.error('Failed to send WhatsApp notification:', err);
+    });
+
+    return successResponse(res, lead, 'Enquiry submitted successfully', 201);
+  } catch (error) {
+    console.error('createPublicLead: Error', error);
+    return errorResponse(res, 'Failed to submit enquiry', 500, error);
+  }
+};
+

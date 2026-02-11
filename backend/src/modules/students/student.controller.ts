@@ -9,7 +9,7 @@ import { AuthRequest } from '../../middlewares/auth.middleware';
 export const getStudents = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
     const { page = 1, limit = 10, branchId, courseId, isActive, search } = req.query;
-    
+
     const { skip, take } = paginationHelper(Number(page), Number(limit));
 
     const where: any = {};
@@ -62,6 +62,15 @@ export const getStudents = async (req: AuthRequest, res: Response): Promise<Resp
           admission: {
             select: { id: true, admissionNumber: true, feeBalance: true },
           },
+          placements: {
+            take: 1,
+            orderBy: { createdAt: 'desc' },
+            include: {
+              company: {
+                select: { id: true, name: true }
+              }
+            }
+          }
         },
         orderBy: { createdAt: 'desc' },
       }),
@@ -149,7 +158,7 @@ export const createStudent = async (req: AuthRequest, res: Response): Promise<Re
 
     // Create user account for student
     const defaultPassword = await bcrypt.hash('Student@123', 10);
-    
+
     const result = await prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
@@ -203,9 +212,13 @@ export const createStudent = async (req: AuthRequest, res: Response): Promise<Re
 export const updateStudent = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
     const { id } = req.params;
-    const { currentSemester, cgpa, isActive } = req.body;
+    const { currentSemester, cgpa, isActive, placementData } = req.body;
 
-    const existingStudent = await prisma.student.findUnique({ where: { id } });
+    const existingStudent = await prisma.student.findUnique({
+      where: { id },
+      include: { placements: { orderBy: { createdAt: 'desc' }, take: 1 } }
+    });
+
     if (!existingStudent) {
       return errorResponse(res, 'Student not found', 404);
     }
@@ -214,34 +227,92 @@ export const updateStudent = async (req: AuthRequest, res: Response): Promise<Re
       return errorResponse(res, 'Access denied', 403);
     }
 
-    const student = await prisma.student.update({
-      where: { id },
-      data: {
-        currentSemester,
-        cgpa,
-        isActive,
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
+    const student = await prisma.$transaction(async (tx) => {
+      // Update student basics
+      const updatedStudent = await tx.student.update({
+        where: { id },
+        data: {
+          currentSemester,
+          cgpa,
+          isActive,
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+            },
+          },
+          course: {
+            select: { id: true, name: true },
           },
         },
-        course: {
-          select: { id: true, name: true },
-        },
-      },
+      });
+
+      // Handle placement update if provided
+      if (placementData) {
+        const { companyId, companyName, position, package: pkg, status } = placementData;
+
+        let finalCompanyId = companyId;
+
+        // If companyName provided but no companyId, find or create company
+        if (!finalCompanyId && companyName) {
+          const existingCompany = await tx.company.findFirst({
+            where: { name: companyName }
+          });
+
+          if (existingCompany) {
+            finalCompanyId = existingCompany.id;
+          } else {
+            const newCompany = await tx.company.create({
+              data: {
+                name: companyName,
+                industry: 'Unknown', // Default
+              }
+            });
+            finalCompanyId = newCompany.id;
+          }
+        }
+
+        if (finalCompanyId) {
+          // If student has a placement, update it. Otherwise create.
+          const existingPlacement = existingStudent.placements[0];
+
+          if (existingPlacement) {
+            await tx.placement.update({
+              where: { id: existingPlacement.id },
+              data: {
+                companyId: finalCompanyId,
+                position,
+                package: pkg,
+                status: status || 'PLACED'
+              }
+            });
+          } else {
+            await tx.placement.create({
+              data: {
+                studentId: id,
+                companyId: finalCompanyId,
+                position,
+                package: pkg,
+                status: status || 'PLACED'
+              }
+            });
+          }
+        }
+      }
+
+      return updatedStudent;
     });
 
     return successResponse(res, student, 'Student updated successfully');
   } catch (error) {
+    console.error('Update Student Error:', error);
     return errorResponse(res, 'Failed to update student', 500, error);
   }
 };
-
 export const deleteStudent = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
     const { id } = req.params;

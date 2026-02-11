@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Filter, Eye, Trash2, Copy, CheckCircle2 } from "lucide-react";
+import { Plus, Filter, Eye, Trash2, Copy, CheckCircle2, Edit, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -9,7 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import PageHeader from "@/components/PageHeader";
 import DataTable from "@/components/DataTable";
 import StatusBadge from "@/components/StatusBadge";
-import { storage } from "@/lib/api";
+import { storage, coursesApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
@@ -29,6 +29,13 @@ interface User {
     name: string;
     code: string;
   };
+  trainerProfile?: {
+    specialization: string;
+    experience: number;
+  };
+  studentProfile?: {
+    courseId: string;
+  };
 }
 
 interface Branch {
@@ -37,19 +44,28 @@ interface Branch {
   code: string;
 }
 
+interface Course {
+  id: string;
+  name: string;
+  isActive: boolean;
+}
+
 const Users = () => {
   const { toast } = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
   const [passwordCopied, setPasswordCopied] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
 
   const currentUser = storage.getUser();
-  const isAdmin = currentUser?.role === 'ADMIN';
+  const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'CEO';
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -58,6 +74,10 @@ const Users = () => {
     phone: "",
     role: "",
     branchId: "",
+    password: "",
+    specialization: "",
+    experience: "",
+    courseId: "",
   });
 
   // Fetch users
@@ -113,14 +133,27 @@ const Users = () => {
     }
   };
 
+  // Fetch courses
+  const fetchCourses = async () => {
+    try {
+      const result = await coursesApi.getCourses();
+      if (result.success) {
+        setCourses(result.data.courses || result.data || []);
+      }
+    } catch (err) {
+      console.error('Error fetching courses:', err);
+    }
+  };
+
   useEffect(() => {
     fetchUsers();
     fetchBranches();
+    fetchCourses();
   }, []);
 
-  // Auto-set branch for BRANCH_HEAD users creating users
+  // Auto-set branch for CHANNEL_PARTNER users creating users
   useEffect(() => {
-    if (currentUser?.role === 'BRANCH_HEAD' && currentUser.branchId && !formData.branchId) {
+    if (currentUser?.role === 'CHANNEL_PARTNER' && currentUser.branchId && !formData.branchId) {
       setFormData(prev => ({
         ...prev,
         branchId: currentUser.branchId || '',
@@ -161,7 +194,41 @@ const Users = () => {
       setError("Branch is required for non-admin users");
       return false;
     }
+    if (formData.role === 'TRAINER') {
+      if (!formData.specialization.trim()) {
+        setError("Specialization course is required for trainers");
+        return false;
+      }
+      if (!formData.experience.trim()) {
+        setError("Years of experience is required for trainers");
+        return false;
+      }
+    }
+    if (formData.role === 'STUDENT') {
+      if (!formData.courseId) {
+        setError("Course is required for students");
+        return false;
+      }
+    }
     return true;
+  };
+
+  const handleEditUser = (user: User) => {
+    setEditMode(true);
+    setEditingUserId(user.id);
+    setFormData({
+      firstName: user.firstName,
+      lastName: user.lastName,
+      email: user.email,
+      phone: user.phone || "",
+      role: user.role,
+      branchId: user.branchId || "",
+      password: "", // Keep password empty for edit
+      specialization: user.trainerProfile?.specialization || "",
+      experience: user.trainerProfile?.experience?.toString() || "",
+      courseId: user.studentProfile?.courseId || "",
+    });
+    setIsDialogOpen(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -176,13 +243,54 @@ const Users = () => {
 
     try {
       const token = storage.getToken();
-      const response = await fetch(`${API_BASE_URL}/users`, {
-        method: 'POST',
+
+      // Prepare request body
+      const body: any = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        phone: formData.phone,
+        isActive: true,
+      };
+
+      // For create mode, include all fields
+      if (!editMode) {
+        body.email = formData.email;
+        body.role = formData.role;
+        body.branchId = formData.branchId;
+        if (formData.role === 'TRAINER') {
+          body.specialization = formData.specialization;
+          body.experience = formData.experience;
+        }
+        if (formData.role === 'STUDENT') {
+          body.courseId = formData.courseId;
+        }
+      }
+      // For edit mode, only include optional fields
+      else {
+        if (formData.branchId) body.branchId = formData.branchId;
+        // Include password only if it's provided
+        if (formData.password) body.password = formData.password;
+
+        if (formData.role === 'TRAINER') {
+          body.specialization = formData.specialization;
+          body.experience = formData.experience;
+        }
+        if (formData.role === 'STUDENT') {
+          body.courseId = formData.courseId;
+        }
+      }
+
+      const url = editMode
+        ? `${API_BASE_URL}/users/${editingUserId}`
+        : `${API_BASE_URL}/users`;
+
+      const response = await fetch(url, {
+        method: editMode ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(editMode ? body : formData),
       });
 
       const result = await response.json();
@@ -204,6 +312,10 @@ const Users = () => {
           phone: "",
           role: "",
           branchId: "",
+          password: "",
+          specialization: "",
+          experience: "",
+          courseId: "",
         });
 
         toast({
@@ -235,6 +347,8 @@ const Users = () => {
     setTempPassword(null);
     setPasswordCopied(false);
     setError(null);
+    setEditMode(false);
+    setEditingUserId(null);
     setFormData({
       firstName: "",
       lastName: "",
@@ -242,13 +356,17 @@ const Users = () => {
       phone: "",
       role: "",
       branchId: "",
+      password: "",
+      specialization: "",
+      experience: "",
+      courseId: "",
     });
   };
 
   const roleVariant = (role: string): "success" | "warning" | "info" | "neutral" => {
     const map: Record<string, "success" | "warning" | "info" | "neutral"> = {
       ADMIN: "success",
-      BRANCH_HEAD: "warning",
+      CHANNEL_PARTNER: "warning",
       TRAINER: "info",
       STUDENT: "neutral",
     };
@@ -274,6 +392,11 @@ const Users = () => {
       label: "",
       render: (r: User) => (
         <div className="flex gap-2">
+          {currentUser?.role === 'CEO' && (
+            <Button variant="ghost" size="sm" onClick={() => handleEditUser(r)}>
+              <Edit className="h-4 w-4" />
+            </Button>
+          )}
           <Button variant="ghost" size="sm">
             <Eye className="h-4 w-4" />
           </Button>
@@ -299,7 +422,7 @@ const Users = () => {
         title="User Management"
         description="Manage system users and their roles"
         actions={
-          (isAdmin || currentUser?.role === 'BRANCH_HEAD') && (
+          (isAdmin || currentUser?.role === 'CHANNEL_PARTNER') && (
             <Button size="sm" className="gap-2" onClick={() => setIsDialogOpen(true)}>
               <Plus className="h-4 w-4" /> Create User
             </Button>
@@ -311,11 +434,13 @@ const Users = () => {
 
       {/* Create User Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={handleCloseDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Create New User</DialogTitle>
+            <DialogTitle>{editMode ? 'Edit User' : 'Create New User'}</DialogTitle>
             <DialogDescription>
-              Add a new user to the system. A temporary password will be generated.
+              {editMode
+                ? 'Update user information and optionally change password.'
+                : 'Add a new user to the system. A temporary password will be generated.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -361,8 +486,9 @@ const Users = () => {
             </div>
           ) : (
             // Show create user form
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <form onSubmit={handleSubmit} className="space-y-6 py-4">
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                {/* Name Group */}
                 <div className="space-y-2">
                   <Label htmlFor="firstName">First Name *</Label>
                   <Input
@@ -370,6 +496,7 @@ const Users = () => {
                     value={formData.firstName}
                     onChange={(e) => handleChange("firstName", e.target.value)}
                     disabled={submitting}
+                    placeholder="Enter first name"
                     required
                   />
                 </div>
@@ -381,87 +508,175 @@ const Users = () => {
                     value={formData.lastName}
                     onChange={(e) => handleChange("lastName", e.target.value)}
                     disabled={submitting}
+                    placeholder="Enter last name"
                     required
                   />
                 </div>
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="email">Email *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => handleChange("email", e.target.value)}
-                  disabled={submitting}
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone</Label>
-                <Input
-                  id="phone"
-                  value={formData.phone}
-                  onChange={(e) => handleChange("phone", e.target.value)}
-                  disabled={submitting}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="role">Role *</Label>
-                <Select
-                  value={formData.role}
-                  onValueChange={(value) => handleChange("role", value)}
-                  disabled={submitting}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {isAdmin && (
-                      <>
-                        <SelectItem value="BRANCH_HEAD">Branch Head</SelectItem>
-                        <SelectItem value="TRAINER">Trainer</SelectItem>
-                        <SelectItem value="STUDENT">Student</SelectItem>
-                      </>
-                    )}
-                    {currentUser?.role === 'BRANCH_HEAD' && (
-                      <>
-                        <SelectItem value="TRAINER">Trainer</SelectItem>
-                        <SelectItem value="STUDENT">Student</SelectItem>
-                      </>
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {formData.role && formData.role !== 'ADMIN' && (
+                {/* Contact Group */}
                 <div className="space-y-2">
-                  <Label htmlFor="branchId">Branch *</Label>
-                  <Select
-                    value={formData.branchId}
-                    onValueChange={(value) => handleChange("branchId", value)}
-                    disabled={submitting || currentUser?.role === 'BRANCH_HEAD'}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select branch" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {branches.map((branch) => (
-                        <SelectItem key={branch.id} value={branch.id}>
-                          {branch.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {currentUser?.role === 'BRANCH_HEAD' && (
-                    <p className="text-xs text-muted-foreground">
-                      You can only create users in your branch
-                    </p>
+                  <Label htmlFor="email">Email *</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => handleChange("email", e.target.value)}
+                    disabled={submitting || editMode}
+                    placeholder="example@company.com"
+                    required
+                  />
+                  {editMode && (
+                    <p className="text-[11px] text-muted-foreground italic">Email cannot be changed</p>
                   )}
                 </div>
-              )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone</Label>
+                  <Input
+                    id="phone"
+                    value={formData.phone}
+                    onChange={(e) => handleChange("phone", e.target.value)}
+                    disabled={submitting}
+                    placeholder="+91-XXXXXXXXXX"
+                  />
+                </div>
+
+                {/* Role & Password Group */}
+                <div className="space-y-2">
+                  <Label htmlFor="role">Role *</Label>
+                  <Select
+                    value={formData.role}
+                    onValueChange={(value) => handleChange("role", value)}
+                    disabled={submitting}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {isAdmin && (
+                        <>
+                          <SelectItem value="CHANNEL_PARTNER">Channel Partner</SelectItem>
+                          <SelectItem value="TRAINER">Trainer</SelectItem>
+                          <SelectItem value="STUDENT">Student</SelectItem>
+                        </>
+                      )}
+                      {currentUser?.role === 'CHANNEL_PARTNER' && (
+                        <>
+                          <SelectItem value="TRAINER">Trainer</SelectItem>
+                          <SelectItem value="STUDENT">Student</SelectItem>
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {editMode ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="password">New Password (Optional)</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={formData.password}
+                      onChange={(e) => handleChange("password", e.target.value)}
+                      disabled={submitting}
+                      placeholder="Leave blank to keep current"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex h-full items-end pb-1 lg:pb-2">
+                    <p className="text-xs text-muted-foreground bg-muted/50 p-2 rounded-md border border-dashed text-center w-full">
+                      A temporary password will be shown after creation
+                    </p>
+                  </div>
+                )}
+
+                {/* Branch Selection - Span full if alone, but here we can pair it or keep it single */}
+                {formData.role && formData.role !== 'ADMIN' && (
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label htmlFor="branchId">Branch *</Label>
+                    <Select
+                      value={formData.branchId}
+                      onValueChange={(value) => handleChange("branchId", value)}
+                      disabled={submitting || currentUser?.role === 'CHANNEL_PARTNER'}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select branch" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {branches.map((branch) => (
+                          <SelectItem key={branch.id} value={branch.id}>
+                            {branch.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {currentUser?.role === 'CHANNEL_PARTNER' && (
+                      <p className="text-xs text-muted-foreground">
+                        You can only create users in your branch
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Trainer Profile Extras */}
+                {formData.role === 'TRAINER' && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="specialization">Specialization Course *</Label>
+                      <Select
+                        value={formData.specialization}
+                        onValueChange={(value) => handleChange("specialization", value)}
+                        disabled={submitting}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select course" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {courses.filter(c => c.isActive).map((course) => (
+                            <SelectItem key={course.id} value={course.name}>
+                              {course.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="experience">Years of Experience *</Label>
+                      <Input
+                        id="experience"
+                        type="number"
+                        value={formData.experience}
+                        onChange={(e) => handleChange("experience", e.target.value)}
+                        disabled={submitting}
+                        placeholder="e.g. 5"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* Student Extras */}
+                {formData.role === 'STUDENT' && (
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label htmlFor="courseId">Course *</Label>
+                    <Select
+                      value={formData.courseId}
+                      onValueChange={(value) => handleChange("courseId", value)}
+                      disabled={submitting}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select course" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {courses.filter(c => c.isActive).map((course) => (
+                          <SelectItem key={course.id} value={course.id}>
+                            {course.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
 
               {error && (
                 <Alert variant="destructive">
@@ -469,7 +684,7 @@ const Users = () => {
                 </Alert>
               )}
 
-              <DialogFooter>
+              <DialogFooter className="gap-2 sm:gap-0">
                 <Button
                   type="button"
                   variant="outline"
@@ -481,11 +696,11 @@ const Users = () => {
                 <Button type="submit" disabled={submitting}>
                   {submitting ? (
                     <>
-                      <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent" />
-                      Creating...
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {editMode ? 'Updating...' : 'Creating...'}
                     </>
                   ) : (
-                    "Create User"
+                    editMode ? 'Update User' : 'Create User'
                   )}
                 </Button>
               </DialogFooter>
@@ -498,3 +713,4 @@ const Users = () => {
 };
 
 export default Users;
+

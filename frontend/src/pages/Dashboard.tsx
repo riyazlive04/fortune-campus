@@ -1,25 +1,37 @@
 import { useState, useEffect } from "react";
-import { Users, UserPlus, GraduationCap, Briefcase } from "lucide-react";
+import { Users, UserPlus, GraduationCap, Briefcase, Award } from "lucide-react";
 import KPICard from "@/components/KPICard";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
+import DashboardSkeleton from "@/components/DashboardSkeleton";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
-import { dashboardApi } from "@/lib/api";
+import { dashboardApi, reportsApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 const COLORS = ["hsl(217, 71%, 53%)", "hsl(142, 71%, 45%)", "hsl(38, 92%, 50%)", "hsl(262, 60%, 55%)"];
 
 const Dashboard = () => {
   const [data, setData] = useState<any>(null);
+  const [performance, setPerformance] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
   const fetchStats = async () => {
     try {
       setLoading(true);
-      const res = await dashboardApi.getStats();
-      if (res.success) {
-        setData(res.data);
+      const [statsRes, perfRes] = await Promise.all([
+        dashboardApi.getStats(),
+        reportsApi.getTrainerPerformance({
+          month: new Date().getMonth() + 1,
+          year: new Date().getFullYear()
+        }).catch(() => ({ success: true, data: [] }))
+      ]);
+
+      if (statsRes.success) {
+        setData(statsRes.data);
+      }
+      if (perfRes.success) {
+        setPerformance(perfRes.data);
       }
     } catch (error: any) {
       toast({
@@ -37,14 +49,7 @@ const Dashboard = () => {
   }, []);
 
   if (loading) {
-    return (
-      <div className="flex min-h-[400px] items-center justify-center">
-        <div className="text-center">
-          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
-          <p className="text-sm text-muted-foreground">Loading analytics...</p>
-        </div>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   if (!data) return null;
@@ -166,37 +171,58 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Trainer Summary */}
-      <div className="rounded-xl border border-border bg-card">
-        <div className="border-b border-border p-4">
-          <h3 className="text-sm font-semibold text-foreground">Trainer Performance</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Trainer</th>
-                <th>Course</th>
-                <th>Students</th>
-                <th>Rating</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.trainerPerformance.map((t: any) => (
-                <tr key={t.name}>
-                  <td className="font-medium">{t.name}</td>
-                  <td>{t.course}</td>
-                  <td>{t.students}</td>
-                  <td>⭐ {t.rating.toFixed(1)}</td>
-                  <td>
-                    <StatusBadge status={t.status} variant={t.status === "Active" ? "success" : "warning"} />
-                  </td>
+      {/* Trainer Performance & Best Performer */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2 rounded-xl border border-border bg-card">
+          <div className="border-b border-border p-4 flex justify-between items-center">
+            <h3 className="text-sm font-semibold text-foreground">Top Performing Trainers</h3>
+            <span className="text-xs text-muted-foreground">Current Month</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Rank</th>
+                  <th>Trainer</th>
+                  <th>Quality</th>
+                  <th className="text-right">Score</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {performance.length === 0 ? (
+                  <tr><td colSpan={4} className="text-center p-4">No performance data yet</td></tr>
+                ) : performance.slice(0, 5).map((t: any, idx) => (
+                  <tr key={t.trainerId}>
+                    <td>{idx + 1}</td>
+                    <td className="font-medium">{t.name}</td>
+                    <td>⭐ {t.avgQuality}</td>
+                    <td className="text-right font-bold text-primary">{t.score}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
+
+        {performance.length > 0 && (
+          <div className="rounded-xl border border-border bg-gradient-to-br from-primary/10 to-transparent p-6 flex flex-col items-center justify-center text-center">
+            <div className="mb-4 bg-yellow-100 p-3 rounded-full">
+              <Award className="h-10 w-10 text-yellow-600" />
+            </div>
+            <h3 className="text-lg font-bold">Best Performer</h3>
+            <p className="text-2xl font-black text-primary my-2">{performance[0].name}</p>
+            <div className="mt-4 flex gap-4 text-xs font-semibold uppercase text-muted-foreground">
+              <div className="flex flex-col">
+                <span>Quality</span>
+                <span className="text-foreground text-lg">{performance[0].avgQuality}</span>
+              </div>
+              <div className="flex flex-col">
+                <span>Reports</span>
+                <span className="text-foreground text-lg">{performance[0].totalReports}</span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

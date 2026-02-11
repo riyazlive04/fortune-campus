@@ -4,6 +4,7 @@ import { Response } from 'express';
 import { prisma } from '../../config/database';
 import { successResponse, errorResponse, paginationHelper, getPaginationMeta } from '../../utils/response';
 import { AuthRequest } from '../../middlewares/auth.middleware';
+import { NotificationService } from '../notifications/notification.service';
 
 export const getCourses = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
@@ -135,8 +136,20 @@ export const createCourse = async (req: AuthRequest, res: Response): Promise<Res
       },
     });
 
+    // Notify everyone? Or just Admin/Branch Head?
+    await NotificationService.notifyRole(UserRole.CEO, {
+      title: 'New Course Added',
+      message: `${course.name} (${course.code}) is now available.`,
+      type: 'INFO',
+      link: '/courses'
+    });
+
     return successResponse(res, course, 'Course created successfully', 201);
-  } catch (error) {
+  } catch (error: any) {
+    console.error('Create Course Error:', error);
+    if (error.code === 'P2002') {
+      return errorResponse(res, 'Course code already exists', 400);
+    }
     return errorResponse(res, 'Failed to create course', 500, error);
   }
 };

@@ -24,8 +24,11 @@ import companyRouter from "./modules/placements/company.routes";
 import incentiveRouter from "./modules/incentives/incentive.routes";
 import reportRouter from "./modules/reports/report.routes";
 import dashboardRouter from "./modules/dashboard/dashboard.routes";
+import notificationRouter from "./modules/notifications/notification.routes";
 
 const app: Application = express();
+
+// ... existing code ...
 
 // --------------------
 // Security & Performance
@@ -98,6 +101,7 @@ app.use("/api/companies", companyRouter);
 app.use("/api/incentives", incentiveRouter);
 app.use("/api/reports", reportRouter);
 app.use("/api/dashboard", dashboardRouter);
+app.use("/api/notifications", notificationRouter);
 
 // --------------------
 // Error Handling

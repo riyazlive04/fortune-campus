@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -22,6 +22,7 @@ model User {
   phone         String?
   role          String
   isActive      Boolean  @default(true)
+  photo         String?
   branchId      String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -32,9 +33,10 @@ model User {
   // Role-specific relations
   leadsCreated  Lead[]   @relation("LeadCreator")
   leadsAssigned Lead[]   @relation("LeadAssignee")
-  studentsAsUser Student? @relation("StudentUser")
+  studentProfile Student? @relation("StudentUser")
   trainerProfile Trainer?
   incentives    Incentive[]
+  notifications Notification[] // Added relation
   
   @@index([email])
   @@index([branchId])
@@ -61,6 +63,10 @@ model Branch {
   students    Student[]
   trainers    Trainer[]
   courses     Course[]
+  awards      TrainerAward[]
+  expenses    Expense[]
+  socialMedia SocialMediaEngagement[]
+  eventPlans  EventPlan[]
   
   @@map("branches")
 }
@@ -118,8 +124,10 @@ model Admission {
   feePaid         Float         @default(0)
   feeBalance      Float         @default(0)
   
-  status          String @default("PENDING")
+  status          String @default("PENDING") // PENDING, DROPOUT, etc.
   admissionDate   DateTime        @default(now())
+  
+  softwareFinishedAt DateTime?    // To trigger conduct exam reminders
   
   branchId        String
   leadId          String?         @unique
@@ -165,6 +173,8 @@ model Student {
   attendances     Attendance[]
   portfolios      Portfolio[]
   placements      Placement[]
+  growthReports   StudentGrowthReport[]
+  feedbacks       StudentFeedback[]
   
   @@index([branchId])
   @@index([courseId])
@@ -194,6 +204,9 @@ model Trainer {
   courses         CourseTrainer[]
   attendances     Attendance[]
   incentives      Incentive[]
+  growthReports   StudentGrowthReport[]
+  fileReports     ClassAndPortfolioReport[]
+  awards          TrainerAward[]
   
   @@index([branchId])
   @@map("trainers")
@@ -223,6 +236,7 @@ model Course {
   admissions      Admission[]
   students        Student[]
   attendances     Attendance[]
+  growthReports   StudentGrowthReport[]
   
   @@index([branchId])
   @@map("courses")
@@ -394,4 +408,168 @@ model WhatsAppLog {
   @@index([admissionId])
   @@index([sentAt])
   @@map("whatsapp_logs")
+}
+
+model Notification {
+  id              String   @id @default(uuid())
+  recipientId     String   // User ID who receives the notification
+  title           String
+  message         String
+  type            String   // "INFO", "WARNING", "SUCCESS", "ERROR"
+  link            String?  // Optional link to navigate to
+  
+  isRead          Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  
+  // Relations
+  recipient       User     @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  
+  @@index([recipientId])
+  @@index([isRead])
+  @@map("notifications")
+}
+
+model StudentGrowthReport {
+  id                String   @id @default(uuid())
+  qualityTeaching   Int      // Score 1-10
+  doubtClearance    Int      // Score 1-10
+  testScore         Float?
+  aiUpdate          String?  // Details about AI/Other updates
+  portfolioFollowUp Boolean  @default(false)
+  classFollowUp     Boolean  @default(false)
+  reportDate        DateTime @default(now())
+  
+  studentId         String
+  trainerId         String
+  courseId          String
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  student           Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  trainer           Trainer  @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  course            Course   @relation(fields: [courseId], references: [id])
+
+  @@index([studentId])
+  @@index([trainerId])
+  @@index([reportDate])
+  @@map("student_growth_reports")
+}
+
+model ClassAndPortfolioReport {
+  id              String   @id @default(uuid())
+  title           String
+  description     String?
+  fileUrl         String?
+  reportType      String   // "CLASS", "PORTFOLIO"
+  status          String   @default("PENDING") // PENDING, CHECKED, REJECTED
+  
+  trainerId       String
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  trainer         Trainer  @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+
+  @@index([trainerId])
+  @@map("class_portfolio_reports")
+}
+
+model StudentFeedback {
+  id              String   @id @default(uuid())
+  rating          Int      // 1-5
+  testimonial     String?
+  googleReviewUrl String?
+  
+  studentId       String
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@map("student_feedbacks")
+}
+
+model TrainerAward {
+  id              String   @id @default(uuid())
+  awardName       String   // e.g., "Best Performer"
+  month           Int
+  year            Int
+  metrics         String?  // JSON string of performance metrics at time of award
+  
+  trainerId       String
+  branchId        String
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  trainer         Trainer  @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  branch          Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@unique([trainerId, month, year, awardName])
+  @@index([trainerId])
+  @@index([branchId])
+  @@map("trainer_awards")
+}
+
+model Expense {
+  id          String   @id @default(uuid())
+  amount      Float
+  category    String   // e.g., "MARKETING", "UTILITIES", "SALARY"
+  description String?
+  date        DateTime @default(now())
+  
+  branchId    String
+  branch      Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([branchId])
+  @@index([date])
+  @@map("expenses")
+}
+
+model SocialMediaEngagement {
+  id            String   @id @default(uuid())
+  platform      String   // e.g., "INSTAGRAM", "FACEBOOK", "LINKEDIN"
+  likes         Int      @default(0)
+  shares        Int      @default(0)
+  leadsGenerated Int     @default(0)
+  date          DateTime @default(now())
+  
+  branchId      String
+  branch        Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([branchId])
+  @@index([date])
+  @@map("social_media_engagements")
+}
+
+model EventPlan {
+  id          String   @id @default(uuid())
+  type        String   // "IV", "SEMINAR"
+  title       String
+  description String?
+  date        DateTime
+  status      String   @default("PLANNED") // PLANNED, COMPLETED, CANCELLED
+  
+  branchId    String
+  branch      Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([branchId])
+  @@index([date])
+  @@map("event_plans")
 }

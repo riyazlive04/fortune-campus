@@ -27,7 +27,7 @@ const Login = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.email || !formData.password) {
       setError("Please enter both email and password");
       return;
@@ -71,10 +71,10 @@ const Login = () => {
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input 
-                id="email" 
+              <Input
+                id="email"
                 name="email"
-                type="email" 
+                type="email"
                 placeholder="you@example.com"
                 value={formData.email}
                 onChange={handleChange}
@@ -84,10 +84,10 @@ const Login = () => {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input 
-                id="password" 
+              <Input
+                id="password"
                 name="password"
-                type="password" 
+                type="password"
                 placeholder="••••••••"
                 value={formData.password}
                 onChange={handleChange}
@@ -114,6 +114,12 @@ const Login = () => {
               )}
             </Button>
           </form>
+        </div>
+
+        <div className="mt-4 text-center">
+          <Button variant="link" className="text-muted-foreground" onClick={() => navigate("/enquiry")}>
+            Looking for courses? Enquire Now
+          </Button>
         </div>
 
         <div className="mt-6">

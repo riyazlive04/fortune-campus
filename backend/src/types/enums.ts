@@ -1,7 +1,7 @@
 
 export enum UserRole {
     ADMIN = "ADMIN",
-    BRANCH_HEAD = "BRANCH_HEAD",
+    CHANNEL_PARTNER = "CHANNEL_PARTNER",
     TRAINER = "TRAINER",
     STUDENT = "STUDENT",
     CEO = "CEO"

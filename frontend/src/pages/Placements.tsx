@@ -1,78 +1,125 @@
+
+import { useState, useEffect } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PageHeader from "@/components/PageHeader";
 import DataTable from "@/components/DataTable";
 import StatusBadge from "@/components/StatusBadge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { placementApi, companyApi } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
-const placements = [
-  { id: "P001", student: "Karthik R.", course: "Full Stack Dev", company: "TechCorp", role: "Frontend Dev", package: "₹6.5 LPA", status: "Placed" },
-  { id: "P002", student: "Simran P.", course: "Data Science", company: "DataMin", role: "Data Analyst", package: "₹5.8 LPA", status: "Placed" },
-  { id: "P003", student: "Neha Gupta", course: "Data Science", company: "-", role: "-", package: "-", status: "Eligible" },
-  { id: "P004", student: "Arjun M.", course: "UI/UX Design", company: "-", role: "-", package: "-", status: "Not Eligible" },
-];
+const Placements = () => {
+  const [placements, setPlacements] = useState<any[]>([]);
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [alumni, setAlumni] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
-const companies = [
-  { name: "TechCorp", industry: "IT Services", openings: 5, placed: 3 },
-  { name: "DataMin", industry: "Analytics", openings: 3, placed: 2 },
-  { name: "DesignHub", industry: "Design Agency", openings: 2, placed: 0 },
-  { name: "CloudNet", industry: "Cloud Infra", openings: 4, placed: 1 },
-];
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [placementsRes, companiesRes] = await Promise.all([
+        placementApi.getPlacements({ limit: 100 }),
+        companyApi.getCompanies({ limit: 100 })
+      ]);
 
-const alumni = [
-  { name: "Ravi Shankar", course: "Full Stack Dev", batch: "2025-H1", company: "Infosys", role: "Software Engineer" },
-  { name: "Priyanka D.", course: "Data Science", batch: "2025-H1", company: "Wipro", role: "Data Analyst" },
-  { name: "Amit Tiwari", course: "DevOps", batch: "2024-H2", company: "TCS", role: "DevOps Engineer" },
-];
+      const fetchedPlacements = placementsRes.data?.placements || placementsRes.data || [];
+      const fetchedCompanies = companiesRes.data?.companies || companiesRes.data || [];
 
-const pCols = [
-  { key: "student", label: "Student", render: (r: any) => <span className="font-medium">{r.student}</span> },
-  { key: "course", label: "Course" },
-  { key: "company", label: "Company" },
-  { key: "role", label: "Role" },
-  { key: "package", label: "Package" },
-  { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} variant={r.status === "Placed" ? "success" : r.status === "Eligible" ? "info" : "neutral"} /> },
-];
+      setPlacements(fetchedPlacements);
+      setCompanies(fetchedCompanies);
 
-const Placements = () => (
-  <div className="animate-fade-in">
-    <PageHeader title="Placements & Alumni" description="Track placement progress and alumni network" />
-    <Tabs defaultValue="placements">
-      <TabsList><TabsTrigger value="placements">Placements</TabsTrigger><TabsTrigger value="companies">Companies</TabsTrigger><TabsTrigger value="alumni">Alumni</TabsTrigger></TabsList>
+      // Filter alumni (Status = PLACED)
+      const placedStudents = fetchedPlacements.filter((p: any) => p.status === 'PLACED');
+      setAlumni(placedStudents);
 
-      <TabsContent value="placements" className="mt-4">
-        <DataTable columns={pCols} data={placements} searchPlaceholder="Search placements..." />
-      </TabsContent>
+    } catch (error) {
+      console.error("Failed to fetch placement data", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to fetch placement data",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      <TabsContent value="companies" className="mt-4">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {companies.map((c) => (
-            <div key={c.name} className="rounded-xl border border-border bg-card p-5">
-              <h3 className="text-sm font-semibold text-foreground">{c.name}</h3>
-              <p className="text-xs text-muted-foreground">{c.industry}</p>
-              <div className="mt-3 flex justify-between text-sm">
-                <span className="text-muted-foreground">Openings: {c.openings}</span>
-                <span className="text-foreground font-medium">Placed: {c.placed}</span>
+  useEffect(() => {
+    fetchData();
+  }, [toast]);
+
+  const pCols = [
+    { key: "studentName", label: "Student", render: (r: any) => <span className="font-medium">{r.student?.user?.firstName} {r.student?.user?.lastName}</span> },
+    { key: "courseName", label: "Course", render: (r: any) => r.student?.course?.name },
+    { key: "companyName", label: "Company", render: (r: any) => r.company?.name || '-' },
+    { key: "position", label: "Role" }, // 'position' in DB, 'Role' in UI
+    { key: "package", label: "Package", render: (r: any) => r.package ? `₹${r.package} LPA` : '-' },
+    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} variant={r.status === "PLACED" ? "success" : r.status === "ELIGIBLE" ? "info" : "neutral"} /> },
+  ];
+
+  return (
+    <div className="animate-fade-in">
+      <PageHeader title="Placements & Alumni" description="Track placement progress and alumni network">
+        {/* Future: Add 'Add Placement' button here */}
+      </PageHeader>
+      <Tabs defaultValue="placements">
+        <TabsList><TabsTrigger value="placements">Placements</TabsTrigger><TabsTrigger value="companies">Companies</TabsTrigger><TabsTrigger value="alumni">Alumni</TabsTrigger></TabsList>
+
+        <TabsContent value="placements" className="mt-4">
+          <DataTable
+            columns={pCols}
+            data={placements}
+            searchPlaceholder="Search placements..."
+            isLoading={loading}
+          />
+        </TabsContent>
+
+        <TabsContent value="companies" className="mt-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {loading ? <div>Loading companies...</div> : companies.length === 0 ? <div className="text-muted-foreground p-4">No companies found</div> : companies.map((c: any) => (
+              <div key={c.id} className="rounded-xl border border-border bg-card p-5">
+                <h3 className="text-sm font-semibold text-foreground">{c.name}</h3>
+                <p className="text-xs text-muted-foreground">{c.industry || 'Industry N/A'}</p>
+                <div className="mt-3 flex justify-between text-sm">
+                  {/* Note: 'Openings' is not in DB schema yet, just showing Placed count from relation if available */}
+                  <span className="text-muted-foreground">Placed: {c._count?.placements || 0}</span>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </TabsContent>
+            ))}
+          </div>
+        </TabsContent>
 
-      <TabsContent value="alumni" className="mt-4">
-        <div className="rounded-xl border border-border bg-card">
-          <table className="data-table">
-            <thead><tr><th>Name</th><th>Course</th><th>Batch</th><th>Company</th><th>Role</th></tr></thead>
-            <tbody>
-              {alumni.map((a, i) => (
-                <tr key={i}><td className="font-medium">{a.name}</td><td>{a.course}</td><td>{a.batch}</td><td>{a.company}</td><td>{a.role}</td></tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </TabsContent>
-    </Tabs>
-  </div>
-);
+        <TabsContent value="alumni" className="mt-4">
+          <div className="rounded-xl border border-border bg-card">
+            {loading ? <div className="p-4">Loading alumni...</div> : alumni.length === 0 ? <div className="p-4 text-muted-foreground">No alumni records found</div> : (
+              <table className="w-full text-sm text-left">
+                <thead className="text-xs text-muted-foreground uppercase bg-muted/50">
+                  <tr>
+                    <th className="px-6 py-3">Name</th>
+                    <th className="px-6 py-3">Course</th>
+                    <th className="px-6 py-3">Company</th>
+                    <th className="px-6 py-3">Role</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {alumni.map((a: any, i: number) => (
+                    <tr key={i} className="border-b border-border hover:bg-muted/50">
+                      <td className="px-6 py-4 font-medium">{a.student?.user?.firstName} {a.student?.user?.lastName}</td>
+                      <td className="px-6 py-4">{a.student?.course?.name}</td>
+                      <td className="px-6 py-4">{a.company?.name || '-'}</td>
+                      <td className="px-6 py-4">{a.position}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+};
 
 export default Placements;

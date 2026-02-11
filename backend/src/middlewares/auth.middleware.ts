@@ -1,10 +1,10 @@
-import { UserRole } from '../types/enums';;
+import { UserRole } from '../types/enums';
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { prisma } from '../config/database';
 import { errorResponse } from '../utils/response';
-;
+
 
 export interface AuthRequest extends Request {
   user?: {
@@ -49,7 +49,7 @@ export const authenticateToken = async (
     req.user = {
       id: user.id,
       email: user.email,
-      role: user.role,
+      role: user.role as UserRole,
       branchId: user.branchId,
     };
 

@@ -1,10 +1,10 @@
-import { UserRole } from '../../types/enums';;
+import { UserRole } from '../../types/enums';
 import { Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../../config/database';
 import { successResponse, errorResponse } from '../../utils/response';
 import { AuthRequest } from '../../middlewares/auth.middleware';
-;
+
 
 /**
  * Get user profile
@@ -22,6 +22,7 @@ export const getProfile = async (req: AuthRequest, res: Response): Promise<Respo
         role: true,
         branchId: true,
         isActive: true,
+        photo: true,
         createdAt: true,
         updatedAt: true,
         branch: {
@@ -40,6 +41,7 @@ export const getProfile = async (req: AuthRequest, res: Response): Promise<Respo
 
     return successResponse(res, user);
   } catch (error) {
+    console.error('Failed to fetch profile error:', error);
     return errorResponse(res, 'Failed to fetch profile', 500, error);
   }
 };
@@ -49,7 +51,7 @@ export const getProfile = async (req: AuthRequest, res: Response): Promise<Respo
  */
 export const updateProfile = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
-    const { firstName, lastName, phone, email } = req.body;
+    const { firstName, lastName, phone, email, photo } = req.body;
     const userId = req.user!.id;
 
     // Check if email is being changed and if it's already taken
@@ -73,6 +75,7 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<Re
         ...(lastName && { lastName: lastName.trim() }),
         ...(phone && { phone: phone.trim() }),
         ...(email && { email: email.toLowerCase().trim() }),
+        ...(photo !== undefined && { photo }),
       },
       select: {
         id: true,
@@ -82,6 +85,8 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<Re
         phone: true,
         role: true,
         branchId: true,
+        isActive: true,
+        photo: true,
         updatedAt: true,
         branch: {
           select: {
@@ -96,6 +101,38 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<Re
     return successResponse(res, user, 'Profile updated successfully');
   } catch (error) {
     return errorResponse(res, 'Failed to update profile', 500, error);
+  }
+};
+
+/**
+ * Delete user profile (Self-deletion)
+ */
+export const deleteProfile = async (req: AuthRequest, res: Response): Promise<Response> => {
+  try {
+    const userId = req.user!.id;
+
+    // Check if user exists
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      return errorResponse(res, 'User not found', 404);
+    }
+
+    // Prevent deletion of CEO account (safety measure)
+    if (user.role === UserRole.CEO) {
+      return errorResponse(res, 'CEO account cannot be deleted', 403);
+    }
+
+    // Delete user
+    await prisma.user.delete({
+      where: { id: userId },
+    });
+
+    return successResponse(res, null, 'Account deleted successfully');
+  } catch (error) {
+    return errorResponse(res, 'Failed to delete account', 500, error);
   }
 };
 
@@ -192,6 +229,7 @@ export const adminUpdateUserProfile = async (req: AuthRequest, res: Response): P
         role: true,
         branchId: true,
         isActive: true,
+        photo: true,
         updatedAt: true,
       },
     });

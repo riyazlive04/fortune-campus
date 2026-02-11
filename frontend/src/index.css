@@ -178,4 +178,12 @@
   .empty-state {
     @apply flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/20 p-12 text-center;
   }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }

@@ -1,0 +1,53 @@
+(node:1616) Warning: Setting the NODE_TLS_REJECT_UNAUTHORIZED environment variable to '0' makes TLS connections and HTTPS requests insecure by disabling certificate verification.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Connected!
+
+--- User Defined Types ---
+┌─────────┬────────────┬──────────────────────────────┐
+│ (index) │ schema     │ type                         │
+├─────────┼────────────┼──────────────────────────────┤
+│ 0       │ 'auth'     │ 'factor_type'                │
+│ 1       │ 'auth'     │ 'factor_status'              │
+│ 2       │ 'auth'     │ 'aal_level'                  │
+│ 3       │ 'auth'     │ 'code_challenge_method'      │
+│ 4       │ 'auth'     │ 'one_time_token_type'        │
+│ 5       │ 'auth'     │ 'oauth_registration_type'    │
+│ 6       │ 'auth'     │ 'oauth_authorization_status' │
+│ 7       │ 'auth'     │ 'oauth_response_type'        │
+│ 8       │ 'auth'     │ 'oauth_client_type'          │
+│ 9       │ 'realtime' │ 'equality_op'                │
+│ 10      │ 'realtime' │ 'user_defined_filter'        │
+│ 11      │ 'realtime' │ 'action'                     │
+│ 12      │ 'realtime' │ 'wal_rls'                    │
+│ 13      │ 'realtime' │ 'wal_column'                 │
+│ 14      │ 'storage'  │ 'buckettype'                 │
+│ 15      │ 'public'   │ 'LeadStatus'                 │
+│ 16      │ 'public'   │ 'LeadSource'                 │
+│ 17      │ 'public'   │ 'AdmissionStatus'            │
+│ 18      │ 'public'   │ 'AttendanceStatus'           │
+│ 19      │ 'public'   │ 'PlacementStatus'            │
+│ 20      │ 'public'   │ 'IncentiveType'              │
+│ 21      │ 'public'   │ 'UserRole'                   │
+└─────────┴────────────┴──────────────────────────────┘
+
+--- Tables ---
+┌─────────┬──────────────┬──────────────────────┐
+│ (index) │ table_schema │ table_name           │
+├─────────┼──────────────┼──────────────────────┤
+│ 0       │ 'public'     │ '_prisma_migrations' │
+│ 1       │ 'public'     │ 'branches'           │
+│ 2       │ 'public'     │ 'leads'              │
+│ 3       │ 'public'     │ 'admissions'         │
+│ 4       │ 'public'     │ 'courses'            │
+│ 5       │ 'public'     │ 'students'           │
+│ 6       │ 'public'     │ 'trainers'           │
+│ 7       │ 'public'     │ 'course_trainers'    │
+│ 8       │ 'public'     │ 'attendances'        │
+│ 9       │ 'public'     │ 'portfolios'         │
+│ 10      │ 'public'     │ 'placements'         │
+│ 11      │ 'public'     │ 'companies'          │
+│ 12      │ 'public'     │ 'incentives'         │
+│ 13      │ 'public'     │ 'whatsapp_logs'      │
+│ 14      │ 'public'     │ 'users'              │
+│ 15      │ 'public'     │ 'notifications'      │
+└─────────┴──────────────┴──────────────────────┘

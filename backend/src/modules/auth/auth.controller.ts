@@ -65,6 +65,7 @@ export const register = async (req: Request, res: Response): Promise<Response> =
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
+        branchId: user.branchId,
         branch: user.branch,
       },
     }, 'User registered successfully', 201);
@@ -136,6 +137,7 @@ export const login = async (req: Request, res: Response): Promise<Response> => {
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
+        branchId: user.branchId,
         branch: user.branch,
       },
     }, 'Login successful');
@@ -177,6 +179,7 @@ export const getCurrentUser = async (req: AuthRequest, res: Response): Promise<R
       firstName: user.firstName,
       lastName: user.lastName,
       role: user.role,
+      branchId: user.branchId,
       branch: user.branch,
       isActive: user.isActive,
     }, 'User retrieved successfully');

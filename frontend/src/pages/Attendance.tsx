@@ -1,6 +1,10 @@
+
+import { useState, useEffect } from "react";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { attendanceApi, branchesApi } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 const classes = [
   { time: "09:00 AM", course: "Full Stack Dev", trainer: "Priya Sharma", batch: "Batch A", topic: "React Hooks", status: "Completed" },
@@ -10,64 +14,102 @@ const classes = [
   { time: "03:30 PM", course: "Full Stack Dev", trainer: "Anjali Rao", batch: "Batch B", topic: "Node.js APIs", status: "Upcoming" },
 ];
 
-const attendance = [
-  { student: "Karthik R.", course: "Full Stack Dev", present: 44, absent: 4, percentage: "92%" },
-  { student: "Neha Gupta", course: "Data Science", present: 42, absent: 6, percentage: "88%" },
-  { student: "Arjun M.", course: "UI/UX Design", present: 38, absent: 2, percentage: "95%" },
-  { student: "Divya K.", course: "DevOps", present: 35, absent: 10, percentage: "78%" },
-];
-
 const statusVariant = (s: string) => s === "Completed" ? "success" : s === "In Progress" ? "warning" : "neutral";
 
-const Attendance = () => (
-  <div className="animate-fade-in">
-    <PageHeader title="Attendance & Classes" description="Track daily attendance and class schedule" />
+const Attendance = () => {
+  const [attendanceData, setAttendanceData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [branches, setBranches] = useState<any[]>([]);
+  const { toast } = useToast();
 
-    <div className="mb-4 flex gap-3">
-      <Select><SelectTrigger className="w-40"><SelectValue placeholder="Select Date" /></SelectTrigger><SelectContent><SelectItem value="today">Today</SelectItem><SelectItem value="yesterday">Yesterday</SelectItem></SelectContent></Select>
-      <Select><SelectTrigger className="w-40"><SelectValue placeholder="Branch" /></SelectTrigger><SelectContent>
-        <SelectItem value="salem">Salem</SelectItem>
-        <SelectItem value="coimbatore">Coimbatore</SelectItem>
-        <SelectItem value="trichy">Trichy</SelectItem>
-        <SelectItem value="erode">Erode</SelectItem>
-      </SelectContent></Select>
-    </div>
+  useEffect(() => {
+    const fetchBranches = async () => {
+      try {
+        const response = await branchesApi.getBranches();
+        setBranches(response.data?.branches || response.data || []);
+      } catch (error) {
+        console.error("Failed to fetch branches");
+      }
+    };
+    fetchBranches();
+  }, []);
 
-    <div className="mb-8">
-      <h3 className="mb-3 text-sm font-semibold text-foreground">Today's Schedule</h3>
-      <div className="rounded-xl border border-border bg-card">
-        <div className="overflow-x-auto">
-          <table className="data-table">
-            <thead><tr><th>Time</th><th>Course</th><th>Trainer</th><th>Batch</th><th>Topic</th><th>Status</th></tr></thead>
-            <tbody>
-              {classes.map((c, i) => (
-                <tr key={i}><td>{c.time}</td><td>{c.course}</td><td>{c.trainer}</td><td>{c.batch}</td><td>{c.topic}</td><td><StatusBadge status={c.status} variant={statusVariant(c.status)} /></td></tr>
-              ))}
-            </tbody>
-          </table>
+  useEffect(() => {
+    const fetchAttendance = async () => {
+      try {
+        setLoading(true);
+        const response = await attendanceApi.getStats();
+        setAttendanceData(response.data || response || []);
+      } catch (error) {
+        console.error("Failed to fetch attendance stats", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to fetch attendance data",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAttendance();
+  }, []);
+
+  return (
+    <div className="animate-fade-in">
+      <PageHeader title="Attendance & Classes" description="Track daily attendance and class schedule" />
+
+      <div className="mb-4 flex gap-3">
+        <Select><SelectTrigger className="w-40"><SelectValue placeholder="Select Date" /></SelectTrigger><SelectContent><SelectItem value="today">Today</SelectItem><SelectItem value="yesterday">Yesterday</SelectItem></SelectContent></Select>
+        <Select><SelectTrigger className="w-40"><SelectValue placeholder="Branch" /></SelectTrigger><SelectContent>
+          {branches.map((b) => (
+            <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+          ))}
+        </SelectContent></Select>
+      </div>
+
+      <div className="mb-8">
+        <h3 className="mb-3 text-sm font-semibold text-foreground">Today's Schedule</h3>
+        <div className="rounded-xl border border-border bg-card">
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead><tr><th>Time</th><th>Course</th><th>Trainer</th><th>Batch</th><th>Topic</th><th>Status</th></tr></thead>
+              <tbody>
+                {classes.map((c, i) => (
+                  <tr key={i}><td>{c.time}</td><td>{c.course}</td><td>{c.trainer}</td><td>{c.batch}</td><td>{c.topic}</td><td><StatusBadge status={c.status} variant={statusVariant(c.status)} /></td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h3 className="mb-3 text-sm font-semibold text-foreground">Attendance Summary</h3>
+        <div className="rounded-xl border border-border bg-card">
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead><tr><th>Student</th><th>Course</th><th>Present</th><th>Absent</th><th>Percentage</th></tr></thead>
+              <tbody>
+                {loading ? (
+                  <tr><td colSpan={5} className="text-center py-4">Loading attendance data...</td></tr>
+                ) : attendanceData.length === 0 ? (
+                  <tr><td colSpan={5} className="text-center py-4">No attendance records found</td></tr>
+                ) : (
+                  attendanceData.map((a, i) => (
+                    <tr key={i}>
+                      <td className="font-medium">{a.student}</td><td>{a.course}</td><td>{a.present}</td><td>{a.absent}</td>
+                      <td><StatusBadge status={a.percentage} variant={parseInt(a.percentage) >= 85 ? "success" : parseInt(a.percentage) >= 75 ? "warning" : "danger"} /></td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>
-
-    <div>
-      <h3 className="mb-3 text-sm font-semibold text-foreground">Attendance Summary</h3>
-      <div className="rounded-xl border border-border bg-card">
-        <div className="overflow-x-auto">
-          <table className="data-table">
-            <thead><tr><th>Student</th><th>Course</th><th>Present</th><th>Absent</th><th>Percentage</th></tr></thead>
-            <tbody>
-              {attendance.map((a, i) => (
-                <tr key={i}>
-                  <td className="font-medium">{a.student}</td><td>{a.course}</td><td>{a.present}</td><td>{a.absent}</td>
-                  <td><StatusBadge status={a.percentage} variant={parseInt(a.percentage) >= 85 ? "success" : parseInt(a.percentage) >= 75 ? "warning" : "danger"} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
-);
+  );
+};
 
 export default Attendance;

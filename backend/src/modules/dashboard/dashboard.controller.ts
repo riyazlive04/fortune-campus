@@ -3,7 +3,7 @@ import { Response } from 'express';
 import { prisma } from '../../config/database';
 import { successResponse, errorResponse } from '../../utils/response';
 import { AuthRequest } from '../../middlewares/auth.middleware';
-import { UserRole, AdmissionStatus, PlacementStatus } from '../../types/enums';
+import { UserRole, PlacementStatus } from '../../types/enums';
 
 export const getDashboardStats = async (req: AuthRequest, res: Response): Promise<Response> => {
     try {
@@ -31,14 +31,25 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
             prisma.lead.count({ where }),
             prisma.lead.count({ where: { ...where, createdAt: { gte: startOfLastMonth, lte: endOfLastMonth } } }),
 
-            prisma.admission.count({ where: { ...where, status: AdmissionStatus.APPROVED } }),
-            prisma.admission.count({ where: { ...where, status: AdmissionStatus.APPROVED, createdAt: { gte: startOfLastMonth, lte: endOfLastMonth } } }),
+            prisma.admission.count({ where }),
+            prisma.admission.count({ where: { ...where, createdAt: { gte: startOfLastMonth, lte: endOfLastMonth } } }),
 
             prisma.student.count({ where: { ...where, isActive: true } }),
             prisma.student.count({ where: { ...where, isActive: true, createdAt: { lte: endOfLastMonth } } }),
 
-            prisma.placement.count({ where: { student: { branchId: branchId || undefined }, status: PlacementStatus.PLACED } }),
-            prisma.placement.count({ where: { student: { branchId: branchId || undefined }, status: PlacementStatus.PLACED, createdAt: { gte: startOfLastMonth, lte: endOfLastMonth } } }),
+            prisma.placement.count({
+                where: {
+                    ...(branchId ? { student: { branchId } } : {}),
+                    status: { notIn: [PlacementStatus.REJECTED, PlacementStatus.NOT_ELIGIBLE] }
+                }
+            }),
+            prisma.placement.count({
+                where: {
+                    ...(branchId ? { student: { branchId } } : {}),
+                    status: { notIn: [PlacementStatus.REJECTED, PlacementStatus.NOT_ELIGIBLE] },
+                    createdAt: { gte: startOfLastMonth, lte: endOfLastMonth }
+                }
+            }),
         ]);
 
         // Helper functions for percentages
@@ -54,28 +65,30 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
             placements: { value: totalPlacements, change: calculateChange(totalPlacements, lastMonthPlacements) },
         };
 
-        // Placement Trend (Last 6 months)
-        const placementTrend = [];
+        // Placement Trend (Last 6 months) - Optimized with parallel queries
+        const placementTrendPromises = [];
         for (let i = 5; i >= 0; i--) {
             const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
             const start = new Date(d.getFullYear(), d.getMonth(), 1);
             const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
             const month = d.toLocaleString('default', { month: 'short' });
 
-            const count = await prisma.placement.count({
-                where: {
-                    student: { branchId: branchId || undefined },
-                    status: PlacementStatus.PLACED,
-                    createdAt: { gte: start, lte: end }
-                }
-            });
-            placementTrend.push({ month, placed: count });
+            placementTrendPromises.push(
+                prisma.placement.count({
+                    where: {
+                        ...(branchId ? { student: { branchId } } : {}),
+                        status: { notIn: [PlacementStatus.REJECTED, PlacementStatus.NOT_ELIGIBLE] },
+                        createdAt: { gte: start, lte: end }
+                    }
+                }).then(count => ({ month, placed: count }))
+            );
         }
+        const placementTrend = await Promise.all(placementTrendPromises);
 
         // Course-wise Distribution (Admissions)
         const courseDistribution = await prisma.admission.groupBy({
             by: ['courseId'],
-            where: { ...where, status: AdmissionStatus.APPROVED },
+            where,
             _count: true,
         });
 
@@ -103,7 +116,10 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
 
             branchPerformance = await Promise.all(branches.map(async (b) => {
                 const placementsCount = await prisma.placement.count({
-                    where: { student: { branchId: b.id }, status: PlacementStatus.PLACED }
+                    where: {
+                        student: { branchId: b.id },
+                        status: { notIn: [PlacementStatus.REJECTED, PlacementStatus.NOT_ELIGIBLE] }
+                    }
                 });
                 return {
                     branch: b.name,

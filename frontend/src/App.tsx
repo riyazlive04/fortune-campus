@@ -7,6 +7,7 @@ import Layout from "./components/Layout";
 import SetupGuard from "./components/SetupGuard";
 import Setup from "./pages/Setup";
 import Login from "./pages/Login";
+import PublicEnquiry from "./pages/PublicEnquiry";
 import Dashboard from "./pages/Dashboard";
 import Users from "./pages/Users";
 import Profile from "./pages/Profile";
@@ -20,6 +21,8 @@ import Portfolio from "./pages/Portfolio";
 import Placements from "./pages/Placements";
 import Incentives from "./pages/Incentives";
 import Reports from "./pages/Reports";
+import StudentGrowth from "./pages/StudentGrowth";
+import BranchInsights from "./pages/BranchInsights";
 import Notifications from "./pages/Notifications";
 import NotFound from "./pages/NotFound";
 
@@ -35,6 +38,7 @@ const App = () => (
           <Routes>
             <Route path="/setup" element={<Setup />} />
             <Route path="/login" element={<Login />} />
+            <Route path="/enquiry" element={<PublicEnquiry />} />
             <Route element={<Layout />}>
               <Route path="/" element={<Dashboard />} />
               <Route path="/users" element={<Users />} />
@@ -49,6 +53,8 @@ const App = () => (
               <Route path="/placements" element={<Placements />} />
               <Route path="/incentives" element={<Incentives />} />
               <Route path="/reports" element={<Reports />} />
+              <Route path="/growth" element={<StudentGrowth />} />
+              <Route path="/branch-insights" element={<BranchInsights />} />
               <Route path="/notifications" element={<Notifications />} />
             </Route>
             <Route path="*" element={<NotFound />} />

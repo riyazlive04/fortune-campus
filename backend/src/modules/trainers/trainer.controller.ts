@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '../../config/database';
 import { successResponse, errorResponse, paginationHelper, getPaginationMeta } from '../../utils/response';
 import { AuthRequest } from '../../middlewares/auth.middleware';
+import { NotificationService } from '../notifications/notification.service';
 
 export const getTrainers = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
@@ -182,8 +183,20 @@ export const createTrainer = async (req: AuthRequest, res: Response): Promise<Re
       return trainer;
     });
 
+    // Notify Admin
+    await NotificationService.notifyRole(UserRole.CEO, {
+      title: 'New Trainer Onboarded',
+      message: `${firstName} ${lastName} has joined as a trainer.`,
+      type: 'SUCCESS',
+      link: '/trainers'
+    });
+
     return successResponse(res, result, 'Trainer created successfully', 201);
-  } catch (error) {
+  } catch (error: any) {
+    if (error.code === 'P2002') {
+      const target = error.meta?.target?.[0] || 'field';
+      return errorResponse(res, `${target} already exists`, 409);
+    }
     return errorResponse(res, 'Failed to create trainer', 500, error);
   }
 };

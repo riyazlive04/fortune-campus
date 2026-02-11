@@ -32,7 +32,7 @@ const Courses = () => {
   const [isReadOnly, setIsReadOnly] = useState(false);
   const { toast } = useToast();
   const user = storage.getUser();
-  const canManage = user?.role === 'ADMIN' || user?.role === 'BRANCH_HEAD' || user?.role === 'CEO';
+  const canManage = user?.role === 'ADMIN' || user?.role === 'CHANNEL_PARTNER' || user?.role === 'CEO';
 
   const fetchCourses = async () => {
     try {
@@ -234,3 +234,4 @@ const Courses = () => {
 };
 
 export default Courses;
+

@@ -6,6 +6,7 @@ import {
   bulkMarkAttendance,
   updateAttendance,
   deleteAttendance,
+  getAttendanceStats,
 } from './attendance.controller';
 import { authenticateToken } from '../../middlewares/auth.middleware';
 import { enforceBranchAccess } from '../../middlewares/branch.middleware';
@@ -16,6 +17,7 @@ const router = Router();
 router.use(authenticateToken);
 router.use(enforceBranchAccess);
 
+router.get('/stats', getAttendanceStats); // Specific route before parameterized route
 router.get('/', getAttendance);
 router.get('/:id', getAttendanceById);
 router.post('/', requireTrainer, markAttendance);
