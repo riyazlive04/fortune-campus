@@ -1,8 +1,14 @@
 // API Base URL
-const rawUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-// Ensure it ends with /api (but only if it's the base URL)
-export const API_BASE_URL = rawUrl.endsWith('/api') ? rawUrl : `${rawUrl.replace(/\/$/, '')}/api`;
+const getBaseUrl = () => {
+  let url = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  // Always ensure it ends with /api
+  if (!url.endsWith('/api') && !url.endsWith('/api/')) {
+    url = `${url.replace(/\/$/, '')}/api`;
+  }
+  return url;
+};
 
+export const API_BASE_URL = getBaseUrl();
 console.log('🌐 API connection initialized at:', API_BASE_URL);
 
 // Setup API Service
