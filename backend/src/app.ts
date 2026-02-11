@@ -70,6 +70,8 @@ app.get("/", (_req, res) => {
 // ⚡ Fallback for non-prefixed routes (Fix for stale frontend cache)
 app.use("/auth", authRouter);
 app.use("/setup", setupRouter);
+app.use("/users", userRouter);
+app.use("/dashboard", dashboardRouter);
 app.use("/health", (_req, res) => res.redirect("/api/health"));
 
 // --------------------
