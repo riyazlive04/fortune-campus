@@ -67,6 +67,11 @@ app.get("/", (_req, res) => {
   });
 });
 
+// ⚡ Fallback for non-prefixed routes (Fix for stale frontend cache)
+app.use("/auth", authRouter);
+app.use("/setup", setupRouter);
+app.use("/health", (req, res) => res.redirect("/api/health"));
+
 // --------------------
 // Health Check
 // --------------------
