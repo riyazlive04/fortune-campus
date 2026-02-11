@@ -22,11 +22,29 @@ export const config = {
   },
 
   cors: {
-    origin: [
-      process.env.FRONTEND_URL || 'http://localhost:5173',
-      /\.vercel\.app$/, // Allow all Vercel subdomains
-      'https://fortune-campus-8bmu.vercel.app' // Direct allow for the current deployment
-    ],
+    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+      if (!origin) return callback(null, true);
+
+      const allowedOrigins = [
+        'https://fortune-campus-8bmu.vercel.app',
+        'http://localhost:5173',
+        'http://localhost:5000'
+      ];
+
+      // Clean up FRONTEND_URL if it has a path
+      if (process.env.FRONTEND_URL) {
+        try {
+          const url = new URL(process.env.FRONTEND_URL);
+          allowedOrigins.push(`${url.protocol}//${url.host}`);
+        } catch (e) {
+          allowedOrigins.push(process.env.FRONTEND_URL.replace(/\/+$/, ''));
+        }
+      }
+
+      const isAllowed = allowedOrigins.includes(origin) || /\.vercel\.app$/.test(origin);
+      callback(null, isAllowed);
+    },
+    credentials: true,
   },
 
   rateLimit: {
