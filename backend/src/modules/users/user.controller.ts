@@ -310,7 +310,6 @@ export const getUserById = async (req: AuthRequest, res: Response): Promise<Resp
         role: true,
         branchId: true,
         isActive: true,
-        photo: true,
         createdAt: true,
         updatedAt: true,
         branch: {
@@ -401,7 +400,6 @@ export const updateUser = async (req: AuthRequest, res: Response): Promise<Respo
         role: true,
         branchId: true,
         isActive: true,
-        photo: true,
         createdAt: true,
         branch: {
           select: {

@@ -22,7 +22,6 @@ export const getProfile = async (req: AuthRequest, res: Response): Promise<Respo
         role: true,
         branchId: true,
         isActive: true,
-        photo: true,
         createdAt: true,
         updatedAt: true,
         branch: {
