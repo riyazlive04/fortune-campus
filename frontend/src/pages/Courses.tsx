@@ -4,10 +4,8 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
-import { storage } from "@/lib/api";
+import { storage, API_BASE_URL } from "@/lib/api";
 import CourseModal from "@/components/CourseModal";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 interface Course {
   id: string;
