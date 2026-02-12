@@ -235,14 +235,14 @@ model Course {
   syllabus        String?  // JSON or text
   prerequisites   String?
   
-  branchId        String
+  branchId        String?
   
   isActive        Boolean  @default(true)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   // Relations
-  branch          Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  branch          Branch?  @relation(fields: [branchId], references: [id], onDelete: Cascade)
   
   trainers        CourseTrainer[]
   batches         Batch[]

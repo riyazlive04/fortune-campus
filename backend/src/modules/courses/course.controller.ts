@@ -15,7 +15,10 @@ export const getCourses = async (req: AuthRequest, res: Response): Promise<Respo
     const where: any = {};
 
     if (req.user?.role !== UserRole.ADMIN && req.user?.role !== UserRole.CEO) {
-      where.branchId = req.user?.branchId;
+      where.OR = [
+        { branchId: req.user?.branchId },
+        { branchId: null }
+      ];
     } else if (branchId) {
       where.branchId = branchId as string;
     }
@@ -118,17 +121,28 @@ export const createCourse = async (req: AuthRequest, res: Response): Promise<Res
   try {
     const { name, code, description, duration, fees, syllabus, prerequisites, branchId } = req.body;
 
+    console.log('--- Course Creation Attempt ---');
+    console.log('User Role:', req.user?.role);
+    console.log('User ID:', req.user?.id);
+    console.log('User BranchID:', req.user?.branchId);
+    console.log('Incoming branchId:', branchId);
+
+    const targetBranchId = branchId || (req.user?.role === UserRole.CEO ? null : req.user?.branchId!);
+    console.log('Final targetBranchId:', targetBranchId);
+
+    const courseData: any = {
+      name,
+      code,
+      description,
+      duration: Number(duration),
+      fees: Number(fees),
+      syllabus,
+      prerequisites,
+      branchId: targetBranchId,
+    };
+
     const course = await prisma.course.create({
-      data: {
-        name,
-        code,
-        description,
-        duration,
-        fees,
-        syllabus,
-        prerequisites,
-        branchId: branchId || req.user?.branchId!,
-      },
+      data: courseData,
       include: {
         branch: {
           select: { id: true, name: true },
@@ -136,13 +150,19 @@ export const createCourse = async (req: AuthRequest, res: Response): Promise<Res
       },
     });
 
-    // Notify everyone? Or just Admin/Branch Head?
-    await NotificationService.notifyRole(UserRole.CEO, {
-      title: 'New Course Added',
-      message: `${course.name} (${course.code}) is now available.`,
-      type: 'INFO',
-      link: '/courses'
-    });
+    console.log('Course created successfully in DB:', course.id);
+
+    try {
+      await NotificationService.notifyRole(UserRole.CEO, {
+        title: 'New Course Added',
+        message: `${course.name} (${course.code}) is now available.`,
+        type: 'INFO',
+        link: '/courses'
+      });
+      console.log('Notification sent for new course');
+    } catch (notifError: any) {
+      console.error('Notification failed (non-blocking):', notifError.message);
+    }
 
     return successResponse(res, course, 'Course created successfully', 201);
   } catch (error: any) {
