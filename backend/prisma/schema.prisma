@@ -63,6 +63,7 @@ model Branch {
   students    Student[]
   trainers    Trainer[]
   courses     Course[]
+  batches     Batch[]
   awards      TrainerAward[]
   expenses    Expense[]
   socialMedia SocialMediaEngagement[]
@@ -94,8 +95,8 @@ model Lead {
 
   // Relations
   branch          Branch     @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  createdBy       User       @relation("LeadCreator", fields: [createdById], references: [id])
-  assignedTo      User?      @relation("LeadAssignee", fields: [assignedToId], references: [id])
+  createdBy       User       @relation("LeadCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  assignedTo      User?      @relation("LeadAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   admission       Admission? @relation("LeadConversion")
   whatsappLogs    WhatsAppLog[]
   
@@ -159,8 +160,12 @@ model Student {
   
   branchId        String
   courseId        String
+  batchId         String?
   
   isActive        Boolean  @default(true)
+  placementEligible Boolean @default(false)
+  certificateLocked Boolean @default(true)
+  
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -169,15 +174,20 @@ model Student {
   admission       Admission @relation(fields: [admissionId], references: [id], onDelete: Cascade)
   branch          Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
   course          Course   @relation(fields: [courseId], references: [id])
+  batch           Batch?   @relation(fields: [batchId], references: [id], onDelete: SetNull)
   
   attendances     Attendance[]
-  portfolios      Portfolio[]
+  portfolios      Portfolio[] // Legacy portfolio
+  portfolioSubmissions PortfolioSubmission[]
+  softwareProgress SoftwareProgress[]
+  testScores       TestScore[]
   placements      Placement[]
   growthReports   StudentGrowthReport[]
   feedbacks       StudentFeedback[]
   
   @@index([branchId])
   @@index([courseId])
+  @@index([batchId])
   @@map("students")
 }
 
@@ -201,12 +211,14 @@ model Trainer {
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   branch          Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
   
-  courses         CourseTrainer[]
-  attendances     Attendance[]
-  incentives      Incentive[]
-  growthReports   StudentGrowthReport[]
-  fileReports     ClassAndPortfolioReport[]
-  awards          TrainerAward[]
+  courses           CourseTrainer[]
+  batches           Batch[]
+  attendances       Attendance[]
+  portfolioSubmissions PortfolioSubmission[]
+  incentives        Incentive[]
+  growthReports     StudentGrowthReport[]
+  fileReports       ClassAndPortfolioReport[]
+  awards            TrainerAward[]
   
   @@index([branchId])
   @@map("trainers")
@@ -233,6 +245,8 @@ model Course {
   branch          Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
   
   trainers        CourseTrainer[]
+  batches         Batch[]
+  portfolioTasks  PortfolioTask[]
   admissions      Admission[]
   students        Student[]
   attendances     Attendance[]
@@ -263,11 +277,18 @@ model CourseTrainer {
 model Attendance {
   id              String           @id @default(uuid())
   date            DateTime
-  status          String
+  status          String           // PRESENT, ABSENT, LATE
   remarks         String?
+  
+  inTime          DateTime?
+  outTime         DateTime?
+  latitude        Float?
+  longitude       Float?
+  isVerified      Boolean          @default(false)
   
   studentId       String
   courseId        String
+  batchId         String?
   trainerId       String?
   
   createdAt       DateTime         @default(now())
@@ -276,13 +297,131 @@ model Attendance {
   // Relations
   student         Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
   course          Course           @relation(fields: [courseId], references: [id])
+  batch           Batch?           @relation(fields: [batchId], references: [id], onDelete: SetNull)
   trainer         Trainer?         @relation(fields: [trainerId], references: [id], onDelete: SetNull)
   
   @@unique([studentId, courseId, date])
   @@index([studentId])
   @@index([courseId])
+  @@index([batchId])
   @@index([date])
   @@map("attendances")
+}
+
+model Batch {
+  id              String   @id @default(uuid())
+  name            String
+  code            String   @unique
+  
+  branchId        String
+  courseId        String
+  trainerId       String?
+  
+  startTime       String?  // e.g. "10:00 AM"
+  endTime         String?
+  
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  branch          Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  course          Course   @relation(fields: [courseId], references: [id])
+  trainer         Trainer? @relation(fields: [trainerId], references: [id], onDelete: SetNull)
+  students        Student[]
+  attendances     Attendance[]
+  tests           Test[]
+  
+  @@index([branchId])
+  @@index([courseId])
+  @@index([trainerId])
+  @@map("batches")
+}
+
+model PortfolioTask {
+  id              String   @id @default(uuid())
+  courseId        String
+  title           String
+  description     String?
+  order           Int      @default(0)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  course          Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  submissions     PortfolioSubmission[]
+  
+  @@index([courseId])
+  @@map("portfolio_tasks")
+}
+
+model PortfolioSubmission {
+  id              String   @id @default(uuid())
+  studentId       String
+  taskId          String
+  trainerId       String?
+  
+  workUrl         String?
+  remarks         String?
+  status          String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  
+  submittedAt     DateTime @default(now())
+  reviewedAt      DateTime?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  task            PortfolioTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  trainer         Trainer? @relation(fields: [trainerId], references: [id], onDelete: SetNull)
+  
+  @@index([studentId])
+  @@index([taskId])
+  @@map("portfolio_submissions")
+}
+
+
+model Test {
+  id              String   @id @default(uuid())
+  batchId         String
+  title           String
+  date            DateTime
+  totalMarks      Float
+  passMarks       Float
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  batch           Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  scores          TestScore[]
+  
+  @@index([batchId])
+  @@map("tests")
+}
+
+model TestScore {
+  id              String   @id @default(uuid())
+  testId          String
+  studentId       String
+  
+  marksObtained   Float
+  isPass          Boolean
+  remarks         String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  test            Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
+  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  
+  @@index([testId])
+  @@index([studentId])
+  @@unique([testId, studentId])
+  @@map("test_scores")
 }
 
 model Portfolio {
@@ -352,6 +491,21 @@ model Placement {
   @@index([companyId])
   @@index([status])
   @@map("placements")
+}
+
+model SoftwareProgress {
+  id              String   @id @default(uuid())
+  studentId       String   @unique // One progress record per student for now
+  
+  completedTopics String   // JSON string or comma-separated list
+  currentTopic    String?
+  progress        Int      @default(0) // Percentage 0-100
+  
+  lastUpdated     DateTime @default(now())
+  
+  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  
+  @@map("software_progress")
 }
 
 model Incentive {

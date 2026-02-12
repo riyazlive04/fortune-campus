@@ -5,12 +5,29 @@ import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
-import { dashboardApi, reportsApi } from "@/lib/api";
+import { dashboardApi, reportsApi, storage } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import TrainerDashboard from "./TrainerDashboard";
+import StudentDashboard from "./StudentDashboard";
+import BranchHeadDashboard from "./BranchHeadDashboard";
 
 const COLORS = ["hsl(217, 71%, 53%)", "hsl(142, 71%, 45%)", "hsl(38, 92%, 50%)", "hsl(262, 60%, 55%)"];
 
 const Dashboard = () => {
+  const user = storage.getUser();
+
+  if (user?.role === 'TRAINER') {
+    return <TrainerDashboard />;
+  }
+
+  if (user?.role === 'STUDENT') {
+    return <StudentDashboard />;
+  }
+
+  if (user?.role === 'CHANNEL_PARTNER') {
+    return <BranchHeadDashboard />;
+  }
+
   const [data, setData] = useState<any>(null);
   const [performance, setPerformance] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,11 +69,31 @@ const Dashboard = () => {
     return <DashboardSkeleton />;
   }
 
-  if (!data) return null;
+  if (!data) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] space-y-4">
+        <PageHeader title="Dashboard Unavailable" description="We encountered an issue while loading your metrics." />
+        <p className="text-muted-foreground">Please try refreshing the page or check your connection.</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+        >
+          Refresh Dashboard
+        </button>
+      </div>
+    );
+  }
+
+  const dashboardTitle = user?.role === 'CEO'
+    ? `${user?.firstName} ${user?.lastName} (CEO)`
+    : `${user?.firstName} ${user?.lastName} (${user?.branch?.name || 'Branch'})`;
+  const dashboardDescription = user?.role === 'CEO'
+    ? "Overview of all branches and operations"
+    : `Overview of ${user?.branch?.name || 'branch'} operations`;
 
   return (
     <div className="animate-fade-in">
-      <PageHeader title="CEO Dashboard" description="Overview of all branches and operations" />
+      <PageHeader title={dashboardTitle} description={dashboardDescription} />
 
       {/* KPI Cards */}
       <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

@@ -1,0 +1,107 @@
+﻿--- Creating Test Student Data ---
+Using user: Student 1 (1fecadb0-ac2f-4b15-8db8-ebae50a37d13)
+npx : 
+PrismaClientValidationError: 
+At line:1 char:1
++ npx tsx 
+create_test_student.ts 2>&1 | 
+Out-File -FilePath error.txt 
+-E ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~
+    + CategoryInfo          :  
+   NotSpecified: (PrismaClien  
+  tValidationError: :String)   
+  [], RemoteException
+    + FullyQualifiedErrorId :  
+   NativeCommandError
+ 
+Invalid 
+`prisma.batch.create()` 
+invocation in
+C:\Users\Welcome-Pc\OneDrive\De
+sktop\sirah_project\Fortune-inn
+ovaties\fortune-campus\backend\
+create_test_student.ts:56:36
+
+  53 // 4. Create Batch
+  54 let batch = await 
+prisma.batch.findFirst();
+  55 if (!batch) {
+ΓåÆ 56     batch = await 
+prisma.batch.create({
+           data: {
+             name: "Morning 
+Batch A",
+             code: "MBA-2024",
+             courseId: "c733548
+c-c5ec-425a-ad80-3a2ff4d68eab",
+             branchId: "1dde41b
+f-ccd9-4364-b2a0-cc934bb87807",
+             startTime: 
+"09:00",
+             endTime: "12:00",
+             capacity: 20,
+             ~~~~~~~~
+         ?   id?: String,
+         ?   trainerId?: 
+String | Null,
+         ?   isActive?: 
+Boolean,
+         ?   createdAt?: 
+DateTime,
+         ?   updatedAt?: 
+DateTime,
+         ?   students?: Student
+UncheckedCreateNestedManyWithou
+tBatchInput,
+         ?   attendances?: Atte
+ndanceUncheckedCreateNestedMany
+WithoutBatchInput,
+         ?   tests?: TestUnchec
+kedCreateNestedManyWithoutBatch
+Input
+           }
+         })
+
+Unknown argument `capacity`. 
+Available options are marked 
+with ?.
+    at wn (C:\Users\Welcome-Pc\
+OneDrive\Desktop\sirah_project\
+Fortune-innovaties\fortune-camp
+us\backend\node_modules\@prisma
+\client\runtime\library.js:29:1
+363)
+    at $n.handleRequestError (C
+:\Users\Welcome-Pc\OneDrive\Des
+ktop\sirah_project\Fortune-inno
+vaties\fortune-campus\backend\n
+ode_modules\@prisma\client\runt
+ime\library.js:121:6958)
+    at 
+$n.handleAndLogRequestError (C:
+\Users\Welcome-Pc\OneDrive\Desk
+top\sirah_project\Fortune-innov
+aties\fortune-campus\backend\no
+de_modules\@prisma\client\runti
+me\library.js:121:6623)
+    at $n.request (C:\Users\Wel
+come-Pc\OneDrive\Desktop\sirah_
+project\Fortune-innovaties\fort
+une-campus\backend\node_modules
+\@prisma\client\runtime\library
+.js:121:6307)
+    at async l (C:\Users\Welcom
+e-Pc\OneDrive\Desktop\sirah_pro
+ject\Fortune-innovaties\fortune
+-campus\backend\node_modules\@p
+risma\client\runtime\library.js
+:130:9633)
+    at async main (C:\Users\Wel
+come-Pc\OneDrive\Desktop\sirah_
+project\Fortune-innovaties\fort
+une-campus\backend\create_test_
+student.ts:56:17) {
+  clientVersion: '5.22.0'
+}

@@ -7,6 +7,8 @@ import {
   updateAttendance,
   deleteAttendance,
   getAttendanceStats,
+  markEntry,
+  markExit,
 } from './attendance.controller';
 import { authenticateToken } from '../../middlewares/auth.middleware';
 import { enforceBranchAccess } from '../../middlewares/branch.middleware';
@@ -21,8 +23,10 @@ router.get('/stats', getAttendanceStats); // Specific route before parameterized
 router.get('/', getAttendance);
 router.get('/:id', getAttendanceById);
 router.post('/', requireTrainer, markAttendance);
+router.post('/entry', requireTrainer, markEntry);
 router.post('/bulk', requireTrainer, bulkMarkAttendance);
 router.put('/:id', requireTrainer, updateAttendance);
+router.put('/:id/exit', requireTrainer, markExit);
 router.delete('/:id', requireTrainer, deleteAttendance);
 
 export default router;

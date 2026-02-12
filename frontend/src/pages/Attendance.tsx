@@ -3,23 +3,15 @@ import { useState, useEffect } from "react";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { attendanceApi, branchesApi } from "@/lib/api";
+import { attendanceApi, branchesApi, batchesApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-
-const classes = [
-  { time: "09:00 AM", course: "Full Stack Dev", trainer: "Priya Sharma", batch: "Batch A", topic: "React Hooks", status: "Completed" },
-  { time: "10:30 AM", course: "Data Science", trainer: "Rahul Verma", batch: "Batch B", topic: "Linear Regression", status: "Completed" },
-  { time: "12:00 PM", course: "UI/UX Design", trainer: "Sneha Patel", batch: "Batch A", topic: "Figma Prototyping", status: "In Progress" },
-  { time: "02:00 PM", course: "DevOps", trainer: "Vikram Singh", batch: "Batch A", topic: "Docker Compose", status: "Upcoming" },
-  { time: "03:30 PM", course: "Full Stack Dev", trainer: "Anjali Rao", batch: "Batch B", topic: "Node.js APIs", status: "Upcoming" },
-];
-
-const statusVariant = (s: string) => s === "Completed" ? "success" : s === "In Progress" ? "warning" : "neutral";
 
 const Attendance = () => {
   const [attendanceData, setAttendanceData] = useState<any[]>([]);
+  const [batches, setBatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [branches, setBranches] = useState<any[]>([]);
+  const [selectedBranch, setSelectedBranch] = useState<string>("all");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -32,6 +24,18 @@ const Attendance = () => {
       }
     };
     fetchBranches();
+  }, []);
+
+  useEffect(() => {
+    const fetchBatches = async () => {
+      try {
+        const response = await batchesApi.getBatches({ isActive: true });
+        setBatches(response.data?.batches || response.data || []);
+      } catch (error) {
+        console.error("Failed to fetch batches");
+      }
+    };
+    fetchBatches();
   }, []);
 
   useEffect(() => {
@@ -55,13 +59,19 @@ const Attendance = () => {
     fetchAttendance();
   }, []);
 
+  // Filter batches based on selected branch if needed
+  const displayedBatches = selectedBranch && selectedBranch !== "all"
+    ? batches.filter(b => b.branchId === selectedBranch)
+    : batches;
+
   return (
     <div className="animate-fade-in">
       <PageHeader title="Attendance & Classes" description="Track daily attendance and class schedule" />
 
       <div className="mb-4 flex gap-3">
         <Select><SelectTrigger className="w-40"><SelectValue placeholder="Select Date" /></SelectTrigger><SelectContent><SelectItem value="today">Today</SelectItem><SelectItem value="yesterday">Yesterday</SelectItem></SelectContent></Select>
-        <Select><SelectTrigger className="w-40"><SelectValue placeholder="Branch" /></SelectTrigger><SelectContent>
+        <Select onValueChange={setSelectedBranch}><SelectTrigger className="w-40"><SelectValue placeholder="Branch" /></SelectTrigger><SelectContent>
+          <SelectItem value="all">All Branches</SelectItem>
           {branches.map((b) => (
             <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
           ))}
@@ -69,15 +79,26 @@ const Attendance = () => {
       </div>
 
       <div className="mb-8">
-        <h3 className="mb-3 text-sm font-semibold text-foreground">Today's Schedule</h3>
+        <h3 className="mb-3 text-sm font-semibold text-foreground">Today's Schedule (Active Batches)</h3>
         <div className="rounded-xl border border-border bg-card">
           <div className="overflow-x-auto">
             <table className="data-table">
-              <thead><tr><th>Time</th><th>Course</th><th>Trainer</th><th>Batch</th><th>Topic</th><th>Status</th></tr></thead>
+              <thead><tr><th>Time</th><th>Course</th><th>Trainer</th><th>Batch Code</th><th>Branch</th><th>Status</th></tr></thead>
               <tbody>
-                {classes.map((c, i) => (
-                  <tr key={i}><td>{c.time}</td><td>{c.course}</td><td>{c.trainer}</td><td>{c.batch}</td><td>{c.topic}</td><td><StatusBadge status={c.status} variant={statusVariant(c.status)} /></td></tr>
-                ))}
+                {displayedBatches.length === 0 ? (
+                  <tr><td colSpan={6} className="text-center py-4 text-muted-foreground">No active batches found</td></tr>
+                ) : (
+                  displayedBatches.map((b: any) => (
+                    <tr key={b.id}>
+                      <td>{b.startTime || "10:00 AM"} - {b.endTime || "12:00 PM"}</td>
+                      <td>{b.course?.name}</td>
+                      <td>{b.trainer?.user?.firstName || "Unassigned"}</td>
+                      <td>{b.code}</td>
+                      <td>{b.branch?.name}</td>
+                      <td><StatusBadge status={b.isActive ? "Active" : "Inactive"} variant={b.isActive ? "success" : "neutral"} /></td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

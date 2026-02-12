@@ -340,7 +340,7 @@ export const getUserById = async (req: AuthRequest, res: Response): Promise<Resp
 export const updateUser = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
     const { id } = req.params;
-    const { firstName, lastName, phone, isActive, branchId, password, specialization, experience } = req.body;
+    const { firstName, lastName, phone, isActive, branchId, password, specialization, experience, role } = req.body;
 
     const existingUser = await prisma.user.findUnique({ where: { id } });
     if (!existingUser) {
@@ -381,12 +381,23 @@ export const updateUser = async (req: AuthRequest, res: Response): Promise<Respo
         phone,
         isActive,
         ...((req.user?.role === UserRole.ADMIN || req.user?.role === UserRole.CEO) && branchId ? { branchId } : {}),
+        ...((req.user?.role === UserRole.ADMIN || req.user?.role === UserRole.CEO) && role ? { role } : {}),
         ...(hashedPassword ? { password: hashedPassword } : {}),
-        ...(existingUser.role === UserRole.TRAINER && (specialization || experience) ? {
+        // Handle Trainer Profile Upsert (Create or Update)
+        ...((role === UserRole.TRAINER || (existingUser.role === UserRole.TRAINER && !role)) && (specialization || experience) ? {
           trainerProfile: {
-            update: {
-              ...(specialization ? { specialization } : {}),
-              ...(experience ? { experience: Number(experience) } : {}),
+            upsert: {
+              create: {
+                employeeId: `TR-${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
+                branchId: branchId || existingUser.branchId,
+                specialization: specialization || 'General',
+                experience: Number(experience) || 0,
+                isActive: true
+              },
+              update: {
+                ...(specialization ? { specialization } : {}),
+                ...(experience ? { experience: Number(experience) } : {}),
+              }
             }
           }
         } : {}),

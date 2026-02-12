@@ -25,6 +25,9 @@ import incentiveRouter from "./modules/incentives/incentive.routes";
 import reportRouter from "./modules/reports/report.routes";
 import dashboardRouter from "./modules/dashboard/dashboard.routes";
 import notificationRouter from "./modules/notifications/notification.routes";
+import batchRouter from "./modules/batches/batch.routes";
+import studentDashboardRouter from "./modules/students/student.dashboard.routes";
+import branchDashboardRouter from "./modules/branches/branch.dashboard.routes";
 
 const app: Application = express();
 
@@ -98,7 +101,7 @@ app.use("/api/users", userRouter);
 app.use("/api/branches", branchRouter);
 app.use("/api/leads", leadRouter);
 app.use("/api/admissions", admissionRouter);
-app.use("/api/students", studentRouter);
+// app.use("/api/students", studentRouter); // Moved below for dashboard route precedence
 app.use("/api/trainers", trainerRouter);
 app.use("/api/courses", courseRouter);
 app.use("/api/attendance", attendanceRouter);
@@ -109,6 +112,12 @@ app.use("/api/incentives", incentiveRouter);
 app.use("/api/reports", reportRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/notifications", notificationRouter);
+app.use("/api/batches", batchRouter);
+// The order is important: studentDashboardRouter should be registered BEFORE studentRouter
+// to prevent "dashboard" from being interpreted as an ID by the studentRouter
+app.use("/api/students", studentDashboardRouter);
+app.use("/api/students", studentRouter);
+app.use("/api/branch-dashboard", branchDashboardRouter);
 
 // --------------------
 // Error Handling

@@ -34,8 +34,8 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
             prisma.admission.count({ where }),
             prisma.admission.count({ where: { ...where, createdAt: { gte: startOfLastMonth, lte: endOfLastMonth } } }),
 
-            prisma.student.count({ where: { ...where, isActive: true } }),
-            prisma.student.count({ where: { ...where, isActive: true, createdAt: { lte: endOfLastMonth } } }),
+            prisma.user.count({ where: { ...where, role: UserRole.STUDENT, isActive: true } }),
+            prisma.user.count({ where: { ...where, role: UserRole.STUDENT, isActive: true, createdAt: { lte: endOfLastMonth } } }),
 
             prisma.placement.count({
                 where: {

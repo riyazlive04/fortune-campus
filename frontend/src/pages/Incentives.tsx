@@ -68,7 +68,7 @@ const Incentives = () => {
           if (!trainerMap.has(inc.trainerId)) {
             trainerMap.set(inc.trainerId, {
               trainer: trainerName,
-              branch: "N/A", // Placeholder as it's not in the list include
+              branch: inc.trainer?.branch?.name || "Unknown",
               studentIds: new Set(),
               placementIncentives: 0,
               totalIncentive: 0,
@@ -100,18 +100,41 @@ const Incentives = () => {
         setTrainerIncentives(aggregatedTrainers);
 
         // 3. Branch-wise Aggregation
-        // Since we don't have branch names readily available in the `getIncentives` response (based on my read of the controller),
-        // this part is tricky.
-        // However, I can try to infer it if the `user` (student) object has branch info?
-        // The controller `getIncentives` includes:
-        // user: { select: { id: true, firstName: true, lastName: true, email: true } } -> NO BRANCH
-        // So I cannot accurately group by branch on the frontend with the current API response.
-        // allow me to show a placeholder message for Branch-wise or hide it if empty.
-        // OR I can try to fetch branches separately and map them if I had IDs.
-        // FOR NOW: I will leave Branch-wise as empty or mock it to avoid breaking, 
-        // but realistically the backend needs to return Branch info.
-        // I'll set it to empty to be honest about data.
-        setBranchIncentives([]);
+        const branchMap = new Map();
+
+        incentives.forEach((inc: any) => {
+          // Use trainer's branch or user's branch as fallback
+          const branchName = inc.trainer?.branch?.name || inc.user?.branch?.name || "Unknown Branch";
+          const branchId = inc.trainer?.branch?.id || inc.user?.branch?.id || "unknown";
+
+          if (!branchMap.has(branchId)) {
+            branchMap.set(branchId, {
+              branch: branchName,
+              trainers: new Set(),
+              totalIncentive: 0,
+              paid: 0,
+              pending: 0
+            });
+          }
+
+          const entry = branchMap.get(branchId);
+          if (inc.trainerId) entry.trainers.add(inc.trainerId);
+
+          const amount = Number(inc.amount) || 0;
+          entry.totalIncentive += amount;
+          if (inc.isPaid) entry.paid += amount;
+          else entry.pending += amount;
+        });
+
+        const aggregatedBranches = Array.from(branchMap.values()).map((b: any) => ({
+          branch: b.branch,
+          trainers: b.trainers.size,
+          totalIncentive: b.totalIncentive,
+          paid: b.paid,
+          pending: b.pending
+        }));
+
+        setBranchIncentives(aggregatedBranches);
 
       } catch (error) {
         console.error("Failed to fetch incentives", error);
@@ -166,7 +189,6 @@ const Incentives = () => {
         </div>
       </div>
 
-      {/* Hidden for now as API doesn't support branch aggregation efficiently yet */}
       {branchIncentives.length > 0 && (
         <div>
           <h3 className="mb-3 text-sm font-semibold text-foreground">Branch-wise Overview</h3>
@@ -196,12 +218,12 @@ const aggregatedTable = (data: any[], formatCurrency: (v: number) => string) => 
   if (data.length === 0) return <div className="p-4 text-muted-foreground">No incentive records found.</div>;
   return (
     <table className="data-table">
-      <thead><tr><th>Trainer</th><th>Students</th><th>Placements</th><th>Incentive</th><th>Status</th></tr></thead>
+      <thead><tr><th>Trainer</th><th>Branch</th><th>Students</th><th>Placements</th><th>Incentive</th><th>Status</th></tr></thead>
       <tbody>
         {data.map((t, i) => (
           <tr key={i}>
             <td className="font-medium">{t.trainer}</td>
-            {/* Removed Branch column as we can't reliably get it yet */}
+            <td className="text-sm text-muted-foreground">{t.branch}</td>
             <td>{t.students}</td>
             <td>{t.placements}</td>
             <td className="font-medium">{formatCurrency(t.incentive)}</td>

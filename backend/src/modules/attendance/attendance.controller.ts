@@ -248,6 +248,68 @@ export const updateAttendance = async (req: AuthRequest, res: Response): Promise
   }
 };
 
+export const markEntry = async (req: AuthRequest, res: Response): Promise<Response> => {
+  try {
+    const { studentId, batchId, courseId, latitude, longitude, date } = req.body;
+    const now = new Date();
+    const attendanceDate = date ? new Date(date) : now;
+    attendanceDate.setHours(0, 0, 0, 0);
+
+    // Check for existing record
+    const existing = await (prisma as any).attendance.findFirst({
+      where: {
+        studentId,
+        courseId,
+        date: {
+          gte: attendanceDate,
+          lt: new Date(attendanceDate.getTime() + 24 * 60 * 60 * 1000)
+        }
+      }
+    });
+
+    if (existing) {
+      return errorResponse(res, 'Attendance record already exists for this day', 400);
+    }
+
+    const attendance = await (prisma as any).attendance.create({
+      data: {
+        studentId,
+        courseId,
+        batchId,
+        date: attendanceDate,
+        inTime: now,
+        latitude,
+        longitude,
+        status: AttendanceStatus.PRESENT,
+        isVerified: true,
+        trainerId: req.user?.role === UserRole.TRAINER ? req.user?.id : undefined
+      }
+    });
+
+    return successResponse(res, attendance, 'Entry marked successfully', 201);
+  } catch (error) {
+    return errorResponse(res, 'Failed to mark entry', 500, error);
+  }
+};
+
+export const markExit = async (req: AuthRequest, res: Response): Promise<Response> => {
+  try {
+    const { id } = req.params;
+    const now = new Date();
+
+    const attendance = await (prisma as any).attendance.update({
+      where: { id },
+      data: {
+        outTime: now
+      }
+    });
+
+    return successResponse(res, attendance, 'Exit marked successfully');
+  } catch (error) {
+    return errorResponse(res, 'Failed to mark exit', 500, error);
+  }
+};
+
 export const deleteAttendance = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
     const { id } = req.params;

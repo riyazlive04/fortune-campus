@@ -298,28 +298,37 @@ const Users = () => {
       }
 
       if (result.success && result.data) {
-        setTempPassword(result.data.tempPassword);
-        setPasswordCopied(false);
-        // Refresh users list
-        fetchUsers();
-        // Reset form
-        setFormData({
-          firstName: "",
-          lastName: "",
-          email: "",
-          phone: "",
-          role: "",
-          branchId: "",
-          password: "",
-          specialization: "",
-          experience: "",
-          courseId: "",
-        });
+        if (editMode) {
+          fetchUsers();
+          handleCloseDialog();
+          toast({
+            title: "Success",
+            description: "User updated successfully",
+          });
+        } else {
+          setTempPassword(result.data.tempPassword);
+          setPasswordCopied(false);
+          // Refresh users list
+          fetchUsers();
+          // Reset form
+          setFormData({
+            firstName: "",
+            lastName: "",
+            email: "",
+            phone: "",
+            role: "",
+            branchId: "",
+            password: "",
+            specialization: "",
+            experience: "",
+            courseId: "",
+          });
 
-        toast({
-          title: "Success",
-          description: "User created successfully",
-        });
+          toast({
+            title: "Success",
+            description: "User created successfully",
+          });
+        }
       }
     } catch (err: any) {
       setError(err.message || "Failed to create user");
@@ -337,6 +346,39 @@ const Users = () => {
         description: "Password copied to clipboard",
       });
       setTimeout(() => setPasswordCopied(false), 3000);
+    }
+  };
+
+  const handleToggleActive = async (user: User) => {
+    const newStatus = !user.isActive;
+    const action = newStatus ? "activate" : "deactivate";
+
+    if (!confirm(`Are you sure you want to ${action} this user?`)) return;
+
+    try {
+      const token = storage.getToken();
+      const response = await fetch(`${API_BASE_URL}/users/${user.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ isActive: newStatus }),
+      });
+
+      if (!response.ok) throw new Error(`Failed to ${action} user`);
+
+      toast({
+        title: "Success",
+        description: `User ${action}d successfully`,
+      });
+      fetchUsers();
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: `Failed to ${action} user`,
+      });
     }
   };
 
@@ -398,6 +440,17 @@ const Users = () => {
           <Button variant="ghost" size="sm">
             <Eye className="h-4 w-4" />
           </Button>
+          {(isAdmin || currentUser?.role === 'CHANNEL_PARTNER') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className={r.isActive ? "text-destructive hover:text-destructive" : "text-green-600 hover:text-green-700"}
+              onClick={() => handleToggleActive(r)}
+              title={r.isActive ? "Deactivate user" : "Activate user"}
+            >
+              {r.isActive ? <Trash2 className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+            </Button>
+          )}
         </div>
       )
     },

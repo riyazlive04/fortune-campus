@@ -1,0 +1,13 @@
+ceo@fortunecampus.com : CEO
+sanjay_cbe@fortunecampus.com : CHANNEL_PARTNER
+pranesh_salem@fortunecampus.com : CHANNEL_PARTNER
+vishnu_erode@fortunecampus.com : CHANNEL_PARTNER
+vimal_tiruppur@fortunecampus.com : CHANNEL_PARTNER
+student1_salem@gmail.com : STUDENT
+student2_erode@gmail.com : STUDENT
+student3_cbe@gmail.com : STUDENT
+student4_tiruppur@gmail.com : STUDENT
+trainer1_salem@gmail.com : TRAINER
+trainer4_tiruppur@gmail.com : TRAINER
+trainer2_cbe@gmail.com : TRAINER
+trainer3_erode@gmail.com : STUDENT

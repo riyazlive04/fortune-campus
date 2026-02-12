@@ -21,4 +21,5 @@ export const requireRoles = (...allowedRoles: UserRole[]) => {
 export const requireAdmin = requireRoles(UserRole.CEO, UserRole.ADMIN);
 export const requireBranchHead = requireRoles(UserRole.CEO, UserRole.ADMIN, UserRole.CHANNEL_PARTNER);
 export const requireTrainer = requireRoles(UserRole.CEO, UserRole.ADMIN, UserRole.CHANNEL_PARTNER, UserRole.TRAINER);
+export const requireStudent = requireRoles(UserRole.CEO, UserRole.ADMIN, UserRole.CHANNEL_PARTNER, UserRole.TRAINER, UserRole.STUDENT);
 

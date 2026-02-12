@@ -426,6 +426,66 @@ export const dashboardApi = {
   },
 };
 
+// Branch Dashboard API Service
+export const branchDashboardApi = {
+  getOverview: async () => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/branch-dashboard/overview`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return response.json();
+  },
+  getAdmissions: async () => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/branch-dashboard/admissions`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return response.json();
+  },
+  getAttendance: async () => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/branch-dashboard/attendance`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return response.json();
+  },
+  getProgress: async () => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/branch-dashboard/progress`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return response.json();
+  },
+  getPortfolio: async () => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/branch-dashboard/portfolio`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return response.json();
+  },
+  getTrainers: async () => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/branch-dashboard/trainers`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return response.json();
+  },
+  getFees: async () => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/branch-dashboard/fees`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return response.json();
+  },
+  getPlacements: async () => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/branch-dashboard/placements`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return response.json();
+  },
+};
+
 // Admissions API Service
 export const admissionsApi = {
   getAdmissions: async (params?: any) => {
@@ -697,17 +757,36 @@ export const attendanceApi = {
   getStats: async () => {
     const token = storage.getToken();
     const response = await fetch(`${API_BASE_URL}/attendance/stats`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch attendance stats');
+    return result;
+  },
+
+  markEntry: async (data: any) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/attendance/entry`, {
+      method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
       },
+      body: JSON.stringify(data),
     });
-
     const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to mark entry');
+    return result;
+  },
 
-    if (!response.ok) {
-      throw new Error(result.message || 'Failed to fetch attendance stats');
-    }
-
+  markExit: async (id: string) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/attendance/${id}/exit`, {
+      method: 'PUT',
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to mark exit');
     return result;
   },
 };
@@ -1412,36 +1491,21 @@ export const notificationsApi = {
     const token = storage.getToken();
     const queryString = params ? new URLSearchParams(params).toString() : '';
     const response = await fetch(`${API_BASE_URL}/notifications?${queryString}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+      headers: { 'Authorization': `Bearer ${token}` },
     });
-
     const result = await response.json();
-
-    if (!response.ok) {
-      throw new Error(result.message || 'Failed to fetch notifications');
-    }
-
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch notifications');
     return result;
   },
-
 
   getWhatsappLogs: async (params?: any) => {
     const token = storage.getToken();
     const queryString = params ? new URLSearchParams(params).toString() : '';
     const response = await fetch(`${API_BASE_URL}/notifications/whatsapp-logs?${queryString}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+      headers: { 'Authorization': `Bearer ${token}` },
     });
-
     const result = await response.json();
-
-    if (!response.ok) {
-      throw new Error(result.message || 'Failed to fetch WhatsApp logs');
-    }
-
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch WhatsApp logs');
     return result;
   },
 
@@ -1449,17 +1513,199 @@ export const notificationsApi = {
     const token = storage.getToken();
     const response = await fetch(`${API_BASE_URL}/notifications/${id}/read`, {
       method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+      headers: { 'Authorization': `Bearer ${token}` },
     });
-
     const result = await response.json();
-
-    if (!response.ok) {
-      throw new Error(result.message || 'Failed to mark notifications as read');
-    }
-
+    if (!response.ok) throw new Error(result.message || 'Failed to mark notifications as read');
     return result;
   }
+};
+
+// Trainer Dashboard API Service
+export const trainerApi = {
+  getDashboardStats: async () => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/trainers/dashboard/stats`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch trainer stats');
+    return result;
+  },
+
+  getBatchStudents: async (batchId: string) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/trainers/batches/${batchId}/students`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch batch students');
+    return result;
+  },
+
+  checkEligibility: async (batchId: string) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/trainers/batches/${batchId}/check-eligibility`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to check eligibility');
+    return result;
+  },
+
+  getBatchTests: async (batchId: string) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/trainers/batches/${batchId}/tests`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch tests');
+    return result;
+  },
+
+  createTest: async (data: any) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/trainers/tests`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to create test');
+    return result;
+  },
+
+  getTestScores: async (testId: string) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/trainers/tests/${testId}/scores`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch test scores');
+    return result;
+  },
+
+  updateTestScores: async (testId: string, scores: any[]) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/trainers/tests/${testId}/scores`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ scores }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to update scores');
+    return result;
+  },
+};
+
+// Portfolio Task API Extensions
+export const portfolioTasksApi = {
+  getTasks: async (courseId: string) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/portfolios/tasks/${courseId}`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch portfolio tasks');
+    return result;
+  },
+
+  submitWork: async (data: any) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/portfolios/submit`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to submit portfolio work');
+    return result;
+  },
+
+  getPendingSubmissions: async () => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/portfolios/pending`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch pending submissions');
+    return result;
+  },
+
+  reviewSubmission: async (id: string, data: any) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/portfolios/review/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to review submission');
+    return result;
+  },
+};
+
+// Software Progress API
+export const softwareProgressApi = {
+  getBatchProgress: async (batchId: string) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/trainers/batches/${batchId}/progress`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch batch progress');
+    return result;
+  },
+
+  updateProgress: async (studentId: string, data: any) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/trainers/students/${studentId}/progress`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to update progress');
+    return result;
+  },
+};
+
+// Batch API Service
+export const batchesApi = {
+  getBatches: async (params?: any) => {
+    const token = storage.getToken();
+    const queryString = params ? new URLSearchParams(params).toString() : '';
+    const response = await fetch(`${API_BASE_URL}/batches?${queryString}`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch batches');
+    return result;
+  },
+
+  getBatchById: async (id: string) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/batches/${id}`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch batch');
+    return result;
+  },
 };

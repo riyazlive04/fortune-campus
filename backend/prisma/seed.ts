@@ -26,6 +26,66 @@ async function main() {
     },
   });
 
+  const salemBranch = await prisma.branch.upsert({
+    where: { code: "FC-SALEM" },
+    update: {},
+    create: {
+      name: "Fortune Campus - Salem",
+      code: "FC-SALEM",
+      address: "Salem Main Road",
+      city: "Salem",
+      state: "Tamil Nadu",
+      phone: "+91-XXXXXXXXXX",
+      email: "salem@fortunecampus.com",
+      isActive: true,
+    },
+  });
+
+  const tiruppurBranch = await prisma.branch.upsert({
+    where: { code: "FC-TIRUPPUR" },
+    update: {},
+    create: {
+      name: "Fortune Campus - Tiruppur",
+      code: "FC-TIRUPPUR",
+      address: "Tiruppur Junction",
+      city: "Tiruppur",
+      state: "Tamil Nadu",
+      phone: "+91-XXXXXXXXXX",
+      email: "tiruppur@fortunecampus.com",
+      isActive: true,
+    },
+  });
+
+  const erodeBranch = await prisma.branch.upsert({
+    where: { code: "FC-ERODE" },
+    update: {},
+    create: {
+      name: "Fortune Campus - Erode",
+      code: "FC-ERODE",
+      address: "Erode Central",
+      city: "Erode",
+      state: "Tamil Nadu",
+      phone: "+91-XXXXXXXXXX",
+      email: "erode@fortunecampus.com",
+      isActive: true,
+    },
+  });
+
+  const coimbatoreBranch = await prisma.branch.upsert({
+    where: { code: "FC-COIMBATORE" },
+    update: {},
+    create: {
+      name: "Fortune Campus - Coimbatore",
+      code: "FC-COIMBATORE",
+      address: "Coimbatore City",
+      city: "Coimbatore",
+      state: "Tamil Nadu",
+      phone: "+91-XXXXXXXXXX",
+      email: "coimbatore@fortunecampus.com",
+      isActive: true,
+    },
+  });
+
   console.log("✅ Branches ready");
 
   // --------------------
@@ -105,52 +165,63 @@ async function main() {
   // --------------------
   // Courses
   // --------------------
-  console.log("📚 Creating courses...");
-
-  const webDevCourse = await prisma.course.upsert({
-    where: { code: "FSWD-101" },
-    update: {},
-    create: {
-      name: "Full Stack Web Development",
-      code: "FSWD-101",
-      description: "Comprehensive frontend and backend course",
-      duration: 6,
-      fees: 50000,
-      syllabus: JSON.stringify([
-        "HTML, CSS, JavaScript",
-        "React.js",
-        "Node.js & Express",
-        "MongoDB",
-        "REST APIs",
-        "Deployment",
-      ]),
-      prerequisites: "Basic programming knowledge",
-      branchId: mainBranch.id,
-    },
-  });
-
-  const dataScienceCourse = await prisma.course.upsert({
-    where: { code: "DSML-101" },
-    update: {},
-    create: {
-      name: "Data Science & Machine Learning",
-      code: "DSML-101",
-      description: "Data analysis and ML fundamentals",
-      duration: 6,
-      fees: 60000,
-      syllabus: JSON.stringify([
-        "Python",
-        "NumPy & Pandas",
-        "Data Visualization",
-        "Machine Learning",
-        "Deep Learning Basics",
-      ]),
-      prerequisites: "Math & statistics basics",
-      branchId: mainBranch.id,
-    },
-  });
-
   console.log("✅ Courses ready");
+
+  // Helper function to seed courses for a specific branch
+  const seedCoursesForBranch = async (branchId: string, branchCode: string) => {
+    const webDev = await prisma.course.upsert({
+      where: { code: `FSWD-101-${branchCode}` },
+      update: {},
+      create: {
+        name: "Full Stack Web Development",
+        code: `FSWD-101-${branchCode}`,
+        description: "Comprehensive frontend and backend course",
+        duration: 6,
+        fees: 50000,
+        syllabus: JSON.stringify([
+          "HTML, CSS, JavaScript",
+          "React.js",
+          "Node.js & Express",
+          "MongoDB",
+          "REST APIs",
+          "Deployment",
+        ]),
+        prerequisites: "Basic programming knowledge",
+        branchId: branchId,
+      },
+    });
+
+    const dataScience = await prisma.course.upsert({
+      where: { code: `DSML-101-${branchCode}` },
+      update: {},
+      create: {
+        name: "Data Science & Machine Learning",
+        code: `DSML-101-${branchCode}`,
+        description: "Data analysis and ML fundamentals",
+        duration: 6,
+        fees: 60000,
+        syllabus: JSON.stringify([
+          "Python",
+          "NumPy & Pandas",
+          "Data Visualization",
+          "Machine Learning",
+          "Deep Learning Basics",
+        ]),
+        prerequisites: "Math & statistics basics",
+        branchId: branchId,
+      },
+    });
+
+    return { webDev, dataScience };
+  };
+
+  // Seed courses for all branches
+  console.log("📚 Seeding courses for all branches...");
+  const { webDev: webDevCourse, dataScience: dataScienceCourse } = await seedCoursesForBranch(mainBranch.id, "MAIN");
+  await seedCoursesForBranch(salemBranch.id, "SALEM");
+  await seedCoursesForBranch(tiruppurBranch.id, "TIRUPPUR");
+  await seedCoursesForBranch(erodeBranch.id, "ERODE");
+  await seedCoursesForBranch(coimbatoreBranch.id, "COIMBATORE");
 
   // --------------------
   // Trainer ↔ Course
@@ -166,6 +237,25 @@ async function main() {
     create: {
       courseId: webDevCourse.id,
       trainerId: trainerProfile.id,
+    },
+  });
+
+  // --------------------
+  // Batches
+  // --------------------
+  console.log("📦 Creating batches...");
+  // @ts-ignore
+  const batchA1 = await prisma.batch.upsert({
+    where: { code: "MAIN-FSWD-A1" },
+    update: {},
+    create: {
+      name: "Batch A1",
+      code: "MAIN-FSWD-A1",
+      branchId: mainBranch.id,
+      courseId: webDevCourse.id,
+      trainerId: trainerProfile.id,
+      startTime: "10:00 AM",
+      endTime: "01:00 PM",
     },
   });
 
@@ -210,8 +300,13 @@ async function main() {
   // --------------------
   console.log("🎓 Creating admission & student...");
 
-  const admission = await prisma.admission.create({
-    data: {
+  const admission = await prisma.admission.upsert({
+    where: { admissionNumber: "ADM2024MAIN0001" },
+    update: {
+      courseId: webDevCourse.id,
+      branchId: mainBranch.id,
+    },
+    create: {
       admissionNumber: "ADM2024MAIN0001",
       firstName: "Vikram",
       lastName: "Reddy",
@@ -245,8 +340,17 @@ async function main() {
     },
   });
 
-  const student = await prisma.student.create({
-    data: {
+  const student = await prisma.student.upsert({
+    where: { enrollmentNumber: "ENR2024001" },
+    update: {
+      // @ts-ignore
+      batchId: batchA1.id,
+      // @ts-ignore
+      placementEligible: true,
+      // @ts-ignore
+      certificateLocked: false,
+    },
+    create: {
       userId: studentUser.id,
       admissionId: admission.id,
       enrollmentNumber: "ENR2024001",
@@ -254,6 +358,12 @@ async function main() {
       cgpa: 0,
       branchId: mainBranch.id,
       courseId: webDevCourse.id,
+      // @ts-ignore
+      batchId: batchA1.id,
+      // @ts-ignore
+      placementEligible: true,
+      // @ts-ignore
+      certificateLocked: false,
     },
   });
 
@@ -273,6 +383,89 @@ async function main() {
       completedAt: new Date(),
       isVerified: true,
     },
+  });
+
+  // --------------------
+  // Detailed Portfolio Tasks & Submissions
+  // --------------------
+  console.log("📝 Creating portfolio tasks & submissions...");
+  const tasks = await Promise.all([
+    // @ts-ignore
+    prisma.portfolioTask.upsert({
+      where: { id: "task-1" },
+      update: {},
+      create: { id: "task-1", courseId: webDevCourse.id, title: "HTML/CSS Basic Layout", order: 1 }
+    }),
+    // @ts-ignore
+    prisma.portfolioTask.upsert({
+      where: { id: "task-2" },
+      update: {},
+      create: { id: "task-2", courseId: webDevCourse.id, title: "JavaScript Todo App", order: 2 }
+    })
+  ]);
+
+  // @ts-ignore
+  await prisma.portfolioSubmission.create({
+    data: {
+      studentId: student.id,
+      taskId: tasks[0].id,
+      trainerId: trainerProfile.id,
+      workUrl: "https://github.com/vikram/layout",
+      status: "APPROVED",
+      remarks: "Excellent layout work!",
+    }
+  });
+
+  // --------------------
+  // Software Progress
+  // --------------------
+  console.log("💻 Creating software progress...");
+  // @ts-ignore
+  await prisma.softwareProgress.create({
+    data: {
+      studentId: student.id,
+      softwareName: "VS Code & Git",
+      completionPercentage: 100,
+      currentModule: "Advanced Git",
+      remainingModules: "None",
+    }
+  });
+
+  // @ts-ignore
+  await prisma.softwareProgress.create({
+    data: {
+      studentId: student.id,
+      softwareName: "React.js",
+      completionPercentage: 60,
+      currentModule: "Hooks & Context API",
+      remainingModules: "Redux, Next.js",
+    }
+  });
+
+  // --------------------
+  // Tests & Scores
+  // --------------------
+  console.log("📊 Creating tests & scores...");
+  // @ts-ignore
+  const midTermTest = await prisma.test.create({
+    data: {
+      batchId: batchA1.id,
+      title: "Full Stack Mid-Term",
+      date: new Date(),
+      totalMarks: 100,
+      passMarks: 50,
+    }
+  });
+
+  // @ts-ignore
+  await prisma.testScore.create({
+    data: {
+      testId: midTermTest.id,
+      studentId: student.id,
+      marksObtained: 85,
+      isPass: true,
+      remarks: "Great performance",
+    }
   });
 
   console.log("\n✅ Seed completed successfully!");
