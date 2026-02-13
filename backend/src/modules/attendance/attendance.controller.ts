@@ -167,6 +167,88 @@ export const markAttendance = async (req: AuthRequest, res: Response): Promise<R
   }
 };
 
+export const markAttendanceIdempotent = async (req: AuthRequest, res: Response): Promise<Response> => {
+  try {
+    const { studentId, status, remarks, date, period = 1 } = req.body;
+    console.log(`[Attendance] Marking ${status} for student ${studentId}, Period ${period}`);
+
+    const now = new Date();
+    const attendanceDate = date ? new Date(date) : now;
+    attendanceDate.setHours(0, 0, 0, 0);
+
+    // Verify student exists and get branch
+    const student = await prisma.student.findUnique({
+      where: { id: studentId },
+    });
+
+    if (!student) {
+      console.error(`[Attendance] Student ${studentId} not found`);
+      return errorResponse(res, 'Student not found', 404);
+    }
+
+    // Branch access control
+    if (req.user?.role !== UserRole.CEO && student.branchId !== req.user?.branchId) {
+      console.error(`[Attendance] Branch mismatch: user branch ${req.user?.branchId}, student branch ${student.branchId}`);
+      return errorResponse(res, 'Access denied', 403);
+    }
+
+    // Fetch trainer profile if logged in as trainer
+    let profileTrainerId: string | undefined = undefined;
+    if (req.user?.role === UserRole.TRAINER) {
+      const trainer = await prisma.trainer.findUnique({
+        where: { userId: req.user.id }
+      });
+      profileTrainerId = trainer?.id;
+    }
+
+    // Find existing record for today AND period
+    const existing = await prisma.attendance.findFirst({
+      where: {
+        studentId,
+        period: Number(period),
+        date: {
+          gte: attendanceDate,
+          lt: new Date(attendanceDate.getTime() + 24 * 60 * 60 * 1000)
+        }
+      }
+    });
+
+    let attendance;
+    if (existing) {
+      console.log(`[Attendance] Updating existing record ${existing.id} for Period ${period}`);
+      attendance = await prisma.attendance.update({
+        where: { id: existing.id },
+        data: {
+          status,
+          remarks: remarks || undefined,
+          updatedAt: now,
+          trainerId: profileTrainerId || undefined
+        }
+      });
+    } else {
+      console.log(`[Attendance] Creating new record for Period ${period}`);
+      attendance = await prisma.attendance.create({
+        data: {
+          studentId,
+          date: attendanceDate,
+          status,
+          remarks,
+          period: Number(period),
+          isVerified: true,
+          trainerId: profileTrainerId || undefined,
+          courseId: student.courseId,
+          batchId: student.batchId || undefined
+        }
+      });
+    }
+
+    return successResponse(res, attendance, 'Attendance marked successfully');
+  } catch (error) {
+    console.error(`[Attendance] Error marking attendance:`, error);
+    return errorResponse(res, 'Failed to mark attendance', 500, error);
+  }
+};
+
 export const bulkMarkAttendance = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
     const { courseId, date, trainerId, attendanceRecords } = req.body;

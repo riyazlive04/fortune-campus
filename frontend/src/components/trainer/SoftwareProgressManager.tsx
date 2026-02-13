@@ -13,7 +13,6 @@ interface SoftwareProgressManagerProps {
 }
 
 const SoftwareProgressManager = ({ batches }: SoftwareProgressManagerProps) => {
-    const [selectedBatch, setSelectedBatch] = useState<string>(batches[0]?.id || "");
     const [students, setStudents] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
@@ -26,11 +25,10 @@ const SoftwareProgressManager = ({ batches }: SoftwareProgressManagerProps) => {
 
     const { toast } = useToast();
 
-    const fetchBatchProgress = async () => {
-        if (!selectedBatch) return;
+    const fetchBranchProgress = async () => {
         try {
             setLoading(true);
-            const res = await softwareProgressApi.getBatchProgress(selectedBatch);
+            const res = await softwareProgressApi.getBranchProgress();
             if (res.success) {
                 setStudents(res.data);
             }
@@ -42,9 +40,9 @@ const SoftwareProgressManager = ({ batches }: SoftwareProgressManagerProps) => {
     };
 
     useEffect(() => {
-        fetchBatchProgress();
+        fetchBranchProgress();
         setExpandedStudent(null);
-    }, [selectedBatch]);
+    }, []);
 
     const handleExpand = (student: any) => {
         if (expandedStudent === student.studentId) {
@@ -80,7 +78,7 @@ const SoftwareProgressManager = ({ batches }: SoftwareProgressManagerProps) => {
 
             if (res.success) {
                 toast({ title: "Success", description: "Progress updated successfully" });
-                fetchBatchProgress();
+                fetchBranchProgress();
                 // Keep expanded to show updated state or close?
             }
         } catch (error: any) {
@@ -92,18 +90,8 @@ const SoftwareProgressManager = ({ batches }: SoftwareProgressManagerProps) => {
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
-                    <h3 className="text-lg font-bold">Software Progress</h3>
-                    <p className="text-sm text-muted-foreground">Track technical skill development per student.</p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">Batch:</span>
-                    <select
-                        className="bg-background border rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary outline-none"
-                        value={selectedBatch}
-                        onChange={(e) => setSelectedBatch(e.target.value)}
-                    >
-                        {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                    </select>
+                    <h3 className="text-lg font-bold">Software Progress (Branch-wide)</h3>
+                    <p className="text-sm text-muted-foreground">Track technical skill development for all students in your branch.</p>
                 </div>
             </div>
 

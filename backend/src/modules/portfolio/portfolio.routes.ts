@@ -13,6 +13,8 @@ import {
   submitPortfolioWork,
   getPendingPortfolioSubmissions,
   reviewPortfolioSubmission,
+  getBranchPortfolioStats,
+  getStudentPortfolioDetails
 } from './portfolio.tasks.controller';
 import { authenticateToken } from '../../middlewares/auth.middleware';
 import { enforceBranchAccess } from '../../middlewares/branch.middleware';
@@ -28,6 +30,8 @@ router.get('/tasks/:courseId', getPortfolioTasksByCourse);
 router.post('/tasks', requireTrainer, createPortfolioTask);
 router.post('/submit', requireStudent, submitPortfolioWork);
 router.get('/pending', requireTrainer, getPendingPortfolioSubmissions);
+router.get('/stats', requireTrainer, getBranchPortfolioStats);
+router.get('/student/:studentId', requireTrainer, getStudentPortfolioDetails);
 router.put('/review/:id', requireTrainer, reviewPortfolioSubmission);
 
 // Legacy Portfolio Routes

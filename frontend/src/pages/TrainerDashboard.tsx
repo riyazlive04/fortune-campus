@@ -21,6 +21,7 @@ const TestsTab = () => <div className="p-4 bg-card border rounded-xl">Test & Eva
 const TrainerDashboard = () => {
     const [stats, setStats] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState("overview");
     const { toast } = useToast();
     const user = storage.getUser();
 
@@ -63,6 +64,8 @@ const TrainerDashboard = () => {
                     value={stats.activeStudents.toString()}
                     icon={Users}
                     accentColor="bg-primary"
+                    onClick={() => setActiveTab("overview")}
+                    className="cursor-pointer hover:shadow-md transition-shadow"
                 />
                 <KPICard
                     title="Attendance (Today)"
@@ -71,22 +74,28 @@ const TrainerDashboard = () => {
                     changeType="negative"
                     icon={ClipboardCheck}
                     accentColor="bg-success"
+                    onClick={() => setActiveTab("attendance")}
+                    className="cursor-pointer hover:shadow-md transition-shadow"
                 />
                 <KPICard
                     title="Pending Portfolios"
                     value={stats.pendingPortfolios.toString()}
                     icon={LayoutDashboard}
                     accentColor="bg-warning"
+                    onClick={() => setActiveTab("portfolio")}
+                    className="cursor-pointer hover:shadow-md transition-shadow"
                 />
                 <KPICard
                     title="Placement Eligible"
                     value={stats.eligibleForPlacement.toString()}
                     icon={Award}
                     accentColor="bg-purple-500"
+                    onClick={() => setActiveTab("placement")}
+                    className="cursor-pointer hover:shadow-md transition-shadow"
                 />
             </div>
 
-            <Tabs defaultValue="overview" className="space-y-4">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
                 <TabsList className="bg-card border p-1 rounded-xl w-full justify-start overflow-x-auto">
                     <TabsTrigger value="overview">Overview</TabsTrigger>
                     <TabsTrigger value="attendance">Attendance</TabsTrigger>
@@ -110,7 +119,10 @@ const TrainerDashboard = () => {
                                             <p className="font-semibold">{c.name}</p>
                                             <p className="text-xs text-muted-foreground">{c.startTime} - {c.endTime}</p>
                                         </div>
-                                        <button className="text-xs bg-primary text-white px-3 py-1 rounded hover:bg-primary/90 transition-colors">
+                                        <button
+                                            onClick={() => setActiveTab("attendance")}
+                                            className="text-xs bg-primary text-white px-3 py-1 rounded hover:bg-primary/90 transition-colors"
+                                        >
                                             View Batch
                                         </button>
                                     </div>
@@ -127,19 +139,31 @@ const TrainerDashboard = () => {
                                 Quick Actions
                             </h3>
                             <div className="grid grid-cols-2 gap-3">
-                                <button className="flex flex-col items-center justify-center p-4 bg-muted hover:bg-muted/80 rounded-lg border transition-all">
+                                <button
+                                    onClick={() => setActiveTab("attendance")}
+                                    className="flex flex-col items-center justify-center p-4 bg-muted hover:bg-muted/80 rounded-lg border transition-all"
+                                >
                                     <ClipboardCheck className="mb-2 text-primary" />
                                     <span className="text-sm font-medium">Mark Attendance</span>
                                 </button>
-                                <button className="flex flex-col items-center justify-center p-4 bg-muted hover:bg-muted/80 rounded-lg border transition-all">
+                                <button
+                                    onClick={() => setActiveTab("portfolio")}
+                                    className="flex flex-col items-center justify-center p-4 bg-muted hover:bg-muted/80 rounded-lg border transition-all"
+                                >
                                     <LayoutDashboard className="mb-2 text-warning" />
                                     <span className="text-sm font-medium">Review Portfolio</span>
                                 </button>
-                                <button className="flex flex-col items-center justify-center p-4 bg-muted hover:bg-muted/80 rounded-lg border transition-all">
+                                <button
+                                    onClick={() => setActiveTab("tests")}
+                                    className="flex flex-col items-center justify-center p-4 bg-muted hover:bg-muted/80 rounded-lg border transition-all"
+                                >
                                     <GraduationCap className="mb-2 text-success" />
                                     <span className="text-sm font-medium">Add Test Score</span>
                                 </button>
-                                <button className="flex flex-col items-center justify-center p-4 bg-muted hover:bg-muted/80 rounded-lg border transition-all">
+                                <button
+                                    onClick={() => setActiveTab("progress")}
+                                    className="flex flex-col items-center justify-center p-4 bg-muted hover:bg-muted/80 rounded-lg border transition-all"
+                                >
                                     <Users className="mb-2 text-purple-500" />
                                     <span className="text-sm font-medium">Student Help</span>
                                 </button>

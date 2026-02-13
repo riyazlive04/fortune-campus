@@ -45,6 +45,10 @@ const TestsManager = ({ batches }: TestsManagerProps) => {
     }, [selectedBatch]);
 
     const handleCreateTest = async () => {
+        if (!selectedBatch) {
+            toast({ variant: "destructive", title: "Error", description: "Please select a batch first" });
+            return;
+        }
         try {
             const res = await trainerApi.createTest({ ...newTest, batchId: selectedBatch });
             if (res.success) {
@@ -127,13 +131,19 @@ const TestsManager = ({ batches }: TestsManagerProps) => {
                     <p className="text-sm text-muted-foreground">Create tests and manage student scores.</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <select
-                        className="bg-background border rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary outline-none"
-                        value={selectedBatch}
-                        onChange={(e) => setSelectedBatch(e.target.value)}
-                    >
-                        {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                    </select>
+                    {batches.length > 0 ? (
+                        <select
+                            className="bg-background border rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary outline-none"
+                            value={selectedBatch}
+                            onChange={(e) => setSelectedBatch(e.target.value)}
+                        >
+                            {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                        </select>
+                    ) : (
+                        <div className="text-sm text-destructive font-medium px-3 py-1.5 border border-destructive/20 bg-destructive/10 rounded-lg">
+                            No active batches found
+                        </div>
+                    )}
 
                     <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                         <DialogTrigger asChild>

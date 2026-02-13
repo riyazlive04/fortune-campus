@@ -789,6 +789,21 @@ export const attendanceApi = {
     if (!response.ok) throw new Error(result.message || 'Failed to mark exit');
     return result;
   },
+
+  markAttendance: async (data: { studentId: string; status: string; remarks?: string; date?: string; period?: number }) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/attendance/mark`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to mark attendance');
+    return result;
+  },
 };
 
 // Portfolio API Service
@@ -1543,6 +1558,16 @@ export const trainerApi = {
     return result;
   },
 
+  getBranchStudents: async () => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/trainers/branch-students`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch branch students');
+    return result;
+  },
+
   checkEligibility: async (batchId: string) => {
     const token = storage.getToken();
     const response = await fetch(`${API_BASE_URL}/trainers/batches/${batchId}/check-eligibility`, {
@@ -1642,6 +1667,26 @@ export const portfolioTasksApi = {
     return result;
   },
 
+  getStats: async () => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/portfolios/stats`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch portfolio stats');
+    return result;
+  },
+
+  getStudentPortfolio: async (studentId: string) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/portfolios/student/${studentId}`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch student portfolio');
+    return result;
+  },
+
   reviewSubmission: async (id: string, data: any) => {
     const token = storage.getToken();
     const response = await fetch(`${API_BASE_URL}/portfolios/review/${id}`, {
@@ -1667,6 +1712,16 @@ export const softwareProgressApi = {
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Failed to fetch batch progress');
+    return result;
+  },
+
+  getBranchProgress: async () => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/trainers/branch-progress`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch branch progress');
     return result;
   },
 

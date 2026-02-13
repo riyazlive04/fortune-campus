@@ -19,27 +19,38 @@ export const getTrainerDashboardStats = async (req: AuthRequest, res: Response):
         today.setHours(0, 0, 0, 0);
         const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
 
-        // 1. Total Active Students (assigned to this trainer's batches)
+        // 1. Total Active Students (assigned to this trainer's branch)
         const activeStudentsCount = await (prisma as any).student.count({
             where: {
-                batch: { trainerId: trainer.id },
+                branchId: trainer.branchId,
                 isActive: true
             }
         });
 
-        // 2. All Active Classes (batches assigned to this trainer)
+        // 2. All Active Classes (Batches in this branch)
+        // Trainers should see all batches in their branch to manage tests/attendance if needed
         const activeBatches = await (prisma as any).batch.findMany({
             where: {
-                trainerId: trainer.id,
+                branchId: trainer.branchId,
                 isActive: true,
             },
-            select: { id: true, name: true, startTime: true, endTime: true, code: true }
+            select: {
+                id: true,
+                name: true,
+                startTime: true,
+                endTime: true,
+                code: true,
+                trainer: {
+                    select: { user: { select: { firstName: true, lastName: true } } }
+                }
+            },
+            orderBy: { startTime: 'asc' }
         });
 
-        // 3. Today's Classes (batches assigned to this trainer)
-        // In a real system, we'd check against a class schedule,
-        // but here every active batch is considered a class.
-        const todayClasses = activeBatches.length; // Simplified as per the comment logic
+        // 3. Today's Classes
+        // Filter active batches to find those that are relevant for "classes" count
+        // For now, we count all active batches in branch as potential classes
+        const todayClasses = activeBatches.length;
 
         // 4. Attendance Counts (Today)
         const attendances = await prisma.attendance.findMany({
@@ -81,11 +92,13 @@ export const getTrainerDashboardStats = async (req: AuthRequest, res: Response):
 
         const lowAttendanceCount = studentAttendanceStats.filter((s: any) => s.percentage < 75).length;
 
-        // 5. Portfolio Approvals Pending
+        // 5. Portfolio Approvals Pending (Branch-wide)
         const pendingPortfolios = await (prisma as any).portfolioSubmission.count({
             where: {
-                trainerId: trainer.id,
-                status: 'PENDING'
+                status: 'PENDING',
+                student: {
+                    branchId: trainer.branchId
+                }
             }
         });
 
@@ -110,7 +123,7 @@ export const getTrainerDashboardStats = async (req: AuthRequest, res: Response):
 
         return successResponse(res, {
             activeStudents: activeStudentsCount,
-            todayClasses: todayClasses.length,
+            todayClasses: todayClasses,
             presentToday: presentCount,
             absentToday: absentCount,
             lowAttendance: lowAttendanceCount,
@@ -143,8 +156,8 @@ export const getStudentsByBatch = async (req: AuthRequest, res: Response): Promi
                 },
                 admission: {
                     select: {
-                        totalFees: true,
-                        pendingFees: true
+                        feeAmount: true,
+                        feeBalance: true
                     }
                 }
             }
@@ -198,5 +211,49 @@ export const checkBatchEligibility = async (req: AuthRequest, res: Response): Pr
         return successResponse(res, { message: 'Eligibility updated', updatedCount: updates.length });
     } catch (error) {
         return errorResponse(res, 'Failed to update eligibility', 500, error);
+    }
+};
+
+export const getBranchStudents = async (req: AuthRequest, res: Response): Promise<Response> => {
+    try {
+        const userId = req.user?.id;
+        const trainer = await prisma.trainer.findUnique({
+            where: { userId }
+        });
+
+        if (!trainer) {
+            return errorResponse(res, 'Trainer profile not found', 404);
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const students = await (prisma as any).student.findMany({
+            where: {
+                branchId: trainer.branchId,
+                isActive: true
+            },
+            include: {
+                user: {
+                    select: {
+                        firstName: true,
+                        lastName: true,
+                        email: true
+                    }
+                },
+                attendances: {
+                    where: {
+                        date: {
+                            gte: today,
+                            lt: new Date(today.getTime() + 24 * 60 * 60 * 1000)
+                        }
+                    }
+                }
+            }
+        });
+
+        return successResponse(res, students);
+    } catch (error) {
+        return errorResponse(res, 'Failed to fetch branch students', 500, error);
     }
 };

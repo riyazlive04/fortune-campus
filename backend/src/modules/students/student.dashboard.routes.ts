@@ -15,9 +15,11 @@ import { UserRole } from '../../types/enums';
 
 const router = Router();
 
-// All routes require authentication and STUDENT role
+// Authentication required for all routes
 router.use(authenticateToken);
-router.use(requireRoles(UserRole.STUDENT));
+
+// Only /dashboard routes require the STUDENT role
+router.use('/dashboard', requireRoles(UserRole.STUDENT));
 
 // Dashboard endpoints
 router.get('/dashboard/overview', getStudentOverview);

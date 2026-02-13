@@ -3,6 +3,7 @@ import {
   getAttendance,
   getAttendanceById,
   markAttendance,
+  markAttendanceIdempotent,
   bulkMarkAttendance,
   updateAttendance,
   deleteAttendance,
@@ -23,6 +24,7 @@ router.get('/stats', getAttendanceStats); // Specific route before parameterized
 router.get('/', getAttendance);
 router.get('/:id', getAttendanceById);
 router.post('/', requireTrainer, markAttendance);
+router.post('/mark', requireTrainer, markAttendanceIdempotent);
 router.post('/entry', requireTrainer, markEntry);
 router.post('/bulk', requireTrainer, bulkMarkAttendance);
 router.put('/:id', requireTrainer, updateAttendance);

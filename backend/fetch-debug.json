@@ -1,0 +1,54 @@
+[
+  {
+    "email": "trainer1_salem@gmail.com",
+    "role": "TRAINER",
+    "branchId": "40a801a8-e06e-4ef3-8686-dd0158a5f41b",
+    "studentsFound": 1,
+    "students": [
+      {
+        "name": "Student",
+        "email": "student1_salem@gmail.com",
+        "branchId": "40a801a8-e06e-4ef3-8686-dd0158a5f41b"
+      }
+    ]
+  },
+  {
+    "email": "trainer2_cbe@gmail.com",
+    "role": "TRAINER",
+    "branchId": "ee7bda19-553f-4161-b38a-146550c9baef",
+    "studentsFound": 1,
+    "students": [
+      {
+        "name": "Student",
+        "email": "student3_cbe@gmail.com",
+        "branchId": "ee7bda19-553f-4161-b38a-146550c9baef"
+      }
+    ]
+  },
+  {
+    "email": "trainer3_erode@gmail.com",
+    "role": "TRAINER",
+    "branchId": "17e90695-0588-4f5d-ba9f-17203ab8dfa3",
+    "studentsFound": 1,
+    "students": [
+      {
+        "name": "Student",
+        "email": "student2_erode@gmail.com",
+        "branchId": "17e90695-0588-4f5d-ba9f-17203ab8dfa3"
+      }
+    ]
+  },
+  {
+    "email": "trainer4_tiruppur@gmail.com",
+    "role": "TRAINER",
+    "branchId": "ec7fdd97-873a-4852-8d05-53a8fce9ff8f",
+    "studentsFound": 1,
+    "students": [
+      {
+        "name": "Student",
+        "email": "student4_tiruppur@gmail.com",
+        "branchId": "ec7fdd97-873a-4852-8d05-53a8fce9ff8f"
+      }
+    ]
+  }
+]

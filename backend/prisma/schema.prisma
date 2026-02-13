@@ -284,6 +284,7 @@ model Attendance {
   outTime         DateTime?
   latitude        Float?
   longitude       Float?
+  period          Int              @default(1)
   isVerified      Boolean          @default(false)
   
   studentId       String
@@ -300,7 +301,7 @@ model Attendance {
   batch           Batch?           @relation(fields: [batchId], references: [id], onDelete: SetNull)
   trainer         Trainer?         @relation(fields: [trainerId], references: [id], onDelete: SetNull)
   
-  @@unique([studentId, courseId, date])
+  @@unique([studentId, courseId, date, period])
   @@index([studentId])
   @@index([courseId])
   @@index([batchId])
@@ -344,6 +345,9 @@ model PortfolioTask {
   title           String
   description     String?
   order           Int      @default(0)
+  isMandatory     Boolean  @default(true)
+  deadlineDays    Int?     // Number of days after enrollment for deadline
+  expectedFormat  String?  // e.g. "PDF", "Link", "ZIP"
   
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -363,8 +367,10 @@ model PortfolioSubmission {
   trainerId       String?
   
   workUrl         String?
+  behanceUrl      String?
   remarks         String?
   status          String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  rejectionCount  Int      @default(0)
   
   submittedAt     DateTime @default(now())
   reviewedAt      DateTime?

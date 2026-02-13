@@ -9,10 +9,14 @@ import {
 import {
   getTrainerDashboardStats,
   getStudentsByBatch,
+  getBranchStudents,
   checkBatchEligibility
 } from './trainer.dashboard.controller';
+// ... (imports omitted for brevity, but I will replace the block)
+// I will just replace the specific lines in the file.
 import {
   getBatchProgress,
+  getBranchProgress,
   updateStudentProgress
 } from '../students/student.progress.controller';
 import {
@@ -32,6 +36,7 @@ router.use(enforceBranchAccess);
 
 // Dashboard routes
 router.get('/dashboard/stats', getTrainerDashboardStats);
+router.get('/branch-students', requireTrainer, getBranchStudents);
 router.get('/batches/:batchId/students', requireTrainer, getStudentsByBatch);
 
 // Test Management routes
@@ -41,6 +46,7 @@ router.get('/tests/:testId/scores', requireTrainer, getTestScores);
 router.put('/tests/:testId/scores', requireTrainer, updateTestScores);
 
 // Student Progress routes
+router.get('/branch-progress', requireTrainer, getBranchProgress);
 router.get('/batches/:batchId/progress', requireTrainer, getBatchProgress);
 router.put('/students/:studentId/progress', requireTrainer, updateStudentProgress);
 

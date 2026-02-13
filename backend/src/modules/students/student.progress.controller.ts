@@ -4,6 +4,53 @@ import { AuthRequest } from '../../middlewares/auth.middleware';
 import { prisma } from '../../config/database';
 import { successResponse, errorResponse } from '../../utils/response';
 
+// Get progress for all students in a trainer's branch
+export const getBranchProgress = async (req: AuthRequest, res: Response): Promise<Response> => {
+    try {
+        const userId = req.user?.id;
+        const trainer = await prisma.trainer.findUnique({
+            where: { userId }
+        });
+
+        if (!trainer) {
+            return errorResponse(res, 'Trainer profile not found', 404);
+        }
+
+        const students = await (prisma as any).student.findMany({
+            where: {
+                branchId: trainer.branchId,
+                isActive: true
+            },
+            select: {
+                id: true,
+                user: {
+                    select: { firstName: true, lastName: true, email: true }
+                },
+                softwareProgress: {
+                    take: 1
+                }
+            }
+        });
+
+        // Format response
+        const formatted = students.map((s: any) => ({
+            studentId: s.id,
+            name: `${s.user.firstName} ${s.user.lastName}`,
+            email: s.user.email,
+            progress: s.softwareProgress[0] ? {
+                id: s.softwareProgress[0].id,
+                completedTopics: JSON.parse(s.softwareProgress[0].completedTopics || "[]"),
+                currentTopic: s.softwareProgress[0].currentTopic,
+                percentage: s.softwareProgress[0].progress
+            } : null
+        }));
+
+        return successResponse(res, formatted);
+    } catch (error) {
+        return errorResponse(res, 'Failed to fetch branch progress', 500, error);
+    }
+};
+
 // Get progress for all students in a batch
 export const getBatchProgress = async (req: AuthRequest, res: Response): Promise<Response> => {
     try {
