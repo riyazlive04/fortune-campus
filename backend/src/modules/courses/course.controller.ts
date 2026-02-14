@@ -75,6 +75,27 @@ export const getCourses = async (req: AuthRequest, res: Response): Promise<Respo
   }
 };
 
+export const getPublicCourses = async (_req: any, res: Response): Promise<Response> => {
+  try {
+    const courses = await prisma.course.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        description: true,
+        duration: true,
+        fees: true
+      },
+      orderBy: { name: 'asc' }
+    });
+
+    return successResponse(res, courses);
+  } catch (error) {
+    return errorResponse(res, 'Failed to fetch public courses', 500, error);
+  }
+};
+
 export const getCourseById = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
     const { id } = req.params;

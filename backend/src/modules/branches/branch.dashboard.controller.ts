@@ -12,7 +12,7 @@ export const getBranchOverview = async (req: AuthRequest, res: Response): Promis
             return errorResponse(res, 'Branch ID not found for user', 400);
         }
 
-        const where = branchId ? { branchId } : {};
+        const where: any = branchId ? { branchId } : {};
         const now = new Date();
         const todayStart = new Date(now.setHours(0, 0, 0, 0));
         const weekStart = new Date(now.setDate(now.getDate() - 7));
@@ -88,7 +88,7 @@ export const getAdmissionsStats = async (req: AuthRequest, res: Response): Promi
         const branchId = req.user?.branchId;
         const where = branchId ? { branchId } : {};
 
-        const [leadsBySource, admissionsTrend] = await Promise.all([
+        const [leadsBySource, admissionsTrend, recentLeads] = await Promise.all([
             prisma.lead.groupBy({
                 by: ['source'],
                 where,
@@ -98,12 +98,46 @@ export const getAdmissionsStats = async (req: AuthRequest, res: Response): Promi
                 by: ['status'],
                 where,
                 _count: true
+            }),
+            prisma.lead.findMany({
+                where: { ...where, status: 'NEW' },
+                orderBy: { createdAt: 'desc' },
+                take: 10
             })
         ]);
 
-        return successResponse(res, { leadsBySource, admissionsTrend });
+        return successResponse(res, { leadsBySource, admissionsTrend, recentLeads });
     } catch (error) {
         return errorResponse(res, 'Failed to fetch admissions stats', 500, error);
+    }
+};
+
+export const convertLead = async (req: AuthRequest, res: Response): Promise<Response> => {
+    try {
+        const { leadId } = req.body;
+        console.log('--- Convert Lead Request ---');
+        console.log('User:', req.user?.id, req.user?.email);
+        console.log('Body:', req.body);
+        console.log('LeadID:', leadId);
+
+        if (!leadId) {
+            console.error('Lead ID is missing');
+            return errorResponse(res, 'Lead ID is required', 400);
+        }
+
+        const lead = await prisma.lead.update({
+            where: { id: leadId },
+            data: { status: 'CONVERTED' }
+        });
+        console.log('Lead updated successfully:', lead.id);
+
+        // Optionally, create a skeleton admission here if needed, 
+        // but for now we just mark the lead as converted.
+
+        return successResponse(res, lead, 'Lead converted successfully');
+    } catch (error: any) {
+        console.error('Convert Lead Error:', error);
+        return errorResponse(res, 'Failed to convert lead', 500, error);
     }
 };
 
@@ -133,26 +167,103 @@ export const getAttendanceStats = async (req: AuthRequest, res: Response): Promi
     }
 };
 
+export const getBranchAttendance = async (req: AuthRequest, res: Response): Promise<Response> => {
+    try {
+        const branchId = req.user?.branchId;
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 20;
+        const skip = (page - 1) * limit;
+        const date = req.query.date ? new Date(req.query.date as string) : undefined;
+
+        const where: any = branchId ? { student: { branchId } } : {};
+        if (date) {
+            const startOfDay = new Date(date);
+            startOfDay.setHours(0, 0, 0, 0);
+            const endOfDay = new Date(date);
+            endOfDay.setHours(23, 59, 59, 999);
+            where.date = { gte: startOfDay, lte: endOfDay };
+        }
+
+        // 1. Get distinct (student, date) groups for pagination
+        const distinctGroups = await prisma.attendance.findMany({
+            where,
+            distinct: ['studentId', 'date'],
+            orderBy: { date: 'desc' },
+            skip,
+            take: limit,
+            select: { studentId: true, date: true }
+        });
+
+        // 2. Hydrate these groups with full data
+        const attendance = await Promise.all(distinctGroups.map(async (group) => {
+            const records = await prisma.attendance.findMany({
+                where: {
+                    studentId: group.studentId,
+                    date: group.date
+                },
+                include: {
+                    student: { include: { user: true } },
+                    course: true,
+                    batch: true
+                },
+                orderBy: { period: 'asc' }
+            });
+
+            const first = records[0];
+            return {
+                id: first.id, // Use the first ID as key
+                date: first.date,
+                student: first.student,
+                course: first.course,
+                batch: first.batch,
+                periods: records.map(r => ({ period: r.period, status: r.status }))
+            };
+        }));
+
+        // 3. Get accurate count of groups
+        const uniqueCount = await prisma.attendance.groupBy({
+            by: ['studentId', 'date'],
+            where,
+        });
+        const total = uniqueCount.length;
+
+        return successResponse(res, { attendance, total, page, limit });
+    } catch (error) {
+        return errorResponse(res, 'Failed to fetch branch attendance', 500, error);
+    }
+};
+
 export const getProgressStats = async (req: AuthRequest, res: Response): Promise<Response> => {
     try {
         const branchId = req.user?.branchId;
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 20;
+        const skip = (page - 1) * limit;
+
         const where = branchId ? { branchId } : {};
 
-        const [courseDistribution, softwareProgress] = await Promise.all([
+        const [courseDistribution, softwareProgress, totalStudents] = await Promise.all([
             prisma.student.groupBy({
                 by: ['courseId'],
-                where,
+                where: { ...where, isActive: true },
                 _count: true
             }),
             prisma.softwareProgress.findMany({
-                where: { student: { branchId } },
-                take: 5,
-                orderBy: { progress: 'asc' },
-                include: { student: { include: { user: true } } }
+                where: { student: { branchId, isActive: true } },
+                skip,
+                take: limit,
+                orderBy: { progress: 'desc' }, // Descending order for top progress
+                include: {
+                    student: { include: { user: true } },
+                    course: true
+                }
+            }),
+            prisma.softwareProgress.count({
+                where: { student: { branchId, isActive: true } }
             })
         ]);
 
-        return successResponse(res, { courseDistribution, softwareProgress });
+        return successResponse(res, { courseDistribution, softwareProgress, total, page, limit });
     } catch (error) {
         return errorResponse(res, 'Failed to fetch progress stats', 500, error);
     }
@@ -209,15 +320,34 @@ export const getTrainerStats = async (req: AuthRequest, res: Response): Promise<
 export const getFeeStats = async (req: AuthRequest, res: Response): Promise<Response> => {
     try {
         const branchId = req.user?.branchId;
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 20;
+        const skip = (page - 1) * limit;
+
         const where = branchId ? { branchId } : {};
 
-        const revenueByCourse = await prisma.admission.groupBy({
-            by: ['courseId'],
-            where,
-            _sum: { feePaid: true, feeBalance: true }
-        });
+        const [revenueByCourse, studentFees, total] = await Promise.all([
+            prisma.admission.groupBy({
+                by: ['courseId'],
+                where,
+                _sum: { feePaid: true, feeBalance: true }
+            }),
+            prisma.admission.findMany({
+                where,
+                skip,
+                take: limit,
+                orderBy: { createdAt: 'desc' },
+                include: {
+                    student: {
+                        include: { user: true }
+                    },
+                    course: true
+                }
+            }),
+            prisma.admission.count({ where })
+        ]);
 
-        return successResponse(res, { revenueByCourse });
+        return successResponse(res, { revenueByCourse, studentFees, total, page, limit });
     } catch (error) {
         return errorResponse(res, 'Failed to fetch fee stats', 500, error);
     }
@@ -226,20 +356,189 @@ export const getFeeStats = async (req: AuthRequest, res: Response): Promise<Resp
 export const getPlacementStats = async (req: AuthRequest, res: Response): Promise<Response> => {
     try {
         const branchId = req.user?.branchId;
-        const where = branchId ? { branchId } : {};
+        const where: any = branchId ? { branchId } : {};
 
-        const [eligibleCount, recentPlacements] = await Promise.all([
+        const [eligibleCount, recentPlacements, totalStudents] = await Promise.all([
             prisma.student.count({ where: { ...where, placementEligible: true } }),
             prisma.placement.findMany({
-                where: { student: { branchId } },
+                where: {
+                    student: branchId ? { branchId: branchId } : undefined
+                },
                 take: 5,
                 orderBy: { createdAt: 'desc' },
                 include: { student: { include: { user: true } }, company: true }
-            })
+            }),
+            prisma.student.count({ where: { ...where, isActive: true } })
         ]);
 
-        return successResponse(res, { eligibleCount, recentPlacements });
+        const notEligibleCount = totalStudents - eligibleCount;
+
+        return successResponse(res, {
+            eligibleCount,
+            notEligibleCount,
+            recentPlacements
+        });
     } catch (error) {
         return errorResponse(res, 'Failed to fetch placement stats', 500, error);
+    }
+};
+
+export const getComplianceStats = async (req: AuthRequest, res: Response): Promise<Response> => {
+    try {
+        const branchId = req.user?.branchId;
+        if (!branchId && req.user?.role !== UserRole.CEO) {
+            return errorResponse(res, 'Branch ID required', 400);
+        }
+
+        const whereStudent = branchId ? { branchId, isActive: true } : { isActive: true };
+
+        // 1. Attendance Compliance (< 75%)
+        // fetching all students and calculating attendance is expensive, so we'll do a simplified check or aggregate if possible
+        // For now, let's fetch students with their attendance count and total days (simplified)
+        // A better approach in production: have a computed field or periodic job. 
+        // Here we will just look for students with recent 'ABSENT' status or many absences.
+
+        // Let's get students with > 3 absences in the last 30 days
+        const last30Days = new Date();
+        last30Days.setDate(last30Days.getDate() - 30);
+
+        const studentsWithHighAbsence = await prisma.student.findMany({
+            where: {
+                ...whereStudent,
+                attendances: {
+                    some: {
+                        date: { gte: last30Days },
+                        status: 'ABSENT'
+                    }
+                }
+            },
+            select: {
+                id: true,
+                user: { select: { firstName: true, lastName: true, email: true } },
+                course: { select: { name: true } },
+                _count: {
+                    select: {
+                        attendances: { where: { status: 'ABSENT', date: { gte: last30Days } } }
+                    }
+                }
+            },
+        });
+
+        // Filter for those with notable absence count (e.g., > 4 days absent in month ~ <80% roughly)
+        const lowAttendanceList = studentsWithHighAbsence
+            .map(s => ({
+                id: s.id,
+                name: `${s.user.firstName} ${s.user.lastName}`,
+                course: s.course?.name,
+                absentDays: s._count.attendances,
+                risk: s._count.attendances > 6 ? 'CRITICAL' : 'WARNING'
+            }))
+            .filter(s => s.absentDays > 3)
+            .sort((a, b) => b.absentDays - a.absentDays);
+
+
+        // 2. Fee Compliance (Overdue)
+        const overdueStudents = await prisma.admission.findMany({
+            where: {
+                branchId: branchId || undefined,
+                feeBalance: { gt: 0 },
+                // Assuming we had a nextInstallmentDate, but for now just showing pending balance
+                status: 'APPROVED'
+            },
+            select: {
+                student: { select: { id: true, user: { select: { firstName: true, lastName: true } } } },
+                course: { select: { name: true } },
+                feeBalance: true,
+                feePaid: true,
+                feeAmount: true
+            },
+            orderBy: { feeBalance: 'desc' },
+            take: 20
+        });
+
+        const feeCompliance = overdueStudents.map(adm => ({
+            name: `${adm.student?.user?.firstName} ${adm.student?.user?.lastName}`,
+            course: adm.course?.name,
+            pending: adm.feeBalance,
+            paid: adm.feePaid,
+            total: adm.feeAmount
+        }));
+
+        // 3. Portfolio Compliance (Pending Approvals > 7 days)
+        // Assuming createdAt is submission date
+        const warningDate = new Date();
+        warningDate.setDate(warningDate.getDate() - 7);
+
+        const delayedPortfolios = await prisma.portfolioSubmission.findMany({
+            where: {
+                student: { branchId: branchId || undefined },
+                status: 'PENDING',
+                submittedAt: { lte: warningDate }
+            },
+            include: {
+                student: { include: { user: true } },
+                task: true
+            }
+        });
+
+        return successResponse(res, {
+            attendanceRisks: lowAttendanceList,
+            feeRisks: feeCompliance,
+            portfolioDelays: delayedPortfolios.map(p => ({
+                id: p.id,
+                studentName: `${p.student.user.firstName} ${p.student.user.lastName}`,
+                taskTitle: p.task.title,
+                submittedAt: p.submittedAt
+            }))
+        });
+
+    } catch (error) {
+        return errorResponse(res, 'Failed to fetch compliance stats', 500, error);
+    }
+};
+
+export const getPlacementReadiness = async (req: AuthRequest, res: Response): Promise<Response> => {
+    try {
+        const branchId = req.user?.branchId;
+        const where = branchId ? { branchId, isActive: true } : { isActive: true };
+
+        const headerRow = await prisma.student.findMany({
+            where,
+            select: {
+                id: true,
+                user: { select: { firstName: true, lastName: true } },
+                course: { select: { name: true } },
+                placementEligible: true,
+                softwareProgress: { select: { status: true } }, // Simplified check
+                portfolioSubmissions: { where: { status: 'APPROVED' }, select: { id: true } },
+                _count: { select: { attendances: { where: { status: 'ABSENT' } } } } // Rough metric
+            }
+        });
+
+        // Transform to readiness list
+        const readinessList = headerRow.map(s => {
+            const portfolioCount = s.portfolioSubmissions.length;
+            // Mock logic: Assume need 5 portfolios and < 10 absences
+            const isAttendanceSafe = s._count.attendances < 10;
+            const isPortfolioReady = portfolioCount >= 5; // simplified threshold
+
+            const missing = [];
+            if (!isAttendanceSafe) missing.push('Attendance');
+            if (!isPortfolioReady) missing.push('Portfolios');
+
+            return {
+                id: s.id,
+                name: `${s.user.firstName} ${s.user.lastName}`,
+                course: s.course?.name,
+                status: s.placementEligible ? 'READY' : 'NOT_READY',
+                missingRequirements: missing,
+                portfolioCount
+            };
+        });
+
+        return successResponse(res, { students: readinessList });
+
+    } catch (error) {
+        return errorResponse(res, 'Failed to fetch placement readiness', 500, error);
     }
 };

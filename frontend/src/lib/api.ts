@@ -232,6 +232,17 @@ export const coursesApi = {
     return result;
   },
 
+  getPublicCourses: async () => {
+    const response = await fetch(`${API_BASE_URL}/courses/public/list`);
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to fetch public courses');
+    }
+
+    return result;
+  },
+
   getCourseById: async (id: string) => {
     const token = storage.getToken();
     const response = await fetch(`${API_BASE_URL}/courses/${id}`, {
@@ -480,6 +491,75 @@ export const branchDashboardApi = {
   getPlacements: async () => {
     const token = storage.getToken();
     const response = await fetch(`${API_BASE_URL}/branch-dashboard/placements`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return response.json();
+  },
+  getCompliance: async () => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/branch-dashboard/compliance`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return response.json();
+  },
+  getPlacementStats: async () => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/branch-dashboard/placements`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return response.json();
+  },
+  getPlacementReadiness: async () => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/branch-dashboard/placement-readiness`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return response.json();
+  },
+  getFeeStats: async (page = 1, limit = 20) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/branch-dashboard/fees?page=${page}&limit=${limit}`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return response.json();
+  },
+  getPortfolioStats: async () => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/branch-dashboard/portfolio`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return response.json();
+  },
+  getProgressStats: async (page = 1, limit = 20) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/branch-dashboard/progress?page=${page}&limit=${limit}`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return response.json();
+  },
+  convertLead: async (leadId: string) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/branch-dashboard/lead/convert`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ leadId }),
+    });
+
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to convert lead');
+    }
+    return result;
+  },
+  getAttendanceList: async (page = 1, limit = 20, date?: string) => {
+    const token = storage.getToken();
+    const queryParams = new URLSearchParams({ page: page.toString(), limit: limit.toString() });
+    if (date) queryParams.append('date', date);
+
+    const response = await fetch(`${API_BASE_URL}/branch-dashboard/attendance/list?${queryParams}`, {
       headers: { 'Authorization': `Bearer ${token}` },
     });
     return response.json();

@@ -231,9 +231,11 @@ export const deleteLead = async (req: AuthRequest, res: Response): Promise<Respo
       return errorResponse(res, 'Access denied', 403);
     }
 
-    if (existingLead.status === LeadStatus.CONVERTED) {
-      return errorResponse(res, 'Cannot delete converted lead', 400);
-    }
+    // Unlink from admission if exists (to avoid FK constraint errors)
+    await prisma.admission.updateMany({
+      where: { leadId: id },
+      data: { leadId: null }
+    });
 
     await prisma.lead.delete({ where: { id } });
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,18 +29,19 @@ const PublicEnquiry = () => {
     });
 
     // Fetch courses on component mount
-    useState(() => {
+    useEffect(() => {
         const fetchCourses = async () => {
             try {
-                const response = await coursesApi.getCourses();
-                const validCourses = response.data?.courses || response.data || [];
+                const response = await coursesApi.getPublicCourses();
+                // API helper returns result, which contains 'data'
+                const validCourses = response.data || [];
                 setCourses(Array.isArray(validCourses) ? validCourses : []);
             } catch (err) {
                 console.error("Failed to fetch courses", err);
             }
         };
         fetchCourses();
-    });
+    }, []);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         setFormData({

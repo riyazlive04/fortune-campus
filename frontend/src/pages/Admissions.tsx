@@ -32,13 +32,16 @@ const Admissions = () => {
       setLoading(true);
       const data = await admissionsApi.getAdmissions();
 
-      const mappedAdmissions = data.data.admissions.map((a: any) => ({
+      // Safely access nested data structure
+      const admissionsList = data?.data?.admissions || data?.admissions || [];
+
+      const mappedAdmissions = admissionsList.map((a: any) => ({
         id: a.id,
         admissionId: a.admissionNumber,
         student: `${a.firstName} ${a.lastName}`,
         course: a.course?.name || "N/A",
         branch: a.branch?.name || "N/A",
-        date: new Date(a.admissionDate).toLocaleDateString(),
+        date: new Date(a.admissionDate || a.createdAt).toLocaleDateString(), // Fallback for date
         placement: "Yes", // Defaulting as schema doesn't have explicit placement support field yet
         status: a.status,
       }));

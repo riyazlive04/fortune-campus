@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   getCourses,
+  getPublicCourses,
   getCourseById,
   createCourse,
   updateCourse,
@@ -13,6 +14,8 @@ import { enforceBranchAccess, attachUserBranch } from '../../middlewares/branch.
 import { requireBranchHead } from '../../middlewares/role.middleware';
 
 const router = Router();
+
+router.get('/public/list', getPublicCourses);
 
 router.use(authenticateToken);
 router.use(enforceBranchAccess);
