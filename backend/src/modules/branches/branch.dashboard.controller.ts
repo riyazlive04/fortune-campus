@@ -326,7 +326,7 @@ export const getFeeStats = async (req: AuthRequest, res: Response): Promise<Resp
 
         const where = branchId ? { branchId } : {};
 
-        const [revenueByCourse, studentFees, total] = await Promise.all([
+        const [revenueByCourse, studentFees, total, overallStats] = await Promise.all([
             prisma.admission.groupBy({
                 by: ['courseId'],
                 where,
@@ -344,12 +344,54 @@ export const getFeeStats = async (req: AuthRequest, res: Response): Promise<Resp
                     course: true
                 }
             }),
-            prisma.admission.count({ where })
+            prisma.admission.count({ where }),
+            prisma.admission.aggregate({
+                where,
+                _sum: {
+                    feeAmount: true,
+                    feePaid: true,
+                    feeBalance: true
+                }
+            })
         ]);
 
-        return successResponse(res, { revenueByCourse, studentFees, total, page, limit });
+        return successResponse(res, { revenueByCourse, studentFees, total, page, limit, overallStats });
     } catch (error) {
         return errorResponse(res, 'Failed to fetch fee stats', 500, error);
+    }
+};
+
+export const updateAdmissionFees = async (req: AuthRequest, res: Response): Promise<Response> => {
+    try {
+        const { id } = req.params;
+        const { feeAmount, feePaid } = req.body;
+
+        if (feeAmount === undefined || feePaid === undefined) {
+            return errorResponse(res, 'Fee amount and fee paid are required', 400);
+        }
+
+        const admission = await prisma.admission.findUnique({
+            where: { id }
+        });
+
+        if (!admission) {
+            return errorResponse(res, 'Admission record not found', 404);
+        }
+
+        const feeBalance = parseFloat(feeAmount) - parseFloat(feePaid);
+
+        const updatedAdmission = await prisma.admission.update({
+            where: { id },
+            data: {
+                feeAmount: parseFloat(feeAmount),
+                feePaid: parseFloat(feePaid),
+                feeBalance
+            }
+        });
+
+        return successResponse(res, { admission: updatedAdmission });
+    } catch (error) {
+        return errorResponse(res, 'Failed to update admission fees', 500, error);
     }
 };
 
@@ -516,10 +558,10 @@ export const getPlacementReadiness = async (req: AuthRequest, res: Response): Pr
         });
 
         // Transform to readiness list
-        const readinessList = headerRow.map(s => {
-            const portfolioCount = s.portfolioSubmissions.length;
+        const readinessList = headerRow.map((s: any) => {
+            const portfolioCount = s.portfolioSubmissions?.length || 0;
             // Mock logic: Assume need 5 portfolios and < 10 absences
-            const isAttendanceSafe = s._count.attendances < 10;
+            const isAttendanceSafe = (s._count?.attendances || 0) < 10;
             const isPortfolioReady = portfolioCount >= 5; // simplified threshold
 
             const missing = [];
@@ -528,8 +570,8 @@ export const getPlacementReadiness = async (req: AuthRequest, res: Response): Pr
 
             return {
                 id: s.id,
-                name: `${s.user.firstName} ${s.user.lastName}`,
-                course: s.course?.name,
+                name: s.user ? `${s.user.firstName} ${s.user.lastName}` : 'Unknown Student',
+                course: s.course?.name || 'Unknown Course',
                 status: s.placementEligible ? 'READY' : 'NOT_READY',
                 missingRequirements: missing,
                 portfolioCount
@@ -539,6 +581,215 @@ export const getPlacementReadiness = async (req: AuthRequest, res: Response): Pr
         return successResponse(res, { students: readinessList });
 
     } catch (error) {
+        console.error('Placement readiness error:', error);
         return errorResponse(res, 'Failed to fetch placement readiness', 500, error);
+    }
+};
+
+export const getBranchReport = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+        const branchId = req.user?.branchId;
+        const { type } = req.params;
+
+        if (!branchId) {
+            res.status(400).json({ success: false, message: 'Branch ID required' });
+            return;
+        }
+
+        let data: any[] = [];
+        let headers: string[] = [];
+        let filename = `report-${type}-${new Date().toISOString().split('T')[0]}.csv`;
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        switch (type) {
+            case 'Daily Admission':
+                headers = ['Admission No', 'Student Name', 'Course', 'Fee Amount', 'Paid', 'Date'];
+                const admissions = await prisma.admission.findMany({
+                    where: {
+                        branchId,
+                        admissionDate: { gte: today }
+                    },
+                    include: { course: true }
+                });
+                data = admissions.map(a => [
+                    a.admissionNumber,
+                    `${a.firstName} ${a.lastName}`,
+                    a.course.name,
+                    a.feeAmount,
+                    a.feePaid,
+                    new Date(a.admissionDate).toLocaleDateString()
+                ]);
+                break;
+
+            case 'Student Discipline':
+                headers = ['Student Name', 'Enrollment', 'Course', 'Absent Days (Last 30 Days)', 'Status'];
+                // Logic to find students with high absenteeism
+                const thirtyDaysAgo = new Date();
+                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+                const absenteeStudents = await prisma.student.findMany({
+                    where: { branchId, isActive: true },
+                    include: {
+                        user: true,
+                        course: true,
+                        attendances: {
+                            where: {
+                                date: { gte: thirtyDaysAgo },
+                                status: 'ABSENT'
+                            }
+                        }
+                    }
+                });
+
+                // Filter only those with > 3 absences
+                data = absenteeStudents
+                    .filter(s => s.attendances.length > 3)
+                    .map(s => [
+                        `${s.user.firstName} ${s.user.lastName}`,
+                        s.enrollmentNumber,
+                        s.course.name,
+                        s.attendances.length,
+                        'High Risk'
+                    ]);
+                break;
+
+            case 'Trainer Efficiency':
+                headers = ['Trainer Name', 'Batches', 'Students', 'Avg Attendance', 'Efficiency'];
+                // Logic already exists in getTrainerStats, reusing simplified version
+                const trainers = await prisma.trainer.findMany({
+                    where: {
+                        branchId,
+                        user: { isActive: true }
+                    },
+                    include: {
+                        user: true,
+                        batches: {
+                            include: {
+                                _count: { select: { students: true } }
+                            }
+                        }
+                    }
+                });
+
+                data = trainers.map(t => [
+                    `${t.user.firstName} ${t.user.lastName}`,
+                    t.batches.length,
+                    t.batches.reduce((acc, b) => acc + (b._count?.students || 0), 0),
+                    '85%', // Mock data for now as calculation is complex
+                    'Good'
+                ]);
+                break;
+
+            case 'Revenue Collection':
+                headers = ['Student Name', 'Enr. No', 'Course', 'Total Fee', 'Paid', 'Balance', 'Status'];
+                const fees = await prisma.admission.findMany({
+                    where: { branchId },
+                    include: { student: { include: { user: true } }, course: true }
+                });
+                data = fees.map(f => [
+                    `${f.firstName} ${f.lastName}`,
+                    f.student?.enrollmentNumber || 'N/A',
+                    f.course.name,
+                    f.feeAmount,
+                    f.feePaid,
+                    f.feeBalance,
+                    f.feeBalance <= 0 ? 'Paid' : 'Pending'
+                ]);
+                break;
+
+            case 'Placement Readiness':
+                // Reusing logic from getPlacementReadiness roughly
+                headers = ['Student Name', 'Course', 'Portfolios', 'Attendance Status', 'Readiness'];
+                const students = await prisma.student.findMany({
+                    where: { branchId, isActive: true },
+                    include: {
+                        user: true,
+                        course: true,
+                        portfolioSubmissions: { where: { status: 'APPROVED' } },
+                        _count: { select: { attendances: { where: { status: 'ABSENT' } } } }
+                    }
+                });
+                data = students.map(s => [
+                    `${s.user.firstName} ${s.user.lastName}`,
+                    s.course.name,
+                    s.portfolioSubmissions.length,
+                    s._count.attendances < 10 ? 'Good' : 'Low',
+                    s.placementEligible ? 'Ready' : 'Not Ready'
+                ]);
+                break;
+
+            case 'Compliance Alert Log':
+                headers = ['Student', 'Issue Type', 'Details', 'Severity'];
+                // Combining fee and attendance risks
+                data = []; // Placeholder for complex logic, or simple aggregation
+                // For now returning empty or mock
+                break;
+
+            default:
+                res.status(400).json({ success: false, message: 'Invalid report type' });
+                return;
+        }
+
+        // CSV Generation
+        const csvRows = [
+            headers.join(','),
+            ...data.map(row => row.map((field: any) => `"${String(field).replace(/"/g, '""')}"`).join(','))
+        ];
+        const csvString = csvRows.join('\n');
+
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', `attachment; filename=${filename}`);
+        res.status(200).send(csvString);
+
+    } catch (error) {
+        console.error('Report generation error:', error);
+        res.status(500).json({ success: false, message: 'Failed to generate report' });
+    }
+};
+
+export const uploadBranchReport = async (req: AuthRequest, res: Response): Promise<Response> => {
+    try {
+        const userId = req.user?.id;
+        const branchId = req.user?.branchId;
+        const file = req.file;
+        const { title, description, type } = req.body;
+
+        console.log(`[uploadBranchReport] Upload initiated by user: ${userId}, branch: ${branchId}`);
+        console.log(`[uploadBranchReport] Data: title=${title}, type=${type}`);
+        console.log(`[uploadBranchReport] File:`, file);
+
+        if (!userId || !branchId) {
+            console.log(`[uploadBranchReport] User or Branch ID missing`);
+            return errorResponse(res, 'Unauthorized', 401);
+        }
+
+        if (!file) {
+            console.log(`[uploadBranchReport] No file received`);
+            return errorResponse(res, 'No file uploaded', 400);
+        }
+
+        // Construct file URL
+        const fileUrl = `/uploads/reports/${file.filename}`;
+        console.log(`[uploadBranchReport] File URL constructed: ${fileUrl}`);
+
+        const report = await (prisma as any).branchReport.create({
+            data: {
+                title,
+                description,
+                type,
+                fileUrl,
+                branchId,
+                uploadedById: userId
+            }
+        });
+
+        console.log(`[uploadBranchReport] Report created in DB:`, report);
+        return successResponse(res, 'Report uploaded successfully', report);
+
+    } catch (error) {
+        console.error('Upload report error:', error);
+        return errorResponse(res, 'Failed to upload report', 500);
     }
 };

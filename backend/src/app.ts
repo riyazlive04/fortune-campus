@@ -57,8 +57,16 @@ if (config.nodeEnv === "development") {
 // --------------------
 // Body Parsers
 // --------------------
+// --------------------
+// Body Parsers
+// --------------------
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// Static Files
+import path from 'path';
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
 
 // --------------------
 // Root (avoid noisy 404s)

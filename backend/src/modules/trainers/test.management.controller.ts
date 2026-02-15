@@ -89,3 +89,15 @@ export const getTestScores = async (req: AuthRequest, res: Response): Promise<Re
         return errorResponse(res, 'Failed to fetch test scores', 500, error);
     }
 };
+
+export const deleteTest = async (req: AuthRequest, res: Response): Promise<Response> => {
+    try {
+        const { testId } = req.params;
+        await (prisma as any).test.delete({
+            where: { id: testId }
+        });
+        return successResponse(res, null, 'Test deleted successfully');
+    } catch (error) {
+        return errorResponse(res, 'Failed to delete test', 500, error);
+    }
+};

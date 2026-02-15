@@ -257,3 +257,100 @@ export const getBranchStudents = async (req: AuthRequest, res: Response): Promis
         return errorResponse(res, 'Failed to fetch branch students', 500, error);
     }
 };
+
+export const getStudentDetailsForTrainer = async (req: AuthRequest, res: Response): Promise<Response> => {
+    try {
+        const { studentId } = req.params;
+        const student = await (prisma as any).student.findUnique({
+            where: { id: studentId },
+            include: {
+                user: {
+                    select: {
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                        phone: true,
+                    },
+                },
+                course: true,
+                batch: true,
+                branch: true,
+                admission: true,
+                attendances: {
+                    orderBy: { date: 'desc' },
+                    take: 50
+                },
+                portfolioSubmissions: {
+                    include: { task: true },
+                    orderBy: { createdAt: 'desc' }
+                },
+                testScores: {
+                    include: { test: true },
+                    orderBy: { createdAt: 'desc' }
+                }
+            }
+        });
+
+        if (!student) {
+            return errorResponse(res, 'Student not found', 404);
+        }
+
+        // Calculate some basic stats for the popup
+        const totalAttendance = await prisma.attendance.count({ where: { studentId } });
+        const presentAttendance = await prisma.attendance.count({ where: { studentId, status: 'PRESENT' } });
+        const attendancePercentage = totalAttendance > 0 ? Math.round((presentAttendance / totalAttendance) * 100) : 0;
+
+        return successResponse(res, {
+            ...student,
+            stats: {
+                attendancePercentage,
+                totalAttendance,
+                presentAttendance
+            }
+        });
+    } catch (error) {
+        return errorResponse(res, 'Failed to fetch student details', 500, error);
+    }
+};
+
+export const getBranchReports = async (req: AuthRequest, res: Response): Promise<Response> => {
+    try {
+        const userId = req.user?.id;
+        console.log(`[getBranchReports] Fetching reports for user: ${userId}`);
+
+        const trainer = await prisma.trainer.findUnique({
+            where: { userId },
+            select: { branchId: true }
+        });
+
+        console.log(`[getBranchReports] Trainer found:`, trainer);
+
+        if (!trainer || !trainer.branchId) {
+            console.log(`[getBranchReports] Trainer or BranchId missing`);
+            return errorResponse(res, 'Trainer or Branch not found', 404);
+        }
+
+        const reports = await (prisma as any).branchReport.findMany({
+            where: {
+                branchId: trainer.branchId
+            },
+            orderBy: {
+                createdAt: 'desc'
+            },
+            include: {
+                uploadedBy: {
+                    select: {
+                        firstName: true,
+                        lastName: true
+                    }
+                }
+            }
+        });
+
+        console.log(`[getBranchReports] Reports found: ${reports.length}`);
+        return successResponse(res, 'Branch reports fetched successfully', reports);
+    } catch (error) {
+        console.error('Fetch reports error:', error);
+        return errorResponse(res, 'Failed to fetch reports', 500);
+    }
+};

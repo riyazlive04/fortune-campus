@@ -395,6 +395,15 @@ export const trainersApi = {
 
     return result;
   },
+  getBranchReports: async () => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/trainers/reports`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch reports');
+    return result;
+  },
 };
 
 // Branches API Service
@@ -523,6 +532,30 @@ export const branchDashboardApi = {
     });
     return response.json();
   },
+  updateStudentFee: async (admissionId: string, data: { feeAmount: number; feePaid: number }) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/branch-dashboard/admissions/${admissionId}/fees`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(data)
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to update fees');
+    }
+    return result;
+  },
+  downloadReport: async (type: string) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/branch-dashboard/reports/${type}`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error('Failed to download report');
+    return response.blob();
+  },
   getPortfolioStats: async () => {
     const token = storage.getToken();
     const response = await fetch(`${API_BASE_URL}/branch-dashboard/portfolio`, {
@@ -561,6 +594,18 @@ export const branchDashboardApi = {
 
     const response = await fetch(`${API_BASE_URL}/branch-dashboard/attendance/list?${queryParams}`, {
       headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return response.json();
+  },
+  uploadReport: async (data: FormData) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/branch-dashboard/reports`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        // Content-Type is automatic with FormData
+      },
+      body: data
     });
     return response.json();
   },
@@ -1648,6 +1693,19 @@ export const trainerApi = {
     return result;
   },
 
+  getStudentDetails: async (studentId: string) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/trainers/students/${studentId}/details`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch student details');
+    return result;
+  },
+
   checkEligibility: async (batchId: string) => {
     const token = storage.getToken();
     const response = await fetch(`${API_BASE_URL}/trainers/batches/${batchId}/check-eligibility`, {
@@ -1694,6 +1752,17 @@ export const trainerApi = {
     return result;
   },
 
+  deleteTest: async (testId: string) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/trainers/tests/${testId}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to delete test');
+    return result;
+  },
+
   updateTestScores: async (testId: string, scores: any[]) => {
     const token = storage.getToken();
     const response = await fetch(`${API_BASE_URL}/trainers/tests/${testId}/scores`, {
@@ -1706,6 +1775,16 @@ export const trainerApi = {
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Failed to update scores');
+    return result;
+  },
+
+  getBranchReports: async () => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/trainers/reports`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch reports');
     return result;
   },
 };

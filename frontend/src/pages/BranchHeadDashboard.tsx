@@ -1,19 +1,9 @@
-
 import { useState, useEffect } from "react";
 import {
-    Users,
-    BarChart3,
-    ClipboardCheck,
-    Receipt,
-    TrendingUp,
-    AlertCircle,
-    CheckCircle2,
-    Search,
-    Download,
-    BookOpen,
-    Briefcase,
-    Shield,
-    Clock
+    Users, BookOpen, GraduationCap, DollarSign,
+    TrendingUp, Briefcase, CalendarCheck, AlertTriangle,
+    Download, CheckCircle2, AlertCircle, FileText, Upload,
+    Receipt, BarChart3, ClipboardCheck, Shield, Clock, Pencil
 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import KPICard from "@/components/KPICard";
@@ -36,6 +26,17 @@ import {
 import StatusBadge from "@/components/StatusBadge";
 
 import { Button } from "@/components/ui/button";
+import {
+    Dialog, DialogContent, DialogDescription, DialogHeader,
+    DialogTitle, DialogTrigger
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+    Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+} from "@/components/ui/select";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Textarea } from "@/components/ui/textarea";
 
 const COLORS = ["hsl(var(--primary))", "hsl(var(--success))", "hsl(var(--warning))", "hsl(var(--destructive))", "#8b5cf6"];
 
@@ -327,11 +328,79 @@ const BranchTrainersList = () => {
     );
 };
 
+const FeeEditDialog = ({ student, open, onOpenChange, onSuccess }: { student: any, open: boolean, onOpenChange: (open: boolean) => void, onSuccess: () => void }) => {
+    const [loading, setLoading] = useState(false);
+    const [formData, setFormData] = useState({
+        feeAmount: student?.feeAmount || 0,
+        feePaid: student?.feePaid || 0
+    });
+    const { toast } = useToast();
+
+    useEffect(() => {
+        if (student) {
+            setFormData({
+                feeAmount: student.feeAmount || 0,
+                feePaid: student.feePaid || 0
+            });
+        }
+    }, [student]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+        try {
+            await branchDashboardApi.updateStudentFee(student.id, formData);
+            toast({ title: "Success", description: "Fees updated successfully" });
+            onSuccess();
+            onOpenChange(false);
+        } catch (error: any) {
+            toast({ variant: "destructive", title: "Error", description: error.message });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Edit Fees - {student?.student?.user?.firstName}</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="space-y-2">
+                        <Label>Total Fee</Label>
+                        <Input
+                            type="number"
+                            value={formData.feeAmount}
+                            onChange={(e) => setFormData(prev => ({ ...prev, feeAmount: parseFloat(e.target.value) }))}
+                            required
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Paid Amount</Label>
+                        <Input
+                            type="number"
+                            value={formData.feePaid}
+                            onChange={(e) => setFormData(prev => ({ ...prev, feePaid: parseFloat(e.target.value) }))}
+                            required
+                        />
+                    </div>
+                    <div className="pt-2 flex justify-end gap-2">
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+                        <Button type="submit" disabled={loading}>{loading ? 'Saving...' : 'Save Changes'}</Button>
+                    </div>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
 const BranchFeesList = () => {
     const [fees, setFees] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
+    const [editingStudent, setEditingStudent] = useState<any>(null);
 
     const fetchFees = async () => {
         setLoading(true);
@@ -365,16 +434,17 @@ const BranchFeesList = () => {
                             <th className="px-4 py-3 text-right">Paid</th>
                             <th className="px-4 py-3 text-right">Balance</th>
                             <th className="px-4 py-3 text-center">Status</th>
+                            <th className="px-4 py-3 text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y">
                         {loading ? (
-                            <tr><td colSpan={6} className="p-4 text-center">Loading...</td></tr>
+                            <tr><td colSpan={7} className="p-4 text-center">Loading...</td></tr>
                         ) : fees.length === 0 ? (
-                            <tr><td colSpan={6} className="p-4 text-center text-muted-foreground">No fee records found</td></tr>
+                            <tr><td colSpan={7} className="p-4 text-center text-muted-foreground">No fee records found</td></tr>
                         ) : (
                             fees.map((record) => {
-                                const total = record.totalFee || 0;
+                                const total = record.feeAmount || 0; // Use feeAmount instead of totalFee
                                 const paid = record.feePaid || 0;
                                 const balance = record.feeBalance || 0;
                                 const status = balance <= 0 ? 'PAID' : paid > 0 ? 'PARTIAL' : 'PENDING';
@@ -400,6 +470,11 @@ const BranchFeesList = () => {
                                             }>
                                                 {status}
                                             </Badge>
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                            <Button size="sm" variant="ghost" onClick={() => setEditingStudent(record)}>
+                                                <Pencil className="w-4 h-4" />
+                                            </Button>
                                         </td>
                                     </tr>
                                 );
@@ -430,6 +505,15 @@ const BranchFeesList = () => {
                     </Button>
                 </div>
             </div>
+
+            {editingStudent && (
+                <FeeEditDialog
+                    student={editingStudent}
+                    open={!!editingStudent}
+                    onOpenChange={(open) => !open && setEditingStudent(null)}
+                    onSuccess={fetchFees}
+                />
+            )}
         </div>
     );
 };
@@ -466,35 +550,22 @@ const BranchHeadDashboard = () => {
                 branchDashboardApi.getProgressStats()
             ]);
 
-            const [
-                overviewRes, admissionsRes, attendanceRes,
-                trainersRes, complianceRes, placementsRes,
-                readinessRes, feesRes, portfolioRes, progressRes
-            ] = results;
-
-            // Helper to get data or log error
-            const getData = (result: PromiseSettledResult<any>, name: string) => {
-                if (result.status === 'fulfilled' && result.value.success) {
-                    return result.value.data;
-                }
-                if (result.status === 'rejected') {
-                    console.error(`Failed to fetch ${name}:`, result.reason);
-                } else if (result.status === 'fulfilled' && !result.value.success) {
-                    console.error(`Failed to fetch ${name}:`, result.value.message);
-                }
-                return null;
+            // Helper to safe extract data
+            const getResult = (index: number) => {
+                const res = results[index];
+                return res.status === 'fulfilled' && res.value.success ? res.value.data : null;
             };
 
-            setStats(getData(overviewRes, 'overview'));
-            setAdmissions(getData(admissionsRes, 'admissions'));
-            setAttendance(getData(attendanceRes, 'attendance'));
-            setTrainers(getData(trainersRes, 'trainers'));
-            setCompliance(getData(complianceRes, 'compliance'));
-            setPlacements(getData(placementsRes, 'placements'));
-            setReadiness(getData(readinessRes, 'readiness'));
-            setFees(getData(feesRes, 'fees'));
-            setPortfolio(getData(portfolioRes, 'portfolio'));
-            setStudentProgress(getData(progressRes, 'progress'));
+            setStats(getResult(0));
+            setAdmissions(getResult(1));
+            setAttendance(getResult(2));
+            setTrainers(getResult(3));
+            setCompliance(getResult(4));
+            setPlacements(getResult(5));
+            setReadiness(getResult(6));
+            setFees(getResult(7));
+            setPortfolio(getResult(8));
+            setStudentProgress(getResult(9));
 
         } catch (error: any) {
             console.error("Critical dashboard error:", error);
@@ -505,6 +576,25 @@ const BranchHeadDashboard = () => {
             });
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDownloadReport = async (reportType: string) => {
+        try {
+            toast({ title: "Generating Report", description: `Please wait while we generate the ${reportType} report...` });
+            const blob = await branchDashboardApi.downloadReport(reportType);
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${reportType.replace(/ /g, '-')}-Report.csv`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            toast({ title: "Success", description: "Report downloaded successfully" });
+        } catch (error) {
+            console.error("Download failed:", error);
+            toast({ variant: "destructive", title: "Error", description: "Failed to download report" });
         }
     };
 
@@ -784,20 +874,22 @@ const BranchHeadDashboard = () => {
                                     </CardDescription>
                                 </div>
                                 <div className="flex gap-2">
-                                    <KPICard
-                                        title="Total Revenue"
-                                        value={safeCurrency(fees?.revenueByCourse?.reduce((acc: number, curr: any) => acc + (curr._sum.feePaid || 0), 0))}
-                                        icon={Receipt}
-                                        accentColor="bg-violet-500"
-                                        className="w-[200px] h-[80px] p-4"
-                                    />
-                                    <KPICard
-                                        title="Pending"
-                                        value={safeCurrency(fees?.revenueByCourse?.reduce((acc: number, curr: any) => acc + (curr._sum.feeBalance || 0), 0))}
-                                        icon={AlertCircle}
-                                        accentColor="bg-red-500"
-                                        className="w-[200px] h-[80px] p-4"
-                                    />
+                                    <div className="w-[200px] h-[80px]">
+                                        <KPICard
+                                            title="Total Revenue"
+                                            value={safeCurrency(fees?.overallStats?._sum?.feePaid || 0)}
+                                            icon={Receipt}
+                                            accentColor="bg-violet-500"
+                                        />
+                                    </div>
+                                    <div className="w-[200px] h-[80px]">
+                                        <KPICard
+                                            title="Pending"
+                                            value={safeCurrency(fees?.overallStats?._sum?.feeBalance || 0)}
+                                            icon={AlertCircle}
+                                            accentColor="bg-red-500"
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         </CardHeader>
@@ -985,13 +1077,76 @@ const BranchHeadDashboard = () => {
 
                 {/* REPORTS TAB */}
                 <TabsContent value="reports" className="space-y-4">
+                    <div className="flex justify-between items-center">
+                        <h3 className="text-lg font-medium">Branch Reports</h3>
+                        <Dialog>
+                            <DialogTrigger asChild>
+                                <Button className="gap-2">
+                                    <Upload className="w-4 h-4" />
+                                    Upload Report
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>Upload Branch Report</DialogTitle>
+                                    <DialogDescription>
+                                        Share reports with your branch trainers.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <form onSubmit={async (e) => {
+                                    e.preventDefault();
+                                    const formData = new FormData(e.currentTarget);
+                                    try {
+                                        toast({ title: "Uploading...", description: "Please wait." });
+                                        await branchDashboardApi.uploadReport(formData);
+                                        toast({ title: "Success", description: "Report uploaded successfully." });
+                                        (e.target as any).reset();
+                                    } catch (err: any) {
+                                        toast({ variant: "destructive", title: "Error", description: err.message });
+                                    }
+                                }} className="space-y-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="title">Report Title</Label>
+                                        <Input id="title" name="title" required placeholder="e.g., Weekly Performance" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="type">Report Type</Label>
+                                        <Select name="type" required>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select type" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Daily Admission">Daily Admission</SelectItem>
+                                                <SelectItem value="Student Discipline">Student Discipline</SelectItem>
+                                                <SelectItem value="Trainer Efficiency">Trainer Efficiency</SelectItem>
+                                                <SelectItem value="Revenue Collection">Revenue Collection</SelectItem>
+                                                <SelectItem value="Placement Readiness">Placement Readiness</SelectItem>
+                                                <SelectItem value="Compliance Alert Log">Compliance Alert Log</SelectItem>
+                                                <SelectItem value="Other">Other</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="description">Description (Optional)</Label>
+                                        <Textarea id="description" name="description" placeholder="Add some details..." />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="file">File (PDF/CSV)</Label>
+                                        <Input id="file" name="file" type="file" required accept=".pdf,.csv,.xlsx" />
+                                    </div>
+                                    <Button type="submit" className="w-full">Upload</Button>
+                                </form>
+                            </DialogContent>
+                        </Dialog>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {['Daily Admission', 'Student Discipline', 'Trainer Efficiency', 'Revenue Collection', 'Placement Readiness', 'Compliance Alert Log'].map((report) => (
-                            <Card key={report} className="hover:border-primary transition-all cursor-pointer group">
+                            <Card key={report} className="hover:border-primary transition-all cursor-pointer group" onClick={() => handleDownloadReport(report)}>
                                 <CardContent className="flex items-center justify-between p-6">
                                     <div className="space-y-1">
                                         <p className="font-bold group-hover:text-primary transition-colors">{report} Report</p>
-                                        <p className="text-xs text-muted-foreground">Generated today at 09:00 AM</p>
+                                        <p className="text-xs text-muted-foreground">System Generated</p>
                                     </div>
                                     <div className="p-2 rounded-lg bg-muted group-hover:bg-primary group-hover:text-white transition-all">
                                         <Download className="w-5 h-5" />

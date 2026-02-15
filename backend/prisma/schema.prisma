@@ -36,7 +36,8 @@ model User {
   studentProfile Student? @relation("StudentUser")
   trainerProfile Trainer?
   incentives    Incentive[]
-  notifications Notification[] // Added relation
+  notifications Notification[]
+  uploadedReports BranchReport[]
   
   @@index([email])
   @@index([branchId])
@@ -68,6 +69,7 @@ model Branch {
   expenses    Expense[]
   socialMedia SocialMediaEngagement[]
   eventPlans  EventPlan[]
+  branchReports BranchReport[]
   
   @@map("branches")
 }
@@ -732,4 +734,20 @@ model EventPlan {
   @@index([branchId])
   @@index([date])
   @@map("event_plans")
+}
+model BranchReport {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  fileUrl     String
+  type        String   // 'Daily Admission', 'Student Discipline', etc.
+  branchId    String
+  uploadedById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  branch      Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  uploadedBy  User     @relation(fields: [uploadedById], references: [id])
+
+  @@map("branch_reports")
 }

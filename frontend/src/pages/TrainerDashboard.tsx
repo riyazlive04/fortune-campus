@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { Users, GraduationCap, ClipboardCheck, LayoutDashboard, Database, CheckSquare, Award } from "lucide-react";
+import { Users, GraduationCap, ClipboardCheck, LayoutDashboard, Database, CheckSquare, Award, FileText, Download } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import KPICard from "@/components/KPICard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -25,6 +25,10 @@ const TrainerDashboard = () => {
     const { toast } = useToast();
     const user = storage.getUser();
 
+    // Assuming these states and API are defined elsewhere or will be added
+    const [reports, setReports] = useState<any>(null); // Added for the new useEffect
+    const trainersApi = trainerApi; // Assuming trainerApi is used for reports as well
+
     const fetchTrainerStats = async () => {
         try {
             setLoading(true);
@@ -39,7 +43,7 @@ const TrainerDashboard = () => {
                 description: error.message || "Failed to fetch trainer stats",
             });
         } finally {
-            setLoading(false);
+            // setLoading(false); // This will be handled by the reports useEffect if it's the last one
         }
     };
 
@@ -47,8 +51,30 @@ const TrainerDashboard = () => {
         fetchTrainerStats();
     }, []);
 
+    // New useEffect for fetching reports, as per instruction
+    useEffect(() => {
+        const fetchReports = async () => {
+            console.log("Fetching Branch Reports...");
+            try {
+                const res = await trainerApi.getBranchReports();
+                console.log("Branch Reports Response:", res);
+                if (res.success) {
+                    setReports(res.data);
+                } else {
+                    console.error("Failed to fetch reports:", res.message);
+                }
+            } catch (e) {
+                console.error("Error fetching reports:", e);
+            } finally {
+                setLoading(false); // Set loading to false after reports are fetched
+            }
+        };
+        fetchReports();
+    }, []);
+
     if (loading) return <DashboardSkeleton />;
-    if (!stats) return null;
+    if (loading) return <DashboardSkeleton />;
+    if (!stats) return <div className="p-8 text-center text-destructive">Failed to load dashboard data. Please try refreshing.</div>;
 
     return (
         <div className="animate-fade-in">
@@ -59,50 +85,51 @@ const TrainerDashboard = () => {
 
             {/* KPI Cards */}
             <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <KPICard
-                    title="Active Students"
-                    value={stats.activeStudents.toString()}
-                    icon={Users}
-                    accentColor="bg-primary"
-                    onClick={() => setActiveTab("overview")}
-                    className="cursor-pointer hover:shadow-md transition-shadow"
-                />
-                <KPICard
-                    title="Attendance (Today)"
-                    value={`${stats.presentToday}/${stats.presentToday + stats.absentToday}`}
-                    change={`${stats.absentToday} absent`}
-                    changeType="negative"
-                    icon={ClipboardCheck}
-                    accentColor="bg-success"
-                    onClick={() => setActiveTab("attendance")}
-                    className="cursor-pointer hover:shadow-md transition-shadow"
-                />
-                <KPICard
-                    title="Pending Portfolios"
-                    value={stats.pendingPortfolios.toString()}
-                    icon={LayoutDashboard}
-                    accentColor="bg-warning"
-                    onClick={() => setActiveTab("portfolio")}
-                    className="cursor-pointer hover:shadow-md transition-shadow"
-                />
-                <KPICard
-                    title="Placement Eligible"
-                    value={stats.eligibleForPlacement.toString()}
-                    icon={Award}
-                    accentColor="bg-purple-500"
-                    onClick={() => setActiveTab("placement")}
-                    className="cursor-pointer hover:shadow-md transition-shadow"
-                />
+                <div onClick={() => setActiveTab("overview")} className="cursor-pointer hover:shadow-md transition-shadow rounded-xl">
+                    <KPICard
+                        title="Active Students"
+                        value={stats.activeStudents.toString()}
+                        icon={Users}
+                        accentColor="bg-primary"
+                    />
+                </div>
+                <div onClick={() => setActiveTab("attendance")} className="cursor-pointer hover:shadow-md transition-shadow rounded-xl">
+                    <KPICard
+                        title="Attendance (Today)"
+                        value={`${stats.presentToday}/${stats.presentToday + stats.absentToday}`}
+                        change={`${stats.absentToday} absent`}
+                        changeType="negative"
+                        icon={ClipboardCheck}
+                        accentColor="bg-success"
+                    />
+                </div>
+                <div onClick={() => setActiveTab("portfolio")} className="cursor-pointer hover:shadow-md transition-shadow rounded-xl">
+                    <KPICard
+                        title="Pending Portfolios"
+                        value={stats.pendingPortfolios.toString()}
+                        icon={LayoutDashboard}
+                        accentColor="bg-warning"
+                    />
+                </div>
+                <div onClick={() => setActiveTab("placement")} className="cursor-pointer hover:shadow-md transition-shadow rounded-xl">
+                    <KPICard
+                        title="Placement Eligible"
+                        value={stats.eligibleForPlacement.toString()}
+                        icon={Award}
+                        accentColor="bg-purple-500"
+                    />
+                </div>
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
                 <TabsList className="bg-card border p-1 rounded-xl w-full justify-start overflow-x-auto">
                     <TabsTrigger value="overview">Overview</TabsTrigger>
                     <TabsTrigger value="attendance">Attendance</TabsTrigger>
-                    <TabsTrigger value="progress">Student Progress</TabsTrigger>
-                    <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
+
                     <TabsTrigger value="tests">Tests</TabsTrigger>
-                    <TabsTrigger value="placement">Placement</TabsTrigger>
+                    <TabsTrigger value="progress">Software Progress</TabsTrigger>
+                    <TabsTrigger value="placement">Placement Eligibility</TabsTrigger>
+                    <TabsTrigger value="reports">Branch Reports</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="overview">
@@ -166,6 +193,13 @@ const TrainerDashboard = () => {
                                 >
                                     <Users className="mb-2 text-purple-500" />
                                     <span className="text-sm font-medium">Student Help</span>
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab("reports")}
+                                    className="flex flex-col items-center justify-center p-4 bg-muted hover:bg-muted/80 rounded-lg border transition-all"
+                                >
+                                    <FileText className="mb-2 text-blue-500" />
+                                    <span className="text-sm font-medium">View Reports</span>
                                 </button>
                             </div>
                         </div>

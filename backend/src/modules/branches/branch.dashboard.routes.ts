@@ -12,8 +12,12 @@ import {
     getComplianceStats,
     getPlacementReadiness,
     convertLead,
-    getBranchAttendance
+    getBranchAttendance,
+    updateAdmissionFees,
+    getBranchReport,
+    uploadBranchReport
 } from './branch.dashboard.controller';
+import { uploadReport } from '../../middlewares/upload.middleware';
 import { authenticateToken } from '../../middlewares/auth.middleware';
 import { requireRoles } from '../../middlewares/role.middleware';
 import { UserRole } from '../../types/enums';
@@ -36,5 +40,8 @@ router.get('/fees', getFeeStats);
 router.get('/placements', getPlacementStats);
 router.get('/compliance', getComplianceStats);
 router.get('/placement-readiness', getPlacementReadiness);
+router.put('/admissions/:id/fees', updateAdmissionFees);
+router.get('/reports/:type', getBranchReport);
+router.post('/reports', uploadReport.single('file'), uploadBranchReport);
 
 export default router;

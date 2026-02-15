@@ -42,12 +42,12 @@ export class AutomationWorker {
         });
 
         for (const adm of admissions) {
-            await NotificationService.notifyBranchRole(adm.branchId, 'CHANNEL_PARTNER', {
-                title: 'Google Review Reminder',
-                message: `Student ${adm.firstName} ${adm.lastName} has reached 50 days since admission. Please request a Google Review.`,
-                type: 'INFO',
-                link: `/admissions`
-            });
+            // await NotificationService.notifyBranchRole(adm.branchId, 'CHANNEL_PARTNER', {
+            //     title: 'Google Review Reminder',
+            //     message: `Student ${adm.firstName} ${adm.lastName} has reached 50 days since admission. Please request a Google Review.`,
+            //     type: 'INFO',
+            //     link: `/admissions`
+            // });
         }
     }
 
@@ -69,12 +69,12 @@ export class AutomationWorker {
         });
 
         for (const adm of admissions) {
-            await NotificationService.notifyBranchRole(adm.branchId, 'CHANNEL_PARTNER', {
-                title: 'Conduct Exam Reminder',
-                message: `Software module for ${adm.firstName} ${adm.lastName} is completed. Please schedule the final exam.`,
-                type: 'WARNING',
-                link: `/admissions`
-            });
+            // await NotificationService.notifyBranchRole(adm.branchId, 'CHANNEL_PARTNER', {
+            //     title: 'Conduct Exam Reminder',
+            //     message: `Software module for ${adm.firstName} ${adm.lastName} is completed. Please schedule the final exam.`,
+            //     type: 'WARNING',
+            //     link: `/admissions`
+            // });
         }
     }
 
@@ -99,12 +99,12 @@ export class AutomationWorker {
         });
 
         for (const adm of admissions) {
-            await NotificationService.notifyBranchRole(adm.branchId, 'ADMISSION_OFFICER', {
-                title: 'Fee Collection Reminder',
-                message: `Student ${adm.firstName} ${adm.lastName} has a pending balance of ₹${adm.feeBalance}.`,
-                type: 'WARNING',
-                link: `/admissions`
-            });
+            // await NotificationService.notifyBranchRole(adm.branchId, 'ADMISSION_OFFICER', {
+            //     title: 'Fee Collection Reminder',
+            //     message: `Student ${adm.firstName} ${adm.lastName} has a pending balance of ₹${adm.feeBalance}.`,
+            //     type: 'WARNING',
+            //     link: `/admissions`
+            // });
         }
     }
 
@@ -133,12 +133,12 @@ export class AutomationWorker {
             });
 
             if (admission) {
-                await NotificationService.notifyBranchRole(admission.branchId, 'CHANNEL_PARTNER', {
-                    title: 'Portfolio Verification Required',
-                    message: `Portfolio for ${admission.firstName} ${admission.lastName} is pending verification.`,
-                    type: 'INFO',
-                    link: `/portfolio`
-                });
+                // await NotificationService.notifyBranchRole(admission.branchId, 'CHANNEL_PARTNER', {
+                //     title: 'Portfolio Verification Required',
+                //     message: `Portfolio for ${admission.firstName} ${admission.lastName} is pending verification.`,
+                //     type: 'INFO',
+                //     link: `/portfolio`
+                // });
             }
         }
     }

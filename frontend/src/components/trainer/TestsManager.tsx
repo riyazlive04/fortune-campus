@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { trainerApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Award, Save, ChevronRight, ChevronDown } from "lucide-react";
+import { Plus, Award, Save, ChevronRight, ChevronDown, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -12,15 +12,20 @@ interface TestsManagerProps {
     batches: any[];
 }
 
-const TestsManager = ({ batches }: TestsManagerProps) => {
-    const [selectedBatch, setSelectedBatch] = useState<string>(batches[0]?.id || "");
+const TestsManager = ({ batches = [] }: TestsManagerProps) => {
+    const [selectedBatch, setSelectedBatch] = useState<string>(batches?.[0]?.id || "");
     const [tests, setTests] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [selectedTest, setSelectedTest] = useState<string | null>(null);
     const [scores, setScores] = useState<any[]>([]); // Current scores being edited
     const [students, setStudents] = useState<any[]>([]); // Students for score entry
     const [isCreateOpen, setIsCreateOpen] = useState(false);
-    const [newTest, setNewTest] = useState({ title: "", maxScore: 100, date: new Date().toISOString().split('T')[0] });
+    const [newTest, setNewTest] = useState({
+        title: "",
+        totalMarks: 50,
+        passMarks: 20,
+        date: new Date().toISOString().split('T')[0]
+    });
 
     const { toast } = useToast();
 
@@ -49,12 +54,37 @@ const TestsManager = ({ batches }: TestsManagerProps) => {
             toast({ variant: "destructive", title: "Error", description: "Please select a batch first" });
             return;
         }
+        if (!newTest.title || !newTest.date) {
+            toast({ variant: "destructive", title: "Error", description: "Please fill all fields" });
+            return;
+        }
+
         try {
             const res = await trainerApi.createTest({ ...newTest, batchId: selectedBatch });
             if (res.success) {
                 toast({ title: "Success", description: "Test created successfully" });
                 setIsCreateOpen(false);
-                setNewTest({ title: "", maxScore: 100, date: new Date().toISOString().split('T')[0] });
+                setNewTest({
+                    title: "",
+                    totalMarks: 50,
+                    passMarks: 20,
+                    date: new Date().toISOString().split('T')[0]
+                });
+                fetchTests();
+            }
+        } catch (error: any) {
+            toast({ variant: "destructive", title: "Error", description: error.message });
+        }
+    };
+
+    const handleDeleteTest = async (testId: string) => {
+        if (!confirm("Are you sure you want to delete this test? This action cannot be undone.")) return;
+
+        try {
+            const res = await trainerApi.deleteTest(testId);
+            if (res.success) {
+                toast({ title: "Success", description: "Test deleted successfully" });
+                if (selectedTest === testId) setSelectedTest(null);
                 fetchTests();
             }
         } catch (error: any) {
@@ -84,8 +114,8 @@ const TestsManager = ({ batches }: TestsManagerProps) => {
                     return {
                         studentId: student.id,
                         studentName: `${student.user.firstName} ${student.user.lastName}`,
-                        score: existingScore ? existingScore.score : '', // empty string for no score
-                        feedback: existingScore ? existingScore.feedback : ''
+                        score: existingScore ? existingScore.marksObtained : '', // Changed from score to marksObtained
+                        feedback: existingScore ? existingScore.remarks : ''
                     };
                 });
 
@@ -109,8 +139,9 @@ const TestsManager = ({ batches }: TestsManagerProps) => {
             // Filter out empty scores if you want, or send all
             const scoresToSave = scores.filter(s => s.score !== '' && s.score !== null).map(s => ({
                 studentId: s.studentId,
-                score: parseFloat(s.score),
-                feedback: s.feedback
+                marksObtained: parseFloat(s.score),
+                isPass: parseFloat(s.score) >= (tests.find(t => t.id === selectedTest)?.passMarks || 0),
+                remarks: s.feedback
             }));
 
             const res = await trainerApi.updateTestScores(selectedTest, scoresToSave);
@@ -166,21 +197,36 @@ const TestsManager = ({ batches }: TestsManagerProps) => {
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
-                                        <Label>Max Score</Label>
+                                        <Label>Total Marks</Label>
                                         <Input
                                             type="number"
-                                            value={newTest.maxScore}
-                                            onChange={(e) => setNewTest({ ...newTest, maxScore: parseInt(e.target.value) })}
+                                            value={newTest.totalMarks}
+                                            onChange={(e) => {
+                                                const total = parseInt(e.target.value) || 0;
+                                                setNewTest({
+                                                    ...newTest,
+                                                    totalMarks: total,
+                                                    passMarks: Math.round(total * 0.4) // Auto-set pass marks to 40%
+                                                });
+                                            }}
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label>Date</Label>
+                                        <Label>Pass Marks</Label>
                                         <Input
-                                            type="date"
-                                            value={newTest.date}
-                                            onChange={(e) => setNewTest({ ...newTest, date: e.target.value })}
+                                            type="number"
+                                            value={newTest.passMarks}
+                                            onChange={(e) => setNewTest({ ...newTest, passMarks: parseInt(e.target.value) })}
                                         />
                                     </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Date</Label>
+                                    <Input
+                                        type="date"
+                                        value={newTest.date}
+                                        onChange={(e) => setNewTest({ ...newTest, date: e.target.value })}
+                                    />
                                 </div>
                                 <Button onClick={handleCreateTest} className="w-full">Create Test</Button>
                             </div>
@@ -208,12 +254,25 @@ const TestsManager = ({ batches }: TestsManagerProps) => {
                                     <div>
                                         <h4 className="font-semibold">{test.title}</h4>
                                         <p className="text-xs text-muted-foreground">
-                                            {new Date(test.date).toLocaleDateString()} • Max: {test.maxScore}
+                                            {new Date(test.date).toLocaleDateString()} • Total: {test.totalMarks} |  Pass: {test.passMarks}
                                         </p>
                                     </div>
                                 </div>
-                                <div className="text-sm font-medium text-muted-foreground">
-                                    {test._count?.scores || 0} Graded
+                                <div className="flex items-center gap-4">
+                                    <span className="text-sm font-medium text-muted-foreground">
+                                        {test._count?.scores || 0} Graded
+                                    </span>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDeleteTest(test.id);
+                                        }}
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </Button>
                                 </div>
                             </div>
 
@@ -245,7 +304,7 @@ const TestsManager = ({ batches }: TestsManagerProps) => {
                                                                 className="h-8 w-20"
                                                                 value={s.score}
                                                                 onChange={(e) => handleScoreChange(idx, 'score', e.target.value)}
-                                                                max={test.maxScore}
+                                                                max={test.totalMarks}
                                                             />
                                                         </td>
                                                         <td className="px-4 py-2">
@@ -267,7 +326,7 @@ const TestsManager = ({ batches }: TestsManagerProps) => {
                     ))
                 )}
             </div>
-        </div>
+        </div >
     );
 };
 

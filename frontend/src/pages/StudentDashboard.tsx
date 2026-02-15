@@ -101,6 +101,7 @@ const StudentDashboard = () => {
     const [feesData, setFeesData] = useState<any>(null);
     const [notifications, setNotifications] = useState<any[]>([]);
     const [error, setError] = useState<string | null>(null);
+    const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
     const { toast } = useToast();
 
     const fetchOverview = async () => {
@@ -426,9 +427,19 @@ const StudentDashboard = () => {
                                         <p className="font-medium">{overview.batch.timing}</p>
                                     </div>
                                     <div>
-                                        <p className="text-sm text-muted-foreground">Trainer</p>
                                         <p className="font-medium">{overview.batch.trainer}</p>
                                     </div>
+                                    {overview.batch.upcomingTest && (
+                                        <div className="pt-2 border-t mt-2">
+                                            <p className="text-sm text-primary font-semibold">Upcoming Test</p>
+                                            <div className="flex justify-between items-center mt-1">
+                                                <p className="font-medium text-sm">{overview.batch.upcomingTest.title}</p>
+                                                <p className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+                                                    {new Date(overview.batch.upcomingTest.date).toLocaleDateString()}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
                         )}
@@ -464,6 +475,23 @@ const StudentDashboard = () => {
                 <TabsContent value="attendance" className="space-y-4">
                     {attendanceData ? (
                         <>
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-muted/30 p-4 rounded-lg border">
+                                <div>
+                                    <h3 className="text-lg font-bold">{overview.student.name}</h3>
+                                    <p className="text-sm text-muted-foreground">Attendance Overview</p>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    <div className="text-right">
+                                        <p className="text-sm font-medium">Overall Attendance</p>
+                                        <p className={`text-2xl font-bold ${overview.attendance.percentage >= 75 ? 'text-green-600' :
+                                            overview.attendance.percentage >= 60 ? 'text-yellow-600' : 'text-red-600'
+                                            }`}>
+                                            {overview.attendance.percentage}%
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div className="grid gap-4 md:grid-cols-4">
                                 <Card>
                                     <CardHeader className="pb-2">
@@ -515,25 +543,45 @@ const StudentDashboard = () => {
                             )}
 
                             <Card>
-                                <CardHeader>
+                                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                                     <CardTitle>Attendance Records</CardTitle>
+                                    <div className="flex items-center gap-2">
+                                        <Label htmlFor="date-filter" className="text-sm whitespace-nowrap">Filter Date:</Label>
+                                        <Input
+                                            id="date-filter"
+                                            type="date"
+                                            className="w-[150px]"
+                                            value={selectedDate}
+                                            onChange={(e) => setSelectedDate(e.target.value)}
+                                        />
+                                        <Button variant="outline" size="sm" onClick={() => setSelectedDate('')}>All</Button>
+                                    </div>
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="space-y-2">
-                                        {attendanceData.records.map((record: any) => (
-                                            <div key={record.id} className="flex items-center justify-between p-2 border rounded">
-                                                <div>
-                                                    <p className="font-medium">{new Date(record.date).toLocaleDateString()}</p>
-                                                    {record.remarks && <p className="text-xs text-muted-foreground">{record.remarks}</p>}
+                                    <div className="space-y-2 mt-4">
+                                        {(() => {
+                                            const filteredRecords = selectedDate
+                                                ? attendanceData.records.filter((r: any) => new Date(r.date).toLocaleDateString('en-CA') === selectedDate)
+                                                : attendanceData.records;
+
+                                            if (filteredRecords.length === 0) {
+                                                return <p className="text-center text-muted-foreground py-4">No records found for this date.</p>;
+                                            }
+
+                                            return filteredRecords.map((record: any) => (
+                                                <div key={record.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                                                    <div>
+                                                        <p className="font-semibold">{new Date(record.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                                                        {record.remarks && <p className="text-xs text-muted-foreground mt-1">Remark: {record.remarks}</p>}
+                                                    </div>
+                                                    <Badge className={`px-3 py-1 ${record.status === 'PRESENT' ? 'bg-green-500 hover:bg-green-600' :
+                                                        record.status === 'LATE' ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-red-500 hover:bg-red-600'
+                                                        }`}>
+                                                        {record.status}
+                                                    </Badge>
                                                 </div>
-                                                <Badge className={
-                                                    record.status === 'PRESENT' ? 'bg-green-500' :
-                                                        record.status === 'LATE' ? 'bg-yellow-500' : 'bg-red-500'
-                                                }>
-                                                    {record.status}
-                                                </Badge>
-                                            </div>
-                                        ))}
+                                            ));
+                                        })()}
                                     </div>
                                 </CardContent>
                             </Card>
@@ -723,20 +771,33 @@ const StudentDashboard = () => {
                                     <CardTitle>Test Results</CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="space-y-2">
+                                    <div className="space-y-4">
                                         {testsData.results.map((result: any) => (
-                                            <div key={result.id} className="flex items-center justify-between p-2 border rounded">
-                                                <div>
-                                                    <p className="font-medium">{result.test.title}</p>
-                                                    <p className="text-sm">
-                                                        Marks: {result.marksObtained} / {result.test.totalMarks}
-                                                    </p>
+                                            <div key={result.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors">
+                                                <div className="space-y-1">
+                                                    <p className="font-semibold">{result.title}</p>
+                                                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                                        <span>{new Date(result.date).toLocaleDateString()}</span>
+                                                        {result.marksObtained !== null && (
+                                                            <span>
+                                                                Marks: {result.marksObtained} / {result.totalMarks}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                <Badge className={result.isPass ? 'bg-green-500' : 'bg-red-500'}>
-                                                    {result.isPass ? 'Passed' : 'Failed'}
+                                                <Badge
+                                                    className={`px-3 py-1 ${result.status === 'PASSED' ? 'bg-green-500 hover:bg-green-600' :
+                                                        result.status === 'FAILED' ? 'bg-red-500 hover:bg-red-600' :
+                                                            'bg-gray-400'
+                                                        }`}
+                                                >
+                                                    {result.status}
                                                 </Badge>
                                             </div>
                                         ))}
+                                        {testsData.results.length === 0 && (
+                                            <p className="text-center text-muted-foreground py-4">No test results found.</p>
+                                        )}
                                     </div>
                                 </CardContent>
                             </Card>

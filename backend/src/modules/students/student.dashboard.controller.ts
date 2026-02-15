@@ -148,6 +148,34 @@ export const getStudentOverview = async (req: AuthRequest, res: Response): Promi
             console.error('Error fetching software progress:', (err as any).message);
         }
 
+        // Get upcoming test
+        let upcomingTest = null;
+        if (student.batchId) {
+            try {
+                const nextTest = await prisma.test.findFirst({
+                    where: {
+                        batchId: student.batchId,
+                        date: { gt: new Date() }
+                    },
+                    orderBy: { date: 'asc' },
+                    select: {
+                        title: true,
+                        date: true,
+                        totalMarks: true
+                    }
+                });
+                if (nextTest) {
+                    upcomingTest = {
+                        title: nextTest.title,
+                        date: nextTest.date,
+                        totalMarks: nextTest.totalMarks
+                    };
+                }
+            } catch (err) {
+                console.error('Error fetching upcoming test:', (err as any).message);
+            }
+        }
+
         // Calculate eligibility
         const certificateEligible =
             attendancePercentage >= 75 &&
@@ -176,6 +204,7 @@ export const getStudentOverview = async (req: AuthRequest, res: Response): Promi
                 trainer: student.batch.trainer ?
                     `${student.batch.trainer.user.firstName} ${student.batch.trainer.user.lastName}` :
                     'Not Assigned',
+                upcomingTest: upcomingTest
             } : null,
             branch: {
                 name: student.branch.name,
@@ -524,50 +553,47 @@ export const getStudentTests = async (req: AuthRequest, res: Response): Promise<
             return errorResponse(res, 'Student profile not found', 404);
         }
 
-        // Get test scores
-        const testScores = await prisma.testScore.findMany({
-            where: { studentId: student.id },
+        // Get all tests for the student's batch
+        const allTests = student.batchId ? await prisma.test.findMany({
+            where: { batchId: student.batchId },
             include: {
-                test: {
-                    select: {
-                        title: true,
-                        totalMarks: true,
-                        passMarks: true,
-                        date: true,
-                    },
-                },
-            },
-            orderBy: { createdAt: 'desc' },
-        });
-
-        // Get upcoming tests (tests in student's batch without scores)
-        const upcomingTests = student.batchId ? await prisma.test.findMany({
-            where: {
-                batchId: student.batchId,
-                date: {
-                    gte: new Date(),
-                },
                 scores: {
-                    none: {
-                        studentId: student.id,
-                    },
-                },
+                    where: { studentId: student.id }
+                }
             },
-            orderBy: { date: 'asc' },
+            orderBy: { date: 'desc' },
         }) : [];
 
-        const passedTests = testScores.filter((score) => score.isPass).length;
-        const failedTests = testScores.filter((score) => !score.isPass).length;
+        const now = new Date();
+        const formattedTests = allTests.map(test => {
+            const score = (test as any).scores[0] || null;
+            return {
+                id: test.id,
+                title: test.title,
+                date: test.date,
+                totalMarks: test.totalMarks,
+                passMarks: test.passMarks,
+                marksObtained: score?.marksObtained ?? null,
+                isPass: score?.isPass ?? null,
+                status: score ? (score.isPass ? 'PASSED' : 'FAILED') : (new Date(test.date) < now ? 'MISSED' : 'UPCOMING')
+            };
+        });
+
+        const upcomingTests = formattedTests.filter(t => t.status === 'UPCOMING');
+        const results = formattedTests.filter(t => t.status !== 'UPCOMING');
+
+        const passedTests = results.filter((t) => t.isPass).length;
+        const failedTests = results.filter((t) => t.isPass === false).length;
 
         return successResponse(res, {
             upcoming: upcomingTests,
-            results: testScores,
+            results: results,
             stats: {
-                total: testScores.length,
+                total: formattedTests.length,
                 passed: passedTests,
                 failed: failedTests,
-                percentage: testScores.length > 0
-                    ? Math.round((passedTests / testScores.length) * 100)
+                percentage: results.length > 0
+                    ? Math.round((passedTests / results.length) * 100)
                     : 0,
             },
         });

@@ -10,7 +10,9 @@ import {
   getTrainerDashboardStats,
   getStudentsByBatch,
   getBranchStudents,
-  checkBatchEligibility
+  getStudentDetailsForTrainer,
+  checkBatchEligibility,
+  getBranchReports
 } from './trainer.dashboard.controller';
 // ... (imports omitted for brevity, but I will replace the block)
 // I will just replace the specific lines in the file.
@@ -20,10 +22,11 @@ import {
   updateStudentProgress
 } from '../students/student.progress.controller';
 import {
-  createTest,
   getTestsByBatch,
   updateTestScores,
-  getTestScores
+  getTestScores,
+  deleteTest,
+  createTest
 } from './test.management.controller';
 import { authenticateToken } from '../../middlewares/auth.middleware';
 import { enforceBranchAccess } from '../../middlewares/branch.middleware';
@@ -37,6 +40,7 @@ router.use(enforceBranchAccess);
 // Dashboard routes
 router.get('/dashboard/stats', getTrainerDashboardStats);
 router.get('/branch-students', requireTrainer, getBranchStudents);
+router.get('/students/:studentId/details', requireTrainer, getStudentDetailsForTrainer);
 router.get('/batches/:batchId/students', requireTrainer, getStudentsByBatch);
 
 // Test Management routes
@@ -44,9 +48,11 @@ router.get('/batches/:batchId/tests', requireTrainer, getTestsByBatch);
 router.post('/tests', requireTrainer, createTest);
 router.get('/tests/:testId/scores', requireTrainer, getTestScores);
 router.put('/tests/:testId/scores', requireTrainer, updateTestScores);
+router.delete('/tests/:testId', requireTrainer, deleteTest);
 
 // Student Progress routes
 router.get('/branch-progress', requireTrainer, getBranchProgress);
+router.get('/reports', requireTrainer, getBranchReports);
 router.get('/batches/:batchId/progress', requireTrainer, getBatchProgress);
 router.put('/students/:studentId/progress', requireTrainer, updateStudentProgress);
 
