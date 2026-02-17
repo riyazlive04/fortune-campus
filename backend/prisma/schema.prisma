@@ -66,6 +66,7 @@ model Branch {
   courses     Course[]
   batches     Batch[]
   awards      TrainerAward[]
+  trainerAttendances TrainerAttendance[]
   expenses    Expense[]
   socialMedia SocialMediaEngagement[]
   eventPlans  EventPlan[]
@@ -80,6 +81,7 @@ model Lead {
   lastName        String
   email           String?
   phone           String
+  location        String?
   source          String @default("OTHER")
   status          String @default("NEW")
   interestedCourse String?
@@ -216,6 +218,7 @@ model Trainer {
   courses           CourseTrainer[]
   batches           Batch[]
   attendances       Attendance[]
+  trainerAttendances TrainerAttendance[]
   portfolioSubmissions PortfolioSubmission[]
   incentives        Incentive[]
   growthReports     StudentGrowthReport[]
@@ -309,6 +312,32 @@ model Attendance {
   @@index([batchId])
   @@index([date])
   @@map("attendances")
+}
+
+model TrainerAttendance {
+  id              String           @id @default(uuid())
+  date            DateTime
+  status          String           // PRESENT, ABSENT, LATE, HALFDAY
+  remarks         String?
+  
+  inTime          DateTime?
+  outTime         DateTime?
+  
+  trainerId       String
+  branchId        String
+  
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  // Relations
+  trainer         Trainer          @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  branch          Branch           @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  
+  @@unique([trainerId, date])
+  @@index([trainerId])
+  @@index([branchId])
+  @@index([date])
+  @@map("trainer_attendances")
 }
 
 model Batch {

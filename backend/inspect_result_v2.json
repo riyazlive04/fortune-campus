@@ -1,0 +1,138 @@
+{
+  "users": [
+    {
+      "name": "Trainer 1",
+      "role": "TRAINER",
+      "branch": "Salem Branch",
+      "branchId": "1e736840-e93c-4259-8fd7-c24c28b14413",
+      "hasTrainerProfile": false,
+      "hasStudentProfile": false
+    },
+    {
+      "name": "Student 1",
+      "role": "STUDENT",
+      "branch": "Salem Branch",
+      "branchId": "1e736840-e93c-4259-8fd7-c24c28b14413",
+      "hasTrainerProfile": false,
+      "hasStudentProfile": false
+    },
+    {
+      "name": "Eshwanth B",
+      "role": "STUDENT",
+      "branch": "Salem Branch",
+      "branchId": "1e736840-e93c-4259-8fd7-c24c28b14413",
+      "hasTrainerProfile": false,
+      "hasStudentProfile": false
+    },
+    {
+      "name": "Trainer 2",
+      "role": "TRAINER",
+      "branch": "Coimbatore",
+      "branchId": "f0feca6f-a037-43e2-9407-8175a234fc46",
+      "hasTrainerProfile": false,
+      "hasStudentProfile": false
+    },
+    {
+      "name": "Student 3",
+      "role": "STUDENT",
+      "branch": "Coimbatore",
+      "branchId": "f0feca6f-a037-43e2-9407-8175a234fc46",
+      "hasTrainerProfile": false,
+      "hasStudentProfile": false
+    },
+    {
+      "name": "Student 2",
+      "role": "STUDENT",
+      "branch": "Erode",
+      "branchId": "ae1ebf77-14a0-4a76-a123-11b44b4517d3",
+      "hasTrainerProfile": false,
+      "hasStudentProfile": false
+    },
+    {
+      "name": "Trainer 3",
+      "role": "TRAINER",
+      "branch": "Erode",
+      "branchId": "ae1ebf77-14a0-4a76-a123-11b44b4517d3",
+      "hasTrainerProfile": false,
+      "hasStudentProfile": false
+    },
+    {
+      "name": "Trainer 4",
+      "role": "TRAINER",
+      "branch": "Tiruppur",
+      "branchId": "738587cc-6f2c-4f03-a386-4c3a376f4cc0",
+      "hasTrainerProfile": false,
+      "hasStudentProfile": false
+    },
+    {
+      "name": "Student 4",
+      "role": "STUDENT",
+      "branch": "Tiruppur",
+      "branchId": "738587cc-6f2c-4f03-a386-4c3a376f4cc0",
+      "hasTrainerProfile": false,
+      "hasStudentProfile": false
+    },
+    {
+      "name": "Vasu Devan",
+      "role": "CEO",
+      "branchId": null,
+      "hasTrainerProfile": false,
+      "hasStudentProfile": false
+    },
+    {
+      "name": "TestStu1771328513144 User",
+      "role": "STUDENT",
+      "branch": "Coimbatore",
+      "branchId": "f0feca6f-a037-43e2-9407-8175a234fc46",
+      "hasTrainerProfile": false,
+      "hasStudentProfile": false
+    },
+    {
+      "name": "TestTrain1771328571376 User",
+      "role": "TRAINER",
+      "branch": "Coimbatore",
+      "branchId": "f0feca6f-a037-43e2-9407-8175a234fc46",
+      "hasTrainerProfile": false,
+      "hasStudentProfile": false
+    },
+    {
+      "name": "Vasudevan CEO",
+      "role": "CEO",
+      "branchId": null,
+      "hasTrainerProfile": false,
+      "hasStudentProfile": false
+    },
+    {
+      "name": "Pranesh Fortune",
+      "role": "CHANNEL_PARTNER",
+      "branch": "Coimbatore",
+      "branchId": "f0feca6f-a037-43e2-9407-8175a234fc46",
+      "hasTrainerProfile": false,
+      "hasStudentProfile": false
+    },
+    {
+      "name": "Vimal Fortune",
+      "role": "CHANNEL_PARTNER",
+      "branch": "Erode",
+      "branchId": "ae1ebf77-14a0-4a76-a123-11b44b4517d3",
+      "hasTrainerProfile": false,
+      "hasStudentProfile": false
+    },
+    {
+      "name": "Sanjay B",
+      "role": "CHANNEL_PARTNER",
+      "branch": "Salem Branch",
+      "branchId": "1e736840-e93c-4259-8fd7-c24c28b14413",
+      "hasTrainerProfile": false,
+      "hasStudentProfile": false
+    },
+    {
+      "name": "Vishnu Fortune",
+      "role": "CHANNEL_PARTNER",
+      "branch": "Tiruppur",
+      "branchId": "738587cc-6f2c-4f03-a386-4c3a376f4cc0",
+      "hasTrainerProfile": false,
+      "hasStudentProfile": false
+    }
+  ]
+}

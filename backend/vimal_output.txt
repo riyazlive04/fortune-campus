@@ -1,0 +1,12 @@
+Found 2 users:
+ID: 94e9a968-b909-4df4-a30f-9f6150e13846
+Name: Vimal Fortune
+Email: vimal_tiruppur@fortunecampus.com
+Role: CHANNEL_PARTNER
+Branch: Fortune Campus - Salem (FC-SALEM)
+---
+ID: 714c4a9e-34ca-4773-af9b-6e9a3159422f
+Name: Vimal Erode
+Email: vimal.erd@fortuneinnovatives.com
+Role: CHANNEL_PARTNER
+Branch: Erode (ERD)

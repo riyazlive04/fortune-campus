@@ -18,9 +18,13 @@ const Attendance = () => {
     const fetchBranches = async () => {
       try {
         const response = await branchesApi.getBranches();
-        setBranches(response.data?.branches || response.data || []);
+        if (response.success && response.data?.branches) {
+          setBranches(response.data.branches);
+        } else {
+          setBranches(Array.isArray(response.data) ? response.data : []);
+        }
       } catch (error) {
-        console.error("Failed to fetch branches");
+        console.error("Failed to fetch branches", error);
       }
     };
     fetchBranches();
@@ -30,9 +34,13 @@ const Attendance = () => {
     const fetchBatches = async () => {
       try {
         const response = await batchesApi.getBatches({ isActive: true });
-        setBatches(response.data?.batches || response.data || []);
+        if (response.success && response.data?.batches) {
+          setBatches(response.data.batches);
+        } else {
+          setBatches(Array.isArray(response.data) ? response.data : []);
+        }
       } catch (error) {
-        console.error("Failed to fetch batches");
+        console.error("Failed to fetch batches", error);
       }
     };
     fetchBatches();
@@ -43,7 +51,11 @@ const Attendance = () => {
       try {
         setLoading(true);
         const response = await attendanceApi.getStats();
-        setAttendanceData(response.data || response || []);
+        if (response.success && response.data?.summary) {
+          setAttendanceData(response.data.summary);
+        } else {
+          setAttendanceData(Array.isArray(response.data) ? response.data : Array.isArray(response) ? response : []);
+        }
       } catch (error) {
         console.error("Failed to fetch attendance stats", error);
         toast({
@@ -61,8 +73,8 @@ const Attendance = () => {
 
   // Filter batches based on selected branch if needed
   const displayedBatches = selectedBranch && selectedBranch !== "all"
-    ? batches.filter(b => b.branchId === selectedBranch)
-    : batches;
+    ? (Array.isArray(batches) ? batches : []).filter(b => b.branchId === selectedBranch)
+    : (Array.isArray(batches) ? batches : []);
 
   return (
     <div className="animate-fade-in">
@@ -72,7 +84,7 @@ const Attendance = () => {
         <Select><SelectTrigger className="w-40"><SelectValue placeholder="Select Date" /></SelectTrigger><SelectContent><SelectItem value="today">Today</SelectItem><SelectItem value="yesterday">Yesterday</SelectItem></SelectContent></Select>
         <Select onValueChange={setSelectedBranch}><SelectTrigger className="w-40"><SelectValue placeholder="Branch" /></SelectTrigger><SelectContent>
           <SelectItem value="all">All Branches</SelectItem>
-          {branches.map((b) => (
+          {(Array.isArray(branches) ? branches : []).map((b) => (
             <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
           ))}
         </SelectContent></Select>
@@ -91,10 +103,10 @@ const Attendance = () => {
                   displayedBatches.map((b: any) => (
                     <tr key={b.id}>
                       <td>{b.startTime || "10:00 AM"} - {b.endTime || "12:00 PM"}</td>
-                      <td>{b.course?.name}</td>
+                      <td>{b.course?.name || "N/A"}</td>
                       <td>{b.trainer?.user?.firstName || "Unassigned"}</td>
-                      <td>{b.code}</td>
-                      <td>{b.branch?.name}</td>
+                      <td>{b.code || "N/A"}</td>
+                      <td>{b.branch?.name || "N/A"}</td>
                       <td><StatusBadge status={b.isActive ? "Active" : "Inactive"} variant={b.isActive ? "success" : "neutral"} /></td>
                     </tr>
                   ))
@@ -114,13 +126,13 @@ const Attendance = () => {
               <tbody>
                 {loading ? (
                   <tr><td colSpan={5} className="text-center py-4">Loading attendance data...</td></tr>
-                ) : attendanceData.length === 0 ? (
+                ) : (!Array.isArray(attendanceData) || attendanceData.length === 0) ? (
                   <tr><td colSpan={5} className="text-center py-4">No attendance records found</td></tr>
                 ) : (
-                  attendanceData.map((a, i) => (
+                  (Array.isArray(attendanceData) ? attendanceData : []).map((a, i) => (
                     <tr key={i}>
                       <td className="font-medium">{a.student}</td><td>{a.course}</td><td>{a.present}</td><td>{a.absent}</td>
-                      <td><StatusBadge status={a.percentage} variant={parseInt(a.percentage) >= 85 ? "success" : parseInt(a.percentage) >= 75 ? "warning" : "danger"} /></td>
+                      <td><StatusBadge status={a.percentage} variant={parseInt(a.percentage || "0") >= 85 ? "success" : parseInt(a.percentage || "0") >= 75 ? "warning" : "danger"} /></td>
                     </tr>
                   ))
                 )}

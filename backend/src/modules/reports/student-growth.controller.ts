@@ -128,15 +128,20 @@ export const getTrainerPerformance = async (req: AuthRequest, res: Response): Pr
             ? branchId as string
             : req.user?.branchId;
 
-        if (!effectiveBranchId) {
+        if (!effectiveBranchId && req.user?.role !== UserRole.CEO) {
             return errorResponse(res, 'Branch ID is required', 400);
         }
 
         const startDate = new Date(Number(year), Number(month) - 1, 1);
         const endDate = new Date(Number(year), Number(month), 0);
 
+        const whereClause: any = { isActive: true };
+        if (effectiveBranchId) {
+            whereClause.branchId = effectiveBranchId;
+        }
+
         const trainers = await prisma.trainer.findMany({
-            where: { branchId: effectiveBranchId, isActive: true },
+            where: whereClause,
             include: {
                 user: { select: { firstName: true, lastName: true } },
                 growthReports: {

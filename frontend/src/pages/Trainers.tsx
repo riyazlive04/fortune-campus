@@ -2,11 +2,13 @@ import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Trash2 } from "lucide-react";
 import { trainersApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import TrainerModal from "@/components/TrainerModal";
+import TrainerAttendanceModal from "@/components/TrainerAttendanceModal";
 import PageHeader from "@/components/PageHeader";
+import { CheckSquare } from "lucide-react";
 
 const Trainers = () => {
     const [trainers, setTrainers] = useState<any[]>([]);
@@ -14,6 +16,11 @@ const Trainers = () => {
     const [searchTerm, setSearchTerm] = useState("");
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedTrainerId, setSelectedTrainerId] = useState<string | null>(null);
+
+    // Attendance Modal State
+    const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
+    const [attendanceTrainer, setAttendanceTrainer] = useState<{ id: string, name: string } | null>(null);
+
     const { toast } = useToast();
 
     const fetchTrainers = async () => {
@@ -55,6 +62,40 @@ const Trainers = () => {
     const handleSuccess = () => {
         fetchTrainers();
         handleModalClose();
+    };
+
+    const handleMarkAttendance = (trainer: any) => {
+        setAttendanceTrainer({
+            id: trainer.id,
+            name: `${trainer.user?.firstName} ${trainer.user?.lastName}`
+        });
+        setIsAttendanceModalOpen(true);
+    };
+
+    const handleAttendanceSuccess = () => {
+        setIsAttendanceModalOpen(false);
+        setAttendanceTrainer(null);
+        fetchTrainers();
+    };
+
+    const handleDeleteTrainer = async (id: string) => {
+        if (window.confirm("Are you sure you want to delete this trainer? This action cannot be undone.")) {
+            try {
+                await trainersApi.deleteTrainer(id);
+                toast({
+                    title: "Success",
+                    description: "Trainer deleted successfully",
+                });
+                fetchTrainers();
+            } catch (error: any) {
+                console.error("Failed to delete trainer", error);
+                toast({
+                    variant: "destructive",
+                    title: "Error",
+                    description: error.message || "Failed to delete trainer",
+                });
+            }
+        }
     };
 
     const filteredTrainers = trainers.filter((trainer) => {
@@ -143,13 +184,30 @@ const Trainers = () => {
                                                         {trainer.isActive ? "Active" : "Inactive"}
                                                     </span>
                                                 </td>
-                                                <td className="px-4 py-3">
+                                                <td className="px-4 py-3 flex items-center gap-2">
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
                                                         onClick={() => handleEditTrainer(trainer.id)}
                                                     >
                                                         View
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="text-green-600 border-green-200 hover:bg-green-50"
+                                                        onClick={() => handleMarkAttendance(trainer)}
+                                                    >
+                                                        <CheckSquare className="h-3.5 w-3.5 mr-1" />
+                                                        Mark attendance
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                        onClick={() => handleDeleteTrainer(trainer.id)}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
                                                     </Button>
                                                 </td>
                                             </tr>
@@ -167,6 +225,13 @@ const Trainers = () => {
                 onClose={handleModalClose}
                 onSuccess={handleSuccess}
                 trainerId={selectedTrainerId}
+            />
+
+            <TrainerAttendanceModal
+                isOpen={isAttendanceModalOpen}
+                onClose={() => setIsAttendanceModalOpen(false)}
+                onSuccess={handleAttendanceSuccess}
+                trainer={attendanceTrainer}
             />
         </div>
     );

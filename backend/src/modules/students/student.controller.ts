@@ -124,7 +124,7 @@ export const getStudentById = async (req: AuthRequest, res: Response): Promise<R
       return errorResponse(res, 'Access denied', 403);
     }
 
-    return successResponse(res, student);
+    return successResponse(res, { student });
   } catch (error) {
     return errorResponse(res, 'Failed to fetch student', 500, error);
   }
@@ -329,7 +329,7 @@ export const deleteStudent = async (req: AuthRequest, res: Response): Promise<Re
     // Delete student (will cascade to user due to onDelete: Cascade)
     await prisma.student.delete({ where: { id } });
 
-    return successResponse(res, null, 'Student deleted successfully');
+    return successResponse(res, { id }, 'Student deleted successfully');
   } catch (error) {
     return errorResponse(res, 'Failed to delete student', 500, error);
   }

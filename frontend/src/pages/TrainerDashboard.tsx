@@ -1,6 +1,21 @@
 
 import { useState, useEffect } from "react";
-import { Users, GraduationCap, ClipboardCheck, LayoutDashboard, Database, CheckSquare, Award, FileText, Download } from "lucide-react";
+import {
+    Users,
+    ClipboardCheck,
+    LayoutDashboard,
+    Award,
+    Calendar,
+    CheckCircle,
+    XCircle,
+    FileText,
+    BookOpen,
+    AlertCircle,
+    DollarSign,
+    Database,
+    CheckSquare,
+    GraduationCap
+} from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import KPICard from "@/components/KPICard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -29,58 +44,45 @@ const TrainerDashboard = () => {
     const [reports, setReports] = useState<any>(null); // Added for the new useEffect
     const trainersApi = trainerApi; // Assuming trainerApi is used for reports as well
 
-    const fetchTrainerStats = async () => {
+    const fetchDashboardData = async () => {
         try {
             setLoading(true);
-            const response = await trainerApi.getDashboardStats();
-            if (response.success) {
-                setStats(response.data);
+            const [statsRes, reportsRes] = await Promise.all([
+                trainerApi.getDashboardStats().catch(e => ({ success: false, error: e })),
+                trainerApi.getBranchReports().catch(e => ({ success: false, error: e }))
+            ]);
+
+            if (statsRes.success) {
+                setStats(statsRes.data);
+            }
+
+            if (reportsRes.success) {
+                setReports(reportsRes.data);
             }
         } catch (error: any) {
+            console.error("Dashboard fetch error:", error);
             toast({
                 variant: "destructive",
                 title: "Error",
-                description: error.message || "Failed to fetch trainer stats",
+                description: "Failed to load dashboard data",
             });
         } finally {
-            // setLoading(false); // This will be handled by the reports useEffect if it's the last one
+            setLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchTrainerStats();
+        fetchDashboardData();
     }, []);
 
-    // New useEffect for fetching reports, as per instruction
-    useEffect(() => {
-        const fetchReports = async () => {
-            console.log("Fetching Branch Reports...");
-            try {
-                const res = await trainerApi.getBranchReports();
-                console.log("Branch Reports Response:", res);
-                if (res.success) {
-                    setReports(res.data);
-                } else {
-                    console.error("Failed to fetch reports:", res.message);
-                }
-            } catch (e) {
-                console.error("Error fetching reports:", e);
-            } finally {
-                setLoading(false); // Set loading to false after reports are fetched
-            }
-        };
-        fetchReports();
-    }, []);
-
-    if (loading) return <DashboardSkeleton />;
     if (loading) return <DashboardSkeleton />;
     if (!stats) return <div className="p-8 text-center text-destructive">Failed to load dashboard data. Please try refreshing.</div>;
 
     return (
         <div className="animate-fade-in">
             <PageHeader
-                title={`Trainer Dashboard: ${user?.firstName} ${user?.lastName}`}
-                description={`Managing ${stats.activeStudents} active students across ${stats.todayClasses} classes today.`}
+                title={`Trainer Dashboard: ${user?.firstName || ''} ${user?.lastName || ''}`}
+                description={`Managing ${stats?.activeStudents || 0} active students across ${stats?.todayClasses || 0} classes today.`}
             />
 
             {/* KPI Cards */}
@@ -88,7 +90,7 @@ const TrainerDashboard = () => {
                 <div onClick={() => setActiveTab("overview")} className="cursor-pointer hover:shadow-md transition-shadow rounded-xl">
                     <KPICard
                         title="Active Students"
-                        value={stats.activeStudents.toString()}
+                        value={(stats?.activeStudents || 0).toString()}
                         icon={Users}
                         accentColor="bg-primary"
                     />
@@ -96,8 +98,8 @@ const TrainerDashboard = () => {
                 <div onClick={() => setActiveTab("attendance")} className="cursor-pointer hover:shadow-md transition-shadow rounded-xl">
                     <KPICard
                         title="Attendance (Today)"
-                        value={`${stats.presentToday}/${stats.presentToday + stats.absentToday}`}
-                        change={`${stats.absentToday} absent`}
+                        value={`${stats?.presentToday || 0}/${(stats?.presentToday || 0) + (stats?.absentToday || 0)}`}
+                        change={`${stats?.absentToday || 0} absent`}
                         changeType="negative"
                         icon={ClipboardCheck}
                         accentColor="bg-success"
@@ -106,7 +108,7 @@ const TrainerDashboard = () => {
                 <div onClick={() => setActiveTab("portfolio")} className="cursor-pointer hover:shadow-md transition-shadow rounded-xl">
                     <KPICard
                         title="Pending Portfolios"
-                        value={stats.pendingPortfolios.toString()}
+                        value={(stats?.pendingPortfolios || 0).toString()}
                         icon={LayoutDashboard}
                         accentColor="bg-warning"
                     />
@@ -114,7 +116,7 @@ const TrainerDashboard = () => {
                 <div onClick={() => setActiveTab("placement")} className="cursor-pointer hover:shadow-md transition-shadow rounded-xl">
                     <KPICard
                         title="Placement Eligible"
-                        value={stats.eligibleForPlacement.toString()}
+                        value={(stats?.eligibleForPlacement || 0).toString()}
                         icon={Award}
                         accentColor="bg-purple-500"
                     />
@@ -201,19 +203,134 @@ const TrainerDashboard = () => {
                                     <FileText className="mb-2 text-blue-500" />
                                     <span className="text-sm font-medium">View Reports</span>
                                 </button>
+                                <button
+                                    onClick={() => setActiveTab("incentives")}
+                                    className="flex flex-col items-center justify-center p-4 bg-muted hover:bg-muted/80 rounded-lg border transition-all"
+                                >
+                                    <DollarSign className="mb-2 text-green-500" />
+                                    <span className="text-sm font-medium">My Incentives</span>
+                                </button>
                             </div>
                         </div>
                     </div>
+                    <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2">
+                        <KPICard title="Total Classes" value={stats?.todayClasses?.toString() || "0"} icon={BookOpen} accentColor="bg-blue-500" />
+                        <KPICard title="Low Attendance" value={stats?.lowAttendance?.toString() || "0"} icon={AlertCircle} accentColor="bg-red-500" />
+                    </div>
                 </TabsContent>
 
-                <TabsContent value="attendance"><AttendanceManager batches={stats.classes} /></TabsContent>
-                <TabsContent value="progress"><SoftwareProgressManager batches={stats.classes} /></TabsContent>
+                <TabsContent value="attendance"><AttendanceManager batches={stats?.classes || []} /></TabsContent>
+                <TabsContent value="progress"><SoftwareProgressManager batches={stats?.classes || []} /></TabsContent>
                 <TabsContent value="portfolio"><PortfolioManager /></TabsContent>
-                <TabsContent value="tests"><TestsManager batches={stats.classes} /></TabsContent>
-                <TabsContent value="placement"><PlacementEligibility batches={stats.classes} /></TabsContent>
+                <TabsContent value="tests"><TestsManager batches={stats?.classes || []} /></TabsContent>
+                <TabsContent value="placement"><PlacementEligibility batches={stats?.classes || []} /></TabsContent>
+                <TabsContent value="incentives"><TrainerIncentivesList /></TabsContent>
             </Tabs>
         </div>
     );
 };
+
+const TrainerIncentivesList = () => {
+    const [incentives, setIncentives] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [stats, setStats] = useState({ total: 0, paid: 0, pending: 0 });
+
+    useEffect(() => {
+        const fetchIncentives = async () => {
+            try {
+                const { authApi, trainersApi, incentivesApi } = await import("@/lib/api");
+                const storage = await import("@/lib/api").then(m => m.storage);
+                const user = storage.getUser();
+
+                if (!user) return;
+
+                const trainersRes = await trainersApi.getTrainers({ search: user.email });
+                const myTrainerProfile = trainersRes.data?.trainers?.find((t: any) => t.userId === user.id);
+
+                if (!myTrainerProfile) {
+                    console.error("Trainer profile not found");
+                    setLoading(false);
+                    return;
+                }
+
+                const res = await incentivesApi.getIncentives({ trainerId: myTrainerProfile.id, limit: 100 });
+                const data = res.data?.incentives || res.data || [];
+                setIncentives(data);
+
+                let t = 0, p = 0;
+                data.forEach((d: any) => {
+                    const amt = Number(d.amount);
+                    t += amt;
+                    if (d.isPaid) p += amt;
+                });
+                setStats({ total: t, paid: p, pending: t - p });
+
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchIncentives();
+    }, []);
+
+    const formatCurrency = (val: number) => `₹${val.toLocaleString('en-IN')}`;
+
+    if (loading) return <div>Loading incentives...</div>;
+
+    return (
+        <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 bg-primary/10 rounded-xl border border-primary/20">
+                    <p className="text-sm text-gray-500">Total Earned</p>
+                    <p className="text-2xl font-bold text-primary">{formatCurrency(stats.total)}</p>
+                </div>
+                <div className="p-4 bg-green-500/10 rounded-xl border border-green-500/20">
+                    <p className="text-sm text-gray-500">Paid Out</p>
+                    <p className="text-2xl font-bold text-green-600">{formatCurrency(stats.paid)}</p>
+                </div>
+                <div className="p-4 bg-yellow-500/10 rounded-xl border border-yellow-500/20">
+                    <p className="text-sm text-gray-500">Pending</p>
+                    <p className="text-2xl font-bold text-yellow-600">{formatCurrency(stats.pending)}</p>
+                </div>
+            </div>
+
+            <div className="rounded-xl border border-border bg-card overflow-hidden">
+                <table className="w-full text-sm text-left">
+                    <thead className="bg-muted text-muted-foreground font-medium">
+                        <tr>
+                            <th className="p-4">Date</th>
+                            <th className="p-4">Type</th>
+                            <th className="p-4">Description</th>
+                            <th className="p-4">Amount</th>
+                            <th className="p-4">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                        {incentives.map((inc) => (
+                            <tr key={inc.id} className="hover:bg-muted/50">
+                                <td className="p-4">{new Date(inc.createdAt).toLocaleDateString()}</td>
+                                <td className="p-4 font-medium">{inc.type}</td>
+                                <td className="p-4 text-muted-foreground max-w-md truncate">{inc.description}</td>
+                                <td className="p-4 font-bold">{formatCurrency(inc.amount)}</td>
+                                <td className="p-4">
+                                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${inc.isPaid ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                        {inc.isPaid ? 'PAID' : 'PENDING'}
+                                    </span>
+                                </td>
+                            </tr>
+                        ))}
+                        {incentives.length === 0 && (
+                            <tr>
+                                <td colSpan={5} className="p-8 text-center text-muted-foreground">No incentives found.</td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
+
 
 export default TrainerDashboard;

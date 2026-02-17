@@ -1,0 +1,58 @@
+
+--- Branch Summary ---
+[FC-MAIN] Fortune Campus - Main (ID: 01857fe6-1355-458c-b95b-e14d9e56dc11)
+  - Students: 0
+  - Trainers: 0
+  - Leads: 0
+  - Users: 0
+[CBE] Coimbatore (ID: f0feca6f-a037-43e2-9407-8175a234fc46)
+  - Students: 1
+  - Trainers: 1
+  - Leads: 0
+  - Users: 3
+[ERD] Erode (ID: ae1ebf77-14a0-4a76-a123-11b44b4517d3)
+  - Students: 1
+  - Trainers: 1
+  - Leads: 0
+  - Users: 3
+[TPR] Tiruppur (ID: 738587cc-6f2c-4f03-a386-4c3a376f4cc0)
+  - Students: 1
+  - Trainers: 1
+  - Leads: 0
+  - Users: 3
+[SNJ] Sanjay (ID: 56be898c-c529-4b02-9b05-4648d36403a5)
+  - Students: 0
+  - Trainers: 0
+  - Leads: 0
+  - Users: 0
+[SLM] Salem Branch (ID: 1e736840-e93c-4259-8fd7-c24c28b14413)
+  - Students: 2
+  - Trainers: 1
+  - Leads: 5
+  - Users: 4
+[FC-SALEM] LEGACY - LEGACY - Fortune Campus - Salem (ID: 40a801a8-e06e-4ef3-8686-dd0158a5f41b)
+  - Students: 0
+  - Trainers: 0
+  - Leads: 0
+  - Users: 0
+[FC-COIMBATORE] LEGACY - LEGACY - Fortune Campus - Coimbatore (ID: ee7bda19-553f-4161-b38a-146550c9baef)
+  - Students: 0
+  - Trainers: 0
+  - Leads: 0
+  - Users: 0
+[FC-ERODE] LEGACY - LEGACY - Fortune Campus - Erode (ID: 17e90695-0588-4f5d-ba9f-17203ab8dfa3)
+  - Students: 0
+  - Trainers: 0
+  - Leads: 0
+  - Users: 0
+[FC-TIRUPPUR] LEGACY - LEGACY - Fortune Campus - Tiruppur (ID: ec7fdd97-873a-4852-8d05-53a8fce9ff8f)
+  - Students: 0
+  - Trainers: 0
+  - Leads: 0
+  - Users: 0
+
+--- Partner Assignments ---
+pranesh_cbe@fortunecampus.com -> Coimbatore (CBE) [ID: f0feca6f-a037-43e2-9407-8175a234fc46]
+vimal_erode@fortunecampus.com -> Erode (ERD) [ID: ae1ebf77-14a0-4a76-a123-11b44b4517d3]
+sanjay_salem@fortunecampus.com -> Salem Branch (SLM) [ID: 1e736840-e93c-4259-8fd7-c24c28b14413]
+vishnu_tiruppur@fortunecampus.com -> Tiruppur (TPR) [ID: 738587cc-6f2c-4f03-a386-4c3a376f4cc0]

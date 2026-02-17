@@ -114,7 +114,7 @@ export const getAttendanceById = async (req: AuthRequest, res: Response): Promis
       return errorResponse(res, 'Access denied', 403);
     }
 
-    return successResponse(res, attendance);
+    return successResponse(res, { attendance });
   } catch (error) {
     return errorResponse(res, 'Failed to fetch attendance', 500, error);
   }
@@ -161,7 +161,7 @@ export const markAttendance = async (req: AuthRequest, res: Response): Promise<R
       },
     });
 
-    return successResponse(res, attendance, 'Attendance marked successfully', 201);
+    return successResponse(res, { attendance }, 'Attendance marked successfully', 201);
   } catch (error) {
     return errorResponse(res, 'Failed to mark attendance', 500, error);
   }
@@ -242,7 +242,7 @@ export const markAttendanceIdempotent = async (req: AuthRequest, res: Response):
       });
     }
 
-    return successResponse(res, attendance, 'Attendance marked successfully');
+    return successResponse(res, { attendance }, 'Attendance marked successfully');
   } catch (error) {
     console.error(`[Attendance] Error marking attendance:`, error);
     return errorResponse(res, 'Failed to mark attendance', 500, error);
@@ -275,7 +275,7 @@ export const bulkMarkAttendance = async (req: AuthRequest, res: Response): Promi
       )
     );
 
-    return successResponse(res, result, `${result.length} attendance records created successfully`, 201);
+    return successResponse(res, { result }, `${result.length} attendance records created successfully`, 201);
   } catch (error) {
     return errorResponse(res, 'Failed to mark bulk attendance', 500, error);
   }
@@ -324,7 +324,7 @@ export const updateAttendance = async (req: AuthRequest, res: Response): Promise
       },
     });
 
-    return successResponse(res, attendance, 'Attendance updated successfully');
+    return successResponse(res, { attendance }, 'Attendance updated successfully');
   } catch (error) {
     return errorResponse(res, 'Failed to update attendance', 500, error);
   }
@@ -368,7 +368,7 @@ export const markEntry = async (req: AuthRequest, res: Response): Promise<Respon
       }
     });
 
-    return successResponse(res, attendance, 'Entry marked successfully', 201);
+    return successResponse(res, { attendance }, 'Entry marked successfully', 201);
   } catch (error) {
     return errorResponse(res, 'Failed to mark entry', 500, error);
   }
@@ -386,7 +386,7 @@ export const markExit = async (req: AuthRequest, res: Response): Promise<Respons
       }
     });
 
-    return successResponse(res, attendance, 'Exit marked successfully');
+    return successResponse(res, { attendance }, 'Exit marked successfully');
   } catch (error) {
     return errorResponse(res, 'Failed to mark exit', 500, error);
   }
@@ -416,7 +416,7 @@ export const deleteAttendance = async (req: AuthRequest, res: Response): Promise
 
     await prisma.attendance.delete({ where: { id } });
 
-    return successResponse(res, null, 'Attendance deleted successfully');
+    return successResponse(res, { id }, 'Attendance deleted successfully');
   } catch (error) {
     return errorResponse(res, 'Failed to delete attendance', 500, error);
   }
@@ -471,7 +471,7 @@ export const getAttendanceStats = async (req: AuthRequest, res: Response): Promi
       };
     });
 
-    return successResponse(res, summary);
+    return successResponse(res, { summary });
   } catch (error) {
     return errorResponse(res, 'Failed to fetch attendance stats', 500, error);
   }

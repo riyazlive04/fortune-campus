@@ -118,6 +118,7 @@ export const login = async (req: Request, res: Response): Promise<Response> => {
     }
 
     // 5️⃣ Generate JWT
+    console.log('Signing token with secret length:', config.jwt.secret.length);
     const token = jwt.sign(
       {
         userId: user.id,

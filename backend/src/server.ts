@@ -3,6 +3,7 @@ import { config } from "./config";
 
 /**
  * Start HTTP server
+ * (Force restart)
  * IMPORTANT:
  * - Do NOT force Prisma connection on startup
  * - Prisma will connect lazily on first query

@@ -2,6 +2,11 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+console.log('--- Config Initializing ---');
+console.log('DATABASE_URL starts with:', process.env.DATABASE_URL?.substring(0, 20));
+console.log('JWT_SECRET length:', process.env.JWT_SECRET?.length || 0);
+console.log('---------------------------');
+
 export const config = {
   port: process.env.PORT || 5000,
   nodeEnv: process.env.NODE_ENV || 'development',

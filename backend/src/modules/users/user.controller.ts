@@ -30,6 +30,12 @@ export const createUser = async (req: AuthRequest, res: Response): Promise<Respo
       return errorResponse(res, 'Email, firstName, lastName, and role are required', 400);
     }
 
+    // Normalize input
+    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedRole = role.trim() as UserRole;
+    const normalizedFirstName = firstName.trim();
+    const normalizedLastName = lastName.trim();
+
     // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
@@ -38,7 +44,7 @@ export const createUser = async (req: AuthRequest, res: Response): Promise<Respo
 
     // Check if email already exists
     const existingUser = await prisma.user.findUnique({
-      where: { email: email.toLowerCase().trim() },
+      where: { email: normalizedEmail },
     });
 
     if (existingUser) {
@@ -48,17 +54,17 @@ export const createUser = async (req: AuthRequest, res: Response): Promise<Respo
     // Role-based permissions check
     if (req.user?.role === UserRole.CEO) {
       // CEO can create any user except other CEOs
-      if (role === UserRole.CEO) {
+      if (normalizedRole === UserRole.CEO) {
         return errorResponse(res, 'Cannot create another CEO user', 403);
       }
     } else if (req.user?.role === UserRole.ADMIN) {
       // ADMIN can create any user
-      if (role === UserRole.ADMIN) {
+      if (normalizedRole === UserRole.ADMIN) {
         return errorResponse(res, 'Cannot create another ADMIN user', 403);
       }
     } else if (req.user?.role === UserRole.CHANNEL_PARTNER) {
       // CHANNEL_PARTNER can only create users in their branch (not ADMIN or other CHANNEL_PARTNERs)
-      if (role === UserRole.ADMIN) {
+      if (normalizedRole === UserRole.ADMIN) {
         return errorResponse(res, 'You cannot create ADMIN users', 403);
       }
       // Must be in the same branch
@@ -70,12 +76,12 @@ export const createUser = async (req: AuthRequest, res: Response): Promise<Respo
     }
 
     // Branch validation for non-ADMIN users
-    if (role !== UserRole.ADMIN && !branchId) {
+    if (normalizedRole !== UserRole.ADMIN && !branchId) {
       return errorResponse(res, 'Branch is required for non-ADMIN users', 400);
     }
 
     // Trainer specific validation
-    if (role === UserRole.TRAINER) {
+    if (normalizedRole === UserRole.TRAINER) {
       if (!specialization || !experience) {
         return errorResponse(res, 'Specialization and experience are required for trainers', 400);
       }
@@ -98,19 +104,19 @@ export const createUser = async (req: AuthRequest, res: Response): Promise<Respo
       // Create User
       const newUser = await tx.user.create({
         data: {
-          email: email.toLowerCase().trim(),
+          email: normalizedEmail,
           password: hashedPassword,
-          firstName: firstName.trim(),
-          lastName: lastName.trim(),
+          firstName: normalizedFirstName,
+          lastName: normalizedLastName,
           phone: phone?.trim(),
-          role: role as UserRole,
-          branchId: role === UserRole.ADMIN ? null : branchId,
+          role: normalizedRole,
+          branchId: normalizedRole === UserRole.ADMIN ? null : branchId,
           isActive: true,
         },
       });
 
       // Create Trainer Profile if role is TRAINER
-      if (role === UserRole.TRAINER) {
+      if (normalizedRole === UserRole.TRAINER) {
         const timestamp = Date.now().toString().slice(-6);
         const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
         const employeeId = `TR-${timestamp}${random}`;
@@ -129,7 +135,7 @@ export const createUser = async (req: AuthRequest, res: Response): Promise<Respo
       }
 
       // Create Student Profile if role is STUDENT
-      if (role === UserRole.STUDENT) {
+      if (normalizedRole === UserRole.STUDENT) {
         const { courseId } = req.body;
 
         if (!courseId) {
@@ -281,6 +287,17 @@ export const getUsers = async (req: AuthRequest, res: Response): Promise<Respons
               experience: true,
             },
           },
+          studentProfile: {
+            select: {
+              id: true,
+              enrollmentNumber: true,
+              course: {
+                select: {
+                  name: true
+                }
+              }
+            }
+          }
         },
         orderBy: { createdAt: 'desc' },
       }),
@@ -340,7 +357,7 @@ export const getUserById = async (req: AuthRequest, res: Response): Promise<Resp
 export const updateUser = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
     const { id } = req.params;
-    const { firstName, lastName, phone, isActive, branchId, password, specialization, experience, role } = req.body;
+    const { firstName, lastName, phone, isActive, branchId, password, specialization, experience, role, courseId } = req.body;
 
     const existingUser = await prisma.user.findUnique({ where: { id } });
     if (!existingUser) {
@@ -373,6 +390,13 @@ export const updateUser = async (req: AuthRequest, res: Response): Promise<Respo
     // Hash password if provided
     const hashedPassword = password ? await bcrypt.hash(password, 10) : undefined;
 
+    // Fetch course fees if student role and courseId provided
+    let courseFees = 0;
+    if ((role === UserRole.STUDENT || (existingUser.role === UserRole.STUDENT && !role)) && courseId) {
+      const course = await prisma.course.findUnique({ where: { id: courseId } });
+      if (course) courseFees = course.fees;
+    }
+
     const user = await prisma.user.update({
       where: { id },
       data: {
@@ -397,6 +421,36 @@ export const updateUser = async (req: AuthRequest, res: Response): Promise<Respo
               update: {
                 ...(specialization ? { specialization } : {}),
                 ...(experience ? { experience: Number(experience) } : {}),
+              }
+            }
+          }
+        } : {}),
+        // Handle Student Profile Upsert (Create or Update)
+        ...((role === UserRole.STUDENT || (existingUser.role === UserRole.STUDENT && !role)) && (courseId) ? {
+          studentProfile: {
+            upsert: {
+              create: {
+                enrollmentNumber: `STU${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
+                branch: { connect: { id: branchId || existingUser.branchId } },
+                course: { connect: { id: courseId } },
+                admission: {
+                  create: {
+                    admissionNumber: `ADM${Date.now().toString().slice(-6)}${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
+                    firstName: firstName || existingUser.firstName,
+                    lastName: lastName || existingUser.lastName,
+                    email: existingUser.email,
+                    phone: phone || existingUser.phone,
+                    courseId: courseId,
+                    branchId: branchId || existingUser.branchId,
+                    feeAmount: courseFees,
+                    status: 'APPROVED'
+                  }
+                },
+                currentSemester: 1,
+                isActive: true
+              },
+              update: {
+                course: { connect: { id: courseId } }
               }
             }
           }

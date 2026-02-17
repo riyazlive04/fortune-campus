@@ -25,7 +25,8 @@ const PublicEnquiry = () => {
         email: "",
         phone: "",
         courseId: "",
-        message: "",
+
+        location: "",
     });
 
     // Fetch courses on component mount
@@ -70,7 +71,8 @@ const PublicEnquiry = () => {
                 email: "",
                 phone: "",
                 courseId: "",
-                message: "",
+
+                location: "",
             });
 
             // Reset success message after 5 seconds
@@ -203,14 +205,13 @@ const PublicEnquiry = () => {
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor="lastName">Last Name *</Label>
+                                            <Label htmlFor="lastName">Last Name (Optional)</Label>
                                             <Input
                                                 id="lastName"
                                                 name="lastName"
                                                 value={formData.lastName}
                                                 onChange={handleChange}
                                                 placeholder="Doe"
-                                                required
                                                 disabled={loading}
                                             />
                                         </div>
@@ -245,6 +246,19 @@ const PublicEnquiry = () => {
                                     </div>
 
                                     <div className="space-y-2">
+                                        <Label htmlFor="location">Location *</Label>
+                                        <Input
+                                            id="location"
+                                            name="location"
+                                            value={formData.location}
+                                            onChange={handleChange}
+                                            placeholder="City, State"
+                                            required
+                                            disabled={loading}
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
                                         <Label htmlFor="courseId">Course Interest *</Label>
                                         <Select
                                             value={formData.courseId}
@@ -263,19 +277,6 @@ const PublicEnquiry = () => {
                                                 ))}
                                             </SelectContent>
                                         </Select>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label htmlFor="message">Message (Optional)</Label>
-                                        <Textarea
-                                            id="message"
-                                            name="message"
-                                            value={formData.message}
-                                            onChange={handleChange}
-                                            placeholder="Tell us about your learning goals..."
-                                            rows={4}
-                                            disabled={loading}
-                                        />
                                     </div>
 
                                     <Button type="submit" className="w-full" size="lg" disabled={loading}>

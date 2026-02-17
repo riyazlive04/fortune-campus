@@ -45,7 +45,10 @@ const Dashboard = () => {
       ]);
 
       if (statsRes.success) {
-        setData(statsRes.data);
+        console.log("Dashboard Stats Received:", statsRes.data.stats);
+        setData(statsRes.data.stats);
+      } else {
+        console.error("Dashboard Stats Failed:", statsRes);
       }
       if (perfRes.success) {
         setPerformance(perfRes.data);
@@ -99,33 +102,33 @@ const Dashboard = () => {
       <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KPICard
           title="Total Leads"
-          value={data.kpis.leads.value.toString()}
-          change={`${data.kpis.leads.change >= 0 ? '+' : ''}${data.kpis.leads.change}% from last month`}
-          changeType={data.kpis.leads.change >= 0 ? "positive" : "negative"}
+          value={data?.kpis?.leads?.value?.toString() || "0"}
+          change={`${(data?.kpis?.leads?.change ?? 0) >= 0 ? '+' : ''}${data?.kpis?.leads?.change ?? 0}% from last month`}
+          changeType={(data?.kpis?.leads?.change ?? 0) >= 0 ? "positive" : "negative"}
           icon={UserPlus}
           accentColor="bg-primary"
         />
         <KPICard
           title="Admissions"
-          value={data.kpis.admissions.value.toString()}
-          change={`${data.kpis.admissions.change >= 0 ? '+' : ''}${data.kpis.admissions.change}% from last month`}
-          changeType={data.kpis.admissions.change >= 0 ? "positive" : "negative"}
+          value={data?.kpis?.admissions?.value?.toString() || "0"}
+          change={`${(data?.kpis?.admissions?.change ?? 0) >= 0 ? '+' : ''}${data?.kpis?.admissions?.change ?? 0}% from last month`}
+          changeType={(data?.kpis?.admissions?.change ?? 0) >= 0 ? "positive" : "negative"}
           icon={Users}
           accentColor="bg-success"
         />
         <KPICard
           title="Active Students"
-          value={data.kpis.activeStudents.value.toString()}
-          change={`${data.kpis.activeStudents.change >= 0 ? '+' : ''}${data.kpis.activeStudents.change}% from last month`}
-          changeType={data.kpis.activeStudents.change >= 0 ? "positive" : "negative"}
+          value={data?.kpis?.activeStudents?.value?.toString() || "0"}
+          change={`${(data?.kpis?.activeStudents?.change ?? 0) >= 0 ? '+' : ''}${data?.kpis?.activeStudents?.change ?? 0}% from last month`}
+          changeType={(data?.kpis?.activeStudents?.change ?? 0) >= 0 ? "positive" : "negative"}
           icon={GraduationCap}
           accentColor="bg-warning"
         />
         <KPICard
           title="Placements"
-          value={data.kpis.placements.value.toString()}
-          change={`${data.kpis.placements.change >= 0 ? '+' : ''}${data.kpis.placements.change}% from last month`}
-          changeType={data.kpis.placements.change >= 0 ? "positive" : "negative"}
+          value={data?.kpis?.placements?.value?.toString() || "0"}
+          change={`${(data?.kpis?.placements?.change ?? 0) >= 0 ? '+' : ''}${data?.kpis?.placements?.change ?? 0}% from last month`}
+          changeType={(data?.kpis?.placements?.change ?? 0) >= 0 ? "positive" : "negative"}
           icon={Briefcase}
           accentColor="bg-purple-500"
         />
@@ -151,14 +154,14 @@ const Dashboard = () => {
           <ResponsiveContainer width="100%" height={240}>
             <PieChart>
               <Pie
-                data={data.courseDistribution}
+                data={data?.courseDistribution || []}
                 cx="50%"
                 cy="50%"
                 outerRadius={90}
                 dataKey="value"
                 label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
               >
-                {data.courseDistribution.map((_: any, i: number) => (
+                {(data?.courseDistribution || []).map((_: any, i: number) => (
                   <Cell key={i} fill={COLORS[i % COLORS.length]} />
                 ))}
               </Pie>
@@ -169,7 +172,7 @@ const Dashboard = () => {
       </div>
 
       {/* Branch Performance Table - Only show if data exists */}
-      {data.branchPerformance && data.branchPerformance.length > 0 && (
+      {data?.branchPerformance && data.branchPerformance.length > 0 && (
         <div className="mb-8 rounded-xl border border-border bg-card">
           <div className="border-b border-border p-4">
             <h3 className="text-sm font-semibold text-foreground">Branch-wise Performance</h3>

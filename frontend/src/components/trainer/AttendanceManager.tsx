@@ -31,7 +31,7 @@ const AttendanceManager = ({ batches }: AttendanceManagerProps) => {
             setLoading(true);
             const res = await trainerApi.getBranchStudents();
             if (res.success) {
-                setStudents(res.data);
+                setStudents(res.data.students || []);
             }
         } catch (error: any) {
             toast({

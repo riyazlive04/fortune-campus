@@ -1,0 +1,56 @@
+{
+  "counts": {
+    "users": 17,
+    "students": 6,
+    "trainers": 5,
+    "admissions": 7
+  },
+  "students": [
+    {
+      "email": "student1_salem@gmail.com",
+      "hasProfile": true
+    },
+    {
+      "email": "kummaraakash554@gmail.com",
+      "hasProfile": true
+    },
+    {
+      "email": "student3_cbe@gmail.com",
+      "hasProfile": true
+    },
+    {
+      "email": "student2_erode@gmail.com",
+      "hasProfile": true
+    },
+    {
+      "email": "student4_tiruppur@gmail.com",
+      "hasProfile": true
+    },
+    {
+      "email": "teststu1771328513144@example.com",
+      "hasProfile": true
+    }
+  ],
+  "trainers": [
+    {
+      "email": "trainer1_salem@gmail.com",
+      "hasProfile": true
+    },
+    {
+      "email": "trainer2_cbe@gmail.com",
+      "hasProfile": true
+    },
+    {
+      "email": "trainer3_erode@gmail.com",
+      "hasProfile": true
+    },
+    {
+      "email": "trainer4_tiruppur@gmail.com",
+      "hasProfile": true
+    },
+    {
+      "email": "testtrain1771328571376@example.com",
+      "hasProfile": true
+    }
+  ]
+}

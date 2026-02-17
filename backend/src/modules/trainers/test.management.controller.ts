@@ -16,7 +16,7 @@ export const createTest = async (req: AuthRequest, res: Response): Promise<Respo
                 passMarks: Number(passMarks)
             }
         });
-        return successResponse(res, test, 'Test created successfully', 201);
+        return successResponse(res, { test }, 'Test created successfully', 201);
     } catch (error) {
         return errorResponse(res, 'Failed to create test', 500, error);
     }
@@ -32,7 +32,7 @@ export const getTestsByBatch = async (req: AuthRequest, res: Response): Promise<
             },
             orderBy: { date: 'desc' }
         });
-        return successResponse(res, tests);
+        return successResponse(res, { tests });
     } catch (error) {
         return errorResponse(res, 'Failed to fetch tests', 500, error);
     }
@@ -65,7 +65,7 @@ export const updateTestScores = async (req: AuthRequest, res: Response): Promise
             }))
         );
 
-        return successResponse(res, results, 'Test scores updated successfully');
+        return successResponse(res, { results }, 'Test scores updated successfully');
     } catch (error) {
         return errorResponse(res, 'Failed to update test scores', 500, error);
     }
@@ -84,7 +84,7 @@ export const getTestScores = async (req: AuthRequest, res: Response): Promise<Re
                 }
             }
         });
-        return successResponse(res, scores);
+        return successResponse(res, { scores });
     } catch (error) {
         return errorResponse(res, 'Failed to fetch test scores', 500, error);
     }
@@ -96,7 +96,7 @@ export const deleteTest = async (req: AuthRequest, res: Response): Promise<Respo
         await (prisma as any).test.delete({
             where: { id: testId }
         });
-        return successResponse(res, null, 'Test deleted successfully');
+        return successResponse(res, { testId }, 'Test deleted successfully');
     } catch (error) {
         return errorResponse(res, 'Failed to delete test', 500, error);
     }

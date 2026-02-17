@@ -10,7 +10,15 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
         const isCEO = req.user?.role === UserRole.CEO;
         const branchId = isCEO ? undefined : req.user?.branchId;
 
+        console.log('Dashboard Stats Debug:', {
+            user: req.user,
+            role: req.user?.role,
+            isCEO,
+            branchId
+        });
+
         const where: any = branchId ? { branchId } : {};
+        console.log('Dashboard Stats Where Clause:', where);
 
         // Get current month and last month dates
         const now = new Date();
@@ -150,11 +158,13 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
         }));
 
         return successResponse(res, {
-            kpis,
-            placementTrend,
-            courseDistribution: courseData,
-            branchPerformance,
-            trainerPerformance: trainerPerformanceData,
+            stats: {
+                kpis,
+                placementTrend,
+                courseDistribution: courseData,
+                branchPerformance,
+                trainerPerformance: trainerPerformanceData,
+            }
         });
     } catch (error) {
         return errorResponse(res, 'Failed to fetch dashboard stats', 500, error);

@@ -162,7 +162,7 @@ export const getStudentsByBatch = async (req: AuthRequest, res: Response): Promi
                 }
             }
         });
-        return successResponse(res, students);
+        return successResponse(res, { students });
     } catch (error) {
         return errorResponse(res, 'Failed to fetch students for batch', 500, error);
     }
@@ -252,7 +252,7 @@ export const getBranchStudents = async (req: AuthRequest, res: Response): Promis
             }
         });
 
-        return successResponse(res, students);
+        return successResponse(res, { students });
     } catch (error) {
         return errorResponse(res, 'Failed to fetch branch students', 500, error);
     }
@@ -348,7 +348,7 @@ export const getBranchReports = async (req: AuthRequest, res: Response): Promise
         });
 
         console.log(`[getBranchReports] Reports found: ${reports.length}`);
-        return successResponse(res, 'Branch reports fetched successfully', reports);
+        return successResponse(res, { reports }, 'Branch reports fetched successfully');
     } catch (error) {
         console.error('Fetch reports error:', error);
         return errorResponse(res, 'Failed to fetch reports', 500);

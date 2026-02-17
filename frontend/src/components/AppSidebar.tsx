@@ -2,7 +2,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Users, UserPlus, GraduationCap, BookOpen,
   ClipboardList, Briefcase, Calendar, FolderKanban, Award,
-  BarChart3, Bell, MessageSquare, ChevronLeft, ChevronRight, Settings, UsersRound
+  BarChart3, Bell, MessageSquare, ChevronLeft, ChevronRight, Settings, UsersRound, Layers
 } from "lucide-react";
 import { storage } from "@/lib/api";
 
@@ -19,6 +19,7 @@ const navSections = [
     label: "Academics",
     items: [
       { title: "Courses & Syllabus", path: "/courses", icon: BookOpen, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER', 'TRAINER'] },
+      { title: "Batches", path: "/batches", icon: Layers, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER', 'TRAINER'] },
       { title: "Trainers", path: "/trainers", icon: GraduationCap, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER'] },
       { title: "Students", path: "/students", icon: Users, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER', 'TRAINER'] },
       { title: "Attendance", path: "/attendance", icon: Calendar, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER', 'TRAINER'] },
@@ -67,18 +68,24 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
   return (
     <aside className={`fixed left-0 top-0 z-40 flex h-screen flex-col bg-sidebar text-sidebar-foreground transition-all duration-300 ${collapsed ? "w-16" : "w-60"}`}>
       {/* Logo */}
+
+      {/* Logo */}
       <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
-        {!collapsed && (
+        {!collapsed ? (
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold">
-              FI
-            </div>
-            <span className="text-sm font-semibold text-sidebar-accent-foreground">Fortune Innovatives</span>
+            <img
+              src="/logo.png"
+              alt="Fortune Innovatives"
+              className="h-10 w-auto object-contain"
+            />
           </div>
-        )}
-        {collapsed && (
-          <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm font-bold">
-            FI
+        ) : (
+          <div className="mx-auto flex h-10 w-10 items-center justify-center">
+            <img
+              src="/logo.png"
+              alt="FI"
+              className="h-full w-full object-contain"
+            />
           </div>
         )}
       </div>
@@ -98,10 +105,11 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
                 <NavLink
                   key={item.path}
                   to={item.path}
-                  className={`mx-2 mb-0.5 flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${isActive
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
-                    } ${collapsed ? "justify-center px-2" : ""}`}
+                  className={({ isActive }) =>
+                    `mx-2 mb-0.5 flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-200 ease-in-out hover:pl-5 ${isActive
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                    } ${collapsed ? "justify-center px-2 hover:pl-2" : ""}`}
                 >
                   <item.icon className="h-4 w-4 shrink-0" />
                   {!collapsed && <span>{item.title}</span>}

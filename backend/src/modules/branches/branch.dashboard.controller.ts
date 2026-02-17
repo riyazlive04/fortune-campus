@@ -18,6 +18,7 @@ export const getBranchOverview = async (req: AuthRequest, res: Response): Promis
         const weekStart = new Date(now.setDate(now.getDate() - 7));
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
+
         const [
             activeStudents,
             newAdmissionsToday,
@@ -27,6 +28,7 @@ export const getBranchOverview = async (req: AuthRequest, res: Response): Promis
             totalAdmissionsCount,
             totalTrainers,
             attendanceToday,
+            trainerAttendanceToday,
             revenueStats,
             placementEligible
         ] = await Promise.all([
@@ -45,6 +47,14 @@ export const getBranchOverview = async (req: AuthRequest, res: Response): Promis
                 },
                 _count: true
             }),
+            prisma.trainerAttendance.groupBy({
+                by: ['status'],
+                where: {
+                    ...(branchId ? { trainer: { branchId } } : {}),
+                    date: { gte: todayStart }
+                },
+                _count: true
+            }),
             prisma.admission.aggregate({
                 where,
                 _sum: { feePaid: true, feeBalance: true, feeAmount: true }
@@ -57,6 +67,11 @@ export const getBranchOverview = async (req: AuthRequest, res: Response): Promis
         const attendanceSummary = {
             present: attendanceToday.find(a => a.status === 'PRESENT')?._count || 0,
             absent: attendanceToday.find(a => a.status === 'ABSENT')?._count || 0,
+            studentsMarked: attendanceToday.length > 0,
+
+            trainerPresent: trainerAttendanceToday.find(a => a.status === 'PRESENT')?._count || 0,
+            trainerAbsent: trainerAttendanceToday.find(a => a.status === 'ABSENT')?._count || 0,
+            trainersMarked: trainerAttendanceToday.length > 0
         };
 
         return successResponse(res, {
@@ -68,6 +83,8 @@ export const getBranchOverview = async (req: AuthRequest, res: Response): Promis
                     monthly: newAdmissionsMonthly,
                     conversionRate
                 },
+                totalLeads,
+                totalAdmissions: totalAdmissionsCount,
                 trainers: totalTrainers,
                 attendance: attendanceSummary,
                 revenue: {
@@ -88,7 +105,7 @@ export const getAdmissionsStats = async (req: AuthRequest, res: Response): Promi
         const branchId = req.user?.branchId;
         const where = branchId ? { branchId } : {};
 
-        const [leadsBySource, admissionsTrend, recentLeads] = await Promise.all([
+        const [leadsBySource, admissionsTrend, recentLeads, pendingAdmissions] = await Promise.all([
             prisma.lead.groupBy({
                 by: ['source'],
                 where,
@@ -103,10 +120,16 @@ export const getAdmissionsStats = async (req: AuthRequest, res: Response): Promi
                 where: { ...where, status: 'NEW' },
                 orderBy: { createdAt: 'desc' },
                 take: 10
+            }),
+            prisma.admission.findMany({
+                where: { ...where, status: 'PENDING' },
+                include: { course: true },
+                orderBy: { createdAt: 'desc' },
+                take: 10
             })
         ]);
 
-        return successResponse(res, { leadsBySource, admissionsTrend, recentLeads });
+        return successResponse(res, { leadsBySource, admissionsTrend, recentLeads, pendingAdmissions });
     } catch (error) {
         return errorResponse(res, 'Failed to fetch admissions stats', 500, error);
     }
@@ -786,7 +809,7 @@ export const uploadBranchReport = async (req: AuthRequest, res: Response): Promi
         });
 
         console.log(`[uploadBranchReport] Report created in DB:`, report);
-        return successResponse(res, 'Report uploaded successfully', report);
+        return successResponse(res, report, 'Report uploaded successfully');
 
     } catch (error) {
         console.error('Upload report error:', error);

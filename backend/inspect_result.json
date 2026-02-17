@@ -1,0 +1,119 @@
+{
+  "users": [
+    {
+      "name": "Trainer 1",
+      "role": "TRAINER",
+      "hasTrainerProfile": true,
+      "hasStudentProfile": false
+    },
+    {
+      "name": "Student 1",
+      "role": "STUDENT",
+      "hasTrainerProfile": false,
+      "hasStudentProfile": false
+    },
+    {
+      "name": "Eshwanth B",
+      "role": "STUDENT",
+      "hasTrainerProfile": false,
+      "hasStudentProfile": false
+    },
+    {
+      "name": "Trainer 2",
+      "role": "TRAINER",
+      "hasTrainerProfile": true,
+      "hasStudentProfile": false
+    },
+    {
+      "name": "Student 3",
+      "role": "STUDENT",
+      "hasTrainerProfile": false,
+      "hasStudentProfile": false
+    },
+    {
+      "name": "Student 2",
+      "role": "STUDENT",
+      "hasTrainerProfile": false,
+      "hasStudentProfile": false
+    },
+    {
+      "name": "Trainer 3",
+      "role": "TRAINER",
+      "hasTrainerProfile": true,
+      "hasStudentProfile": false
+    },
+    {
+      "name": "Trainer 4",
+      "role": "TRAINER",
+      "hasTrainerProfile": true,
+      "hasStudentProfile": false
+    },
+    {
+      "name": "Student 4",
+      "role": "STUDENT",
+      "hasTrainerProfile": false,
+      "hasStudentProfile": false
+    },
+    {
+      "name": "Vasu Devan",
+      "role": "CEO",
+      "hasTrainerProfile": false,
+      "hasStudentProfile": false
+    },
+    {
+      "name": "Vasudevan CEO",
+      "role": "CEO",
+      "hasTrainerProfile": false,
+      "hasStudentProfile": false
+    },
+    {
+      "name": "Pranesh Fortune",
+      "role": "CHANNEL_PARTNER",
+      "hasTrainerProfile": false,
+      "hasStudentProfile": false
+    },
+    {
+      "name": "Vimal Fortune",
+      "role": "CHANNEL_PARTNER",
+      "hasTrainerProfile": false,
+      "hasStudentProfile": false
+    },
+    {
+      "name": "Sanjay B",
+      "role": "CHANNEL_PARTNER",
+      "hasTrainerProfile": false,
+      "hasStudentProfile": false
+    },
+    {
+      "name": "Vishnu Fortune",
+      "role": "CHANNEL_PARTNER",
+      "hasTrainerProfile": false,
+      "hasStudentProfile": false
+    }
+  ],
+  "totalStudents": 0,
+  "totalTrainers": 4,
+  "studentDetails": [],
+  "trainerDetails": [
+    {
+      "id": "9b2a41e8-09d4-414f-b579-518d433378d3",
+      "employeeId": "EMP-TRAINER1SALEM",
+      "name": "Trainer 1"
+    },
+    {
+      "id": "a7a70e85-61a3-411d-a29a-fe9a072d60bb",
+      "employeeId": "EMP-TRAINER2CBE",
+      "name": "Trainer 2"
+    },
+    {
+      "id": "01159d24-a5cc-40a7-a3ba-0fb076001957",
+      "employeeId": "EMP-T3-ERODE",
+      "name": "Trainer 3"
+    },
+    {
+      "id": "7ac3a1fc-f415-45a8-b72e-41bae3c3cec0",
+      "employeeId": "EMP-TRAINER4TIRUPPUR",
+      "name": "Trainer 4"
+    }
+  ]
+}

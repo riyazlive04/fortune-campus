@@ -28,6 +28,7 @@ export const authenticateToken = async (
       return errorResponse(res, 'Access token required', 401);
     }
 
+    console.log('Verifying token with secret length:', config.jwt.secret.length);
     const decoded = jwt.verify(token, config.jwt.secret) as any;
 
     // Verify user still exists and is active

@@ -113,7 +113,7 @@ export const getTrainerById = async (req: AuthRequest, res: Response): Promise<R
       return errorResponse(res, 'Access denied', 403);
     }
 
-    return successResponse(res, trainer);
+    return successResponse(res, { trainer });
   } catch (error) {
     return errorResponse(res, 'Failed to fetch trainer', 500, error);
   }
@@ -191,7 +191,7 @@ export const createTrainer = async (req: AuthRequest, res: Response): Promise<Re
       link: '/trainers'
     });
 
-    return successResponse(res, result, 'Trainer created successfully', 201);
+    return successResponse(res, { trainer: result }, 'Trainer created successfully', 201);
   } catch (error: any) {
     if (error.code === 'P2002') {
       const target = error.meta?.target?.[0] || 'field';
@@ -238,7 +238,7 @@ export const updateTrainer = async (req: AuthRequest, res: Response): Promise<Re
       },
     });
 
-    return successResponse(res, trainer, 'Trainer updated successfully');
+    return successResponse(res, { trainer }, 'Trainer updated successfully');
   } catch (error) {
     return errorResponse(res, 'Failed to update trainer', 500, error);
   }
@@ -260,7 +260,7 @@ export const deleteTrainer = async (req: AuthRequest, res: Response): Promise<Re
     // Delete trainer (will cascade to user)
     await prisma.trainer.delete({ where: { id } });
 
-    return successResponse(res, null, 'Trainer deleted successfully');
+    return successResponse(res, { id }, 'Trainer deleted successfully');
   } catch (error) {
     return errorResponse(res, 'Failed to delete trainer', 500, error);
   }

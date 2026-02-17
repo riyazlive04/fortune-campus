@@ -98,7 +98,7 @@ export const getLeadById = async (req: AuthRequest, res: Response): Promise<Resp
       return errorResponse(res, 'Access denied', 403);
     }
 
-    return successResponse(res, lead);
+    return successResponse(res, { lead });
   } catch (error) {
     return errorResponse(res, 'Failed to fetch lead', 500, error);
   }
@@ -117,6 +117,7 @@ export const createLead = async (req: AuthRequest, res: Response): Promise<Respo
       followUpDate,
       branchId,
       assignedToId,
+      location,
     } = req.body;
 
     if (!req.user?.id) {
@@ -136,6 +137,7 @@ export const createLead = async (req: AuthRequest, res: Response): Promise<Respo
         branchId: branchId || req.user.branchId!,
         createdById: req.user.id,
         assignedToId: assignedToId || req.user.id,
+        location,
         status: LeadStatus.NEW,
       },
       include: {
@@ -174,6 +176,7 @@ export const updateLead = async (req: AuthRequest, res: Response): Promise<Respo
       notes,
       followUpDate,
       assignedToId,
+      location,
     } = req.body;
 
     const existingLead = await prisma.lead.findUnique({ where: { id } });
@@ -200,6 +203,7 @@ export const updateLead = async (req: AuthRequest, res: Response): Promise<Respo
         notes,
         followUpDate: followUpDate ? new Date(followUpDate) : undefined,
         assignedToId,
+        location,
       },
       include: {
         branch: {
@@ -239,7 +243,7 @@ export const deleteLead = async (req: AuthRequest, res: Response): Promise<Respo
 
     await prisma.lead.delete({ where: { id } });
 
-    return successResponse(res, null, 'Lead deleted successfully');
+    return successResponse(res, { id }, 'Lead deleted successfully');
   } catch (error) {
     return errorResponse(res, 'Failed to delete lead', 500, error);
   }
@@ -321,7 +325,7 @@ export const createPublicLead = async (req: Request, res: Response): Promise<Res
       email,
       phone,
       courseId,
-      message,
+      location,
     } = req.body;
 
     // Find default branch (first one) and default user (CEO)
@@ -358,10 +362,9 @@ export const createPublicLead = async (req: Request, res: Response): Promise<Res
         phone,
         source: 'Website Enquiry',
         interestedCourse,
-        notes: message,
         branchId: defaultBranch.id,
-        createdById: defaultUser.id,
         assignedToId: defaultUser.id,
+        location,
         status: LeadStatus.NEW,
       },
     });

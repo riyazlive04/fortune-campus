@@ -1,0 +1,69 @@
+{
+  "usersCount": 6,
+  "studentsCount": 0,
+  "admissionsCount": 7,
+  "usersWithProfile": [
+    {
+      "email": "student1_salem@gmail.com",
+      "hasProfile": false
+    },
+    {
+      "email": "kummaraakash554@gmail.com",
+      "hasProfile": false
+    },
+    {
+      "email": "student3_cbe@gmail.com",
+      "hasProfile": false
+    },
+    {
+      "email": "student2_erode@gmail.com",
+      "hasProfile": false
+    },
+    {
+      "email": "student4_tiruppur@gmail.com",
+      "hasProfile": false
+    },
+    {
+      "email": "teststu1771328513144@example.com",
+      "hasProfile": false
+    }
+  ],
+  "students": [],
+  "admissions": [
+    {
+      "id": "c5c69924-1802-448c-a3f2-066a33387afc",
+      "email": "kummaraakash554@gmail.com",
+      "status": "APPROVED"
+    },
+    {
+      "id": "253cf9f7-30f9-4778-ae40-dde070406934",
+      "email": "aakashkummar1258@gmail.com",
+      "status": "PENDING"
+    },
+    {
+      "id": "579a951b-ae9f-44a1-93e0-ab163504efdf",
+      "email": "student1_salem@gmail.com",
+      "status": "APPROVED"
+    },
+    {
+      "id": "7cb0360c-98d8-4a88-bbd1-6b4b5c3234f8",
+      "email": "student3_cbe@gmail.com",
+      "status": "APPROVED"
+    },
+    {
+      "id": "4f67b36a-47ee-4973-b302-c8729e03707c",
+      "email": "student2_erode@gmail.com",
+      "status": "APPROVED"
+    },
+    {
+      "id": "590de247-23e3-4f64-8eea-525882abe283",
+      "email": "student4_tiruppur@gmail.com",
+      "status": "APPROVED"
+    },
+    {
+      "id": "db120fb4-49e4-4932-90f8-8fe49e8f602d",
+      "email": "teststu1771328513144@example.com",
+      "status": "APPROVED"
+    }
+  ]
+}

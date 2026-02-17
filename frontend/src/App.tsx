@@ -15,6 +15,7 @@ import Leads from "./pages/Leads";
 import Admissions from "./pages/Admissions";
 import Courses from "./pages/Courses";
 import Trainers from "./pages/Trainers";
+import Batches from "./pages/Batches";
 import Students from "./pages/Students";
 import Attendance from "./pages/Attendance";
 import Portfolio from "./pages/Portfolio";
@@ -47,6 +48,7 @@ const App = () => (
               <Route path="/admissions" element={<Admissions />} />
               <Route path="/courses" element={<Courses />} />
               <Route path="/trainers" element={<Trainers />} />
+              <Route path="/batches" element={<Batches />} />
               <Route path="/students" element={<Students />} />
               <Route path="/attendance" element={<Attendance />} />
               <Route path="/portfolio" element={<Portfolio />} />
