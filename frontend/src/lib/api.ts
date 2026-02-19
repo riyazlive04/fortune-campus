@@ -11,6 +11,42 @@ const getBaseUrl = () => {
 export const API_BASE_URL = getBaseUrl();
 console.log('🌐 API connection initialized at:', API_BASE_URL);
 
+// Storage utilities - defined first so all API services can use it
+export const storage = {
+  setToken: (token: string) => {
+    localStorage.setItem('auth_token', token);
+  },
+
+  getToken: () => {
+    return localStorage.getItem('auth_token');
+  },
+
+  removeToken: () => {
+    localStorage.removeItem('auth_token');
+  },
+
+  setUser: (user: any) => {
+    localStorage.setItem('user', JSON.stringify(user));
+    window.dispatchEvent(new Event('user-updated'));
+  },
+
+  getUser: () => {
+    const user = localStorage.getItem('user');
+    return user ? JSON.parse(user) : null;
+  },
+
+  removeUser: () => {
+    localStorage.removeItem('user');
+    window.dispatchEvent(new Event('user-updated'));
+  },
+
+  clear: () => {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user');
+    window.dispatchEvent(new Event('user-updated'));
+  },
+};
+
 // Setup API Service
 export const setupApi = {
   // Check if initial setup is required
@@ -806,42 +842,6 @@ export const admissionsApi = {
   },
 };
 
-// Storage utilities
-export const storage = {
-  setToken: (token: string) => {
-    localStorage.setItem('auth_token', token);
-  },
-
-  getToken: () => {
-    return localStorage.getItem('auth_token');
-  },
-
-  removeToken: () => {
-    localStorage.removeItem('auth_token');
-  },
-
-  setUser: (user: any) => {
-    localStorage.setItem('user', JSON.stringify(user));
-    window.dispatchEvent(new Event('user-updated'));
-  },
-
-  getUser: () => {
-    const user = localStorage.getItem('user');
-    return user ? JSON.parse(user) : null;
-  },
-
-  removeUser: () => {
-    localStorage.removeItem('user');
-    window.dispatchEvent(new Event('user-updated'));
-  },
-
-  clear: () => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user');
-    window.dispatchEvent(new Event('user-updated'));
-  },
-};
-
 // Students API Service
 export const studentsApi = {
   getStudents: async (params?: any) => {
@@ -938,11 +938,33 @@ export const studentsApi = {
   },
 };
 
+// Placements API Service
+export const placementsApi = {
+  getPlacements: async (params?: any) => {
+    const token = storage.getToken();
+    const queryString = params ? new URLSearchParams(params).toString() : '';
+    const response = await fetch(`${API_BASE_URL}/placements?${queryString}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to fetch placements');
+    }
+
+    return result;
+  },
+};
+
 // Attendance API Service
 export const attendanceApi = {
-  getStats: async () => {
+  getStats: async (params?: any) => {
     const token = storage.getToken();
-    const response = await fetch(`${API_BASE_URL}/attendance/stats`, {
+    const queryString = params ? new URLSearchParams(params).toString() : '';
+    const response = await fetch(`${API_BASE_URL}/attendance/stats?${queryString}`, {
       headers: { 'Authorization': `Bearer ${token}` },
     });
     const result = await response.json();
@@ -988,6 +1010,24 @@ export const attendanceApi = {
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Failed to mark attendance');
+    return result;
+  },
+
+  getAttendance: async (params?: any) => {
+    const token = storage.getToken();
+    const queryString = params ? new URLSearchParams(params).toString() : '';
+    const response = await fetch(`${API_BASE_URL}/attendance?${queryString}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to fetch attendance records');
+    }
+
     return result;
   },
 };

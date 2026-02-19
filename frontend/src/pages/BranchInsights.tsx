@@ -26,7 +26,6 @@ const BranchInsights = () => {
         feesPending: [],
         placementEligible: [],
         expenses: { expenses: [], totalAmount: 0 },
-        socialMedia: [],
         eventPlans: []
     });
     const [sessionError, setSessionError] = useState(false);
@@ -69,11 +68,10 @@ const BranchInsights = () => {
         const fetchWorkflowData = async () => {
             try {
                 setLoading(true);
-                const [adm, fees, placement, social] = await Promise.all([
+                const [adm, fees, placement] = await Promise.all([
                     reportsApi.getDailyAdmissions(selectedBranch).catch(() => ({ data: [] })),
                     reportsApi.getFeesPending(selectedBranch).catch(() => ({ data: [] })),
                     reportsApi.getPlacementEligible(selectedBranch).catch(() => ({ data: [] })),
-                    reportsApi.getSocialEngagement(selectedBranch).catch(() => ({ data: [] }))
                 ]);
 
                 const now = new Date();
@@ -84,7 +82,6 @@ const BranchInsights = () => {
                     feesPending: fees?.data || [],
                     placementEligible: placement?.data || [],
                     expenses: exp?.data || { expenses: [], totalAmount: 0 },
-                    socialMedia: social?.data || [],
                     eventPlans: []
                 });
             } catch (error: any) {
@@ -159,7 +156,6 @@ const BranchInsights = () => {
                         <TabsTrigger value="admissions" className="gap-2"><Users className="h-4 w-4" /> Admissions</TabsTrigger>
                         <TabsTrigger value="fees" className="gap-2"><IndianRupee className="h-4 w-4" /> Fees</TabsTrigger>
                         <TabsTrigger value="operations" className="gap-2"><ClipboardCheck className="h-4 w-4" /> Operations</TabsTrigger>
-                        <TabsTrigger value="marketing" className="gap-2"><Share2 className="h-4 w-4" /> Marketing</TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="admissions" className="space-y-6">
@@ -282,25 +278,6 @@ const BranchInsights = () => {
                                 <CardDescription className="mb-4">Schedule Industrial Visits or Seminars for this branch.</CardDescription>
                                 <Button variant="outline" className="gap-2"><Plus className="h-4 w-4" /> Plan New Event</Button>
                             </Card>
-                        </div>
-                    </TabsContent>
-
-                    <TabsContent value="marketing">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {['Instagram', 'Facebook', 'LinkedIn'].map((platform) => {
-                                const stats = branchData?.socialMedia?.find((s: any) => s.platform === platform.toUpperCase());
-                                return (
-                                    <Card key={platform}>
-                                        <CardHeader className="pb-2">
-                                            <CardTitle className="text-sm font-medium">{platform} Engagement</CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="text-2xl font-bold">{stats?.likes || 0} Likes</div>
-                                            <p className="text-xs text-muted-foreground mt-1">{stats?.leadsGenerated || 0} Leads generated</p>
-                                        </CardContent>
-                                    </Card>
-                                );
-                            })}
                         </div>
                     </TabsContent>
                 </Tabs>

@@ -131,10 +131,6 @@ const Trainers = () => {
                                 className="pl-9"
                             />
                         </div>
-                        <Button onClick={handleAddTrainer}>
-                            <Plus className="mr-2 h-4 w-4" />
-                            Add Trainer
-                        </Button>
                     </div>
 
                     <div className="rounded-md border">

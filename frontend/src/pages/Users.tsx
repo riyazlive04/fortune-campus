@@ -11,6 +11,15 @@ import DataTable from "@/components/DataTable";
 import StatusBadge from "@/components/StatusBadge";
 import { storage, coursesApi, API_BASE_URL } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import StudentModal from "@/components/StudentModal";
+import TrainerModal from "@/components/TrainerModal";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ChevronDown, UserPlus, Users as UsersIcon, School } from "lucide-react";
 
 interface User {
   id: string;
@@ -55,6 +64,10 @@ const Users = () => {
   const [courses, setCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
+  const [isTrainerModalOpen, setIsTrainerModalOpen] = useState(false);
+  const [selectedStudentForEdit, setSelectedStudentForEdit] = useState<any | null>(null);
+  const [selectedTrainerIdForEdit, setSelectedTrainerIdForEdit] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
@@ -192,26 +205,29 @@ const Users = () => {
       setError("Branch is required for non-admin users");
       return false;
     }
-    if (formData.role === 'TRAINER') {
-      if (!formData.specialization.trim()) {
-        setError("Specialization course is required for trainers");
-        return false;
-      }
-      if (!formData.experience.trim()) {
-        setError("Years of experience is required for trainers");
-        return false;
-      }
-    }
     if (formData.role === 'STUDENT') {
-      if (!formData.courseId) {
-        setError("Course is required for students");
-        return false;
-      }
+      // Specialized fields moved to StudentModal
     }
     return true;
   };
 
   const handleEditUser = (user: User) => {
+    if (user.role === 'STUDENT') {
+      // Find the full student record if possible, or just pass basic info
+      // For editing student, the StudentModal expects a student object with relations
+      // The users list might not have all relations needed for StudentModal
+      // But we can pass what we have
+      setSelectedStudentForEdit(user);
+      setIsStudentModalOpen(true);
+      return;
+    }
+
+    if (user.role === 'TRAINER') {
+      setSelectedTrainerIdForEdit(user.id);
+      setIsTrainerModalOpen(true);
+      return;
+    }
+
     setEditMode(true);
     setEditingUserId(user.id);
     setFormData({
@@ -227,6 +243,29 @@ const Users = () => {
       courseId: user.studentProfile?.courseId || "",
     });
     setIsDialogOpen(true);
+  };
+
+  const handleCreateUser = (role: string) => {
+    setFormData({
+      firstName: "",
+      lastName: "",
+      email: "",
+      phone: "",
+      role: role,
+      branchId: currentUser?.branchId || "",
+      password: "",
+      specialization: "",
+      experience: "",
+      courseId: "",
+    });
+
+    if (role === 'STUDENT') {
+      setIsStudentModalOpen(true);
+    } else if (role === 'TRAINER') {
+      setIsTrainerModalOpen(true);
+    } else {
+      setIsDialogOpen(true);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -437,9 +476,6 @@ const Users = () => {
               <Edit className="h-4 w-4" />
             </Button>
           )}
-          <Button variant="ghost" size="sm">
-            <Eye className="h-4 w-4" />
-          </Button>
           {(isAdmin || currentUser?.role === 'CHANNEL_PARTNER') && (
             <Button
               variant="ghost"
@@ -474,14 +510,56 @@ const Users = () => {
         description="Manage system users and their roles"
         actions={
           (isAdmin || currentUser?.role === 'CHANNEL_PARTNER') && (
-            <Button size="sm" className="gap-2" onClick={() => setIsDialogOpen(true)}>
-              <Plus className="h-4 w-4" /> Create User
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="sm" className="gap-2">
+                  <Plus className="h-4 w-4" /> Create User <ChevronDown className="h-4 w-4 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 animate-in fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2">
+                <DropdownMenuItem className="cursor-pointer py-2.5" onClick={() => handleCreateUser('STUDENT')}>
+                  <School className="mr-2 h-4 w-4 text-emerald-600" />
+                  <span>New Student</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer py-2.5" onClick={() => handleCreateUser('TRAINER')}>
+                  <UsersIcon className="mr-2 h-4 w-4 text-emerald-600" />
+                  <span>New Trainer</span>
+                </DropdownMenuItem>
+                {isAdmin && (
+                  <DropdownMenuItem className="cursor-pointer py-2.5" onClick={() => handleCreateUser('CHANNEL_PARTNER')}>
+                    <UserPlus className="mr-2 h-4 w-4 text-emerald-600" />
+                    <span>Channel Partner</span>
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           )
         }
       />
 
       <DataTable columns={columns} data={users} searchPlaceholder="Search users..." />
+
+      <StudentModal
+        isOpen={isStudentModalOpen}
+        onClose={() => {
+          setIsStudentModalOpen(false);
+          setSelectedStudentForEdit(null);
+        }}
+        onSuccess={fetchUsers}
+        student={selectedStudentForEdit}
+        initialData={formData}
+      />
+
+      <TrainerModal
+        isOpen={isTrainerModalOpen}
+        onClose={() => {
+          setIsTrainerModalOpen(false);
+          setSelectedTrainerIdForEdit(null);
+        }}
+        onSuccess={fetchUsers}
+        trainerId={selectedTrainerIdForEdit}
+        initialData={formData}
+      />
 
       {/* Create User Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={handleCloseDialog}>
@@ -598,25 +676,14 @@ const Users = () => {
                   <Select
                     value={formData.role}
                     onValueChange={(value) => handleChange("role", value)}
-                    disabled={submitting}
+                    disabled={submitting || !isAdmin}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select role" />
                     </SelectTrigger>
                     <SelectContent>
-                      {isAdmin && (
-                        <>
-                          <SelectItem value="CHANNEL_PARTNER">Channel Partner</SelectItem>
-                          <SelectItem value="TRAINER">Trainer</SelectItem>
-                          <SelectItem value="STUDENT">Student</SelectItem>
-                        </>
-                      )}
-                      {currentUser?.role === 'CHANNEL_PARTNER' && (
-                        <>
-                          <SelectItem value="TRAINER">Trainer</SelectItem>
-                          <SelectItem value="STUDENT">Student</SelectItem>
-                        </>
-                      )}
+                      <SelectItem value="ADMIN">Admin</SelectItem>
+                      <SelectItem value="CHANNEL_PARTNER">Channel Partner</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -669,64 +736,7 @@ const Users = () => {
                   </div>
                 )}
 
-                {/* Trainer Profile Extras */}
-                {formData.role === 'TRAINER' && (
-                  <>
-                    <div className="space-y-2">
-                      <Label htmlFor="specialization">Specialization Course *</Label>
-                      <Select
-                        value={formData.specialization}
-                        onValueChange={(value) => handleChange("specialization", value)}
-                        disabled={submitting}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select course" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {courses.filter(c => c.isActive).map((course) => (
-                            <SelectItem key={course.id} value={course.name}>
-                              {course.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="experience">Years of Experience *</Label>
-                      <Input
-                        id="experience"
-                        type="number"
-                        value={formData.experience}
-                        onChange={(e) => handleChange("experience", e.target.value)}
-                        disabled={submitting}
-                        placeholder="e.g. 5"
-                      />
-                    </div>
-                  </>
-                )}
 
-                {/* Student Extras */}
-                {formData.role === 'STUDENT' && (
-                  <div className="space-y-2 sm:col-span-2">
-                    <Label htmlFor="courseId">Course *</Label>
-                    <Select
-                      value={formData.courseId}
-                      onValueChange={(value) => handleChange("courseId", value)}
-                      disabled={submitting}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select course" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {courses.filter(c => c.isActive).map((course) => (
-                          <SelectItem key={course.id} value={course.id}>
-                            {course.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
               </div>
 
               {error && (

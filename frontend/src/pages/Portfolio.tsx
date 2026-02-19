@@ -7,7 +7,19 @@ import { Progress } from "@/components/ui/progress";
 import { portfolioApi, coursesApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Link } from "lucide-react";
+import { Link, Plus, Trash2, Edit, CheckCircle, XCircle } from "lucide-react";
+import PortfolioModal from "@/components/PortfolioModal";
+import { storage } from "@/lib/api";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const statusVariant = (s: string) => s === "Verified" ? "success" : s === "Submitted" ? "warning" : "neutral";
 
@@ -16,7 +28,16 @@ const Portfolio = () => {
   const [courses, setCourses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCourse, setSelectedCourse] = useState<string>("all");
+
+  // Management State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<any>(null); // For Edit
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [deleteId, setDeleteId] = useState<string | null>(null); // For Delete Confirmation
+
   const { toast } = useToast();
+  const user = storage.getUser();
+  const canManage = ['ADMIN', 'CEO', 'BRANCH_HEAD'].includes(user?.role);
 
   useEffect(() => {
     const fetchCourses = async () => {
@@ -50,7 +71,46 @@ const Portfolio = () => {
     };
 
     fetchPortfolios();
-  }, [toast]);
+    fetchPortfolios();
+  }, [toast, refreshKey]);
+
+  // Actions
+  const handleEdit = (project: any) => {
+    setSelectedProject(project);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    try {
+      await portfolioApi.deletePortfolio(deleteId);
+      toast({ title: "Success", description: "Project deleted successfully" });
+      setRefreshKey(prev => prev + 1);
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Error", description: "Failed to delete project" });
+    } finally {
+      setDeleteId(null);
+    }
+  };
+
+  const handleVerify = async (id: string, status: boolean) => {
+    try {
+      await portfolioApi.verifyPortfolio(id, status);
+      toast({ title: "Success", description: `Project ${status ? 'verified' : 'unverified'} successfully` });
+      setRefreshKey(prev => prev + 1);
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Error", description: "Failed to update status" });
+    }
+  };
+
+  const handleModalClose = () => {
+    setIsModalOpen(false);
+    setSelectedProject(null);
+  };
+
+  const handleSuccess = () => {
+    setRefreshKey(prev => prev + 1);
+  };
 
   // Group portfolios by student
   const groupedPortfolios = portfolios.reduce((acc: any, curr: any) => {
@@ -86,7 +146,7 @@ const Portfolio = () => {
     <div className="animate-fade-in">
       <PageHeader title="Portfolio Management" description="Track student portfolio completion across courses" />
 
-      <div className="mb-4 flex gap-3">
+      <div className="mb-4 flex gap-3 justify-between items-center">
         <Select value={selectedCourse} onValueChange={setSelectedCourse}>
           <SelectTrigger className="w-40"><SelectValue placeholder="Course" /></SelectTrigger>
           <SelectContent>
@@ -96,6 +156,12 @@ const Portfolio = () => {
             ))}
           </SelectContent>
         </Select>
+
+        {canManage && (
+          <Button onClick={() => setIsModalOpen(true)} className="gap-2">
+            <Plus className="h-4 w-4" /> Add Project
+          </Button>
+        )}
       </div>
 
       <div className="grid gap-4">
@@ -127,16 +193,42 @@ const Portfolio = () => {
                 <Progress value={progress} className="mb-4 h-2" />
                 <div className="space-y-2">
                   {p.items.map((item: any, i: number) => (
-                    <div key={i} className="flex items-center justify-between rounded-md bg-muted/30 px-3 py-2">
+                    <div key={i} className="flex items-center justify-between rounded-md bg-muted/30 px-3 py-2 group">
                       <div className="flex flex-col">
                         <span className="text-sm font-medium">{item.title}</span>
-                        {item.projectUrl && (
-                          <a href={item.projectUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-500 hover:underline flex items-center gap-1">
-                            View Project <Link className="h-3 w-3" />
-                          </a>
+                        <div className="flex gap-3 text-xs text-muted-foreground">
+                          {item.projectUrl && (
+                            <a href={item.projectUrl} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline flex items-center gap-1">
+                              Live Demo <Link className="h-3 w-3" />
+                            </a>
+                          )}
+                          {item.githubUrl && (
+                            <a href={item.githubUrl} target="_blank" rel="noopener noreferrer" className="hover:underline flex items-center gap-1">
+                              GitHub <Link className="h-3 w-3" />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <StatusBadge status={item.status} variant={statusVariant(item.status)} />
+
+                        {canManage && (
+                          <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                            {!item.isVerified && (
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-green-600 hover:text-green-700 hover:bg-green-100" onClick={() => handleVerify(item.id, true)} title="Verify">
+                                <CheckCircle className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-blue-600 hover:text-blue-700 hover:bg-blue-100" onClick={() => handleEdit(item)} title="Edit">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-red-600 hover:text-red-700 hover:bg-red-100" onClick={() => setDeleteId(item.id)} title="Delete">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         )}
                       </div>
-                      <StatusBadge status={item.status} variant={statusVariant(item.status)} />
                     </div>
                   ))}
                 </div>
@@ -145,7 +237,32 @@ const Portfolio = () => {
           })
         )}
       </div>
-    </div>
+
+
+      <PortfolioModal
+        isOpen={isModalOpen}
+        onClose={handleModalClose}
+        onSuccess={handleSuccess}
+        initialData={selectedProject}
+      />
+
+      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the project entry.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div >
   );
 };
 

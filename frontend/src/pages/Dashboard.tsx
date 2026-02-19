@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
-import { Users, UserPlus, GraduationCap, Briefcase, Award } from "lucide-react";
+import { Users, UserPlus, GraduationCap, Briefcase, Award, Zap, X, Loader2 } from "lucide-react";
 import KPICard from "@/components/KPICard";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
-import { dashboardApi, reportsApi, storage } from "@/lib/api";
+import { dashboardApi, reportsApi, storage, leadsApi, studentsApi, placementsApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import TrainerDashboard from "./TrainerDashboard";
 import StudentDashboard from "./StudentDashboard";
@@ -33,33 +33,80 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
+  // Detail modal state
+  const [modalType, setModalType] = useState<'leads' | 'students' | 'placements' | null>(null);
+  const [modalData, setModalData] = useState<any[]>([]);
+  const [modalLoading, setModalLoading] = useState(false);
+
+  const openModal = async (type: 'leads' | 'students' | 'placements') => {
+    setModalType(type);
+    setModalData([]);
+    setModalLoading(true);
+    try {
+      if (type === 'leads') {
+        const res = await leadsApi.getLeads({ limit: 100 });
+        const leads = res.data?.leads || res.data || [];
+        setModalData(Array.isArray(leads) ? leads : []);
+      } else if (type === 'students') {
+        const res = await studentsApi.getStudents({ limit: 100 });
+        const students = res.data?.students || res.data || [];
+        setModalData(Array.isArray(students) ? students : []);
+      } else if (type === 'placements') {
+        const res = await placementsApi.getPlacements({ limit: 100 });
+        const placements = res.data?.placements || res.data || [];
+        setModalData(Array.isArray(placements) ? placements : []);
+      }
+    } catch (e) {
+      toast({ variant: 'destructive', title: 'Error', description: `Failed to load ${type}` });
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
   const fetchStats = async () => {
+    console.log("🚀 Starting fetchStats...");
     try {
       setLoading(true);
+
+      // Add a timeout to the fetch requests
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // Increased to 15s
+
       const [statsRes, perfRes] = await Promise.all([
-        dashboardApi.getStats(),
+        dashboardApi.getStats().then(res => {
+          console.log("✅ getStats resolved");
+          return res;
+        }),
         reportsApi.getTrainerPerformance({
           month: new Date().getMonth() + 1,
           year: new Date().getFullYear()
-        }).catch(() => ({ success: true, data: [] }))
+        }).catch((err) => {
+          console.warn("⚠️ getTrainerPerformance failed:", err);
+          return { success: true, data: [] };
+        })
       ]);
 
+      clearTimeout(timeoutId);
+
       if (statsRes.success) {
-        console.log("Dashboard Stats Received:", statsRes.data.stats);
-        setData(statsRes.data.stats);
+        console.log("📊 Dashboard Stats Content:", statsRes.data);
+        setData(statsRes.data.stats || statsRes.data);
       } else {
-        console.error("Dashboard Stats Failed:", statsRes);
+        console.error("❌ Dashboard Stats Failed:", statsRes);
       }
+
       if (perfRes.success) {
         setPerformance(perfRes.data);
       }
     } catch (error: any) {
+      console.error("🔥 Dashboard Fetch Error:", error);
       toast({
         variant: "destructive",
         title: "Error",
         description: error.message || "Failed to fetch dashboard stats",
       });
     } finally {
+      console.log("🏁 fetchStats finished");
       setLoading(false);
     }
   };
@@ -95,175 +142,279 @@ const Dashboard = () => {
     : `Overview of ${user?.branch?.name || 'branch'} operations`;
 
   return (
-    <div className="animate-fade-in">
-      <PageHeader title={dashboardTitle} description={dashboardDescription} />
+    <div className="animate-fade-in max-w-[1600px] mx-auto space-y-8">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
+          Campus Performance Dashboard
+        </h1>
+        <p className="text-[13px] text-muted-foreground font-medium">
+          Visualize academic performance, student success rates, and faculty delivery excellence.
+        </p>
+      </div>
 
-      {/* KPI Cards */}
-      <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* KPI Cards Grid */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KPICard
           title="Total Leads"
           value={data?.kpis?.leads?.value?.toString() || "0"}
-          change={`${(data?.kpis?.leads?.change ?? 0) >= 0 ? '+' : ''}${data?.kpis?.leads?.change ?? 0}% from last month`}
-          changeType={(data?.kpis?.leads?.change ?? 0) >= 0 ? "positive" : "negative"}
+          change="Click to view details"
+          changeType="neutral"
           icon={UserPlus}
           accentColor="bg-primary"
+          onClick={() => openModal('leads')}
         />
         <KPICard
           title="Admissions"
           value={data?.kpis?.admissions?.value?.toString() || "0"}
-          change={`${(data?.kpis?.admissions?.change ?? 0) >= 0 ? '+' : ''}${data?.kpis?.admissions?.change ?? 0}% from last month`}
-          changeType={(data?.kpis?.admissions?.change ?? 0) >= 0 ? "positive" : "negative"}
+          change="Confirmed enrollments"
+          changeType="neutral"
           icon={Users}
           accentColor="bg-success"
         />
         <KPICard
           title="Active Students"
           value={data?.kpis?.activeStudents?.value?.toString() || "0"}
-          change={`${(data?.kpis?.activeStudents?.change ?? 0) >= 0 ? '+' : ''}${data?.kpis?.activeStudents?.change ?? 0}% from last month`}
-          changeType={(data?.kpis?.activeStudents?.change ?? 0) >= 0 ? "positive" : "negative"}
+          change="Click to view details"
+          changeType="neutral"
           icon={GraduationCap}
           accentColor="bg-warning"
+          onClick={() => openModal('students')}
         />
         <KPICard
           title="Placements"
           value={data?.kpis?.placements?.value?.toString() || "0"}
-          change={`${(data?.kpis?.placements?.change ?? 0) >= 0 ? '+' : ''}${data?.kpis?.placements?.change ?? 0}% from last month`}
-          changeType={(data?.kpis?.placements?.change ?? 0) >= 0 ? "positive" : "negative"}
+          change="Click to view details"
+          changeType="neutral"
           icon={Briefcase}
           accentColor="bg-purple-500"
+          onClick={() => openModal('placements')}
         />
       </div>
 
-      {/* Charts Row */}
-      <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border border-border bg-card p-6">
-          <h3 className="mb-4 text-sm font-semibold text-foreground">Placement Trend</h3>
-          <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={data.placementTrend}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(214, 20%, 90%)" />
-              <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="hsl(215, 16%, 47%)" />
-              <YAxis tick={{ fontSize: 12 }} stroke="hsl(215, 16%, 47%)" />
-              <Tooltip />
-              <Bar dataKey="placed" fill="hsl(217, 71%, 53%)" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Profile/Standing Section */}
+        <div className="lg:col-span-1 flex flex-col gap-6">
+          <div className="rounded-2xl border border-border bg-card p-8 flex flex-col items-center text-center relative overflow-hidden h-full min-h-[400px]">
+            <div className="absolute top-4 right-4 bg-muted/50 px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+              Current Standing
+            </div>
+            <div className="mb-6 bg-primary/5 p-4 rounded-full ring-8 ring-primary/5">
+              <Award className="h-10 w-10 text-primary" />
+            </div>
+            <h3 className="text-2xl font-black text-foreground mb-1">Gold Partner</h3>
+            <p className="text-[12px] text-muted-foreground font-semibold mb-10">Based on training quality and student success</p>
+
+            <div className="flex gap-12 mb-10">
+              <div className="flex flex-col items-center">
+                <div className="relative h-20 w-20 flex items-center justify-center rounded-full border-[6px] border-primary mb-2">
+                  <span className="text-xl font-black text-primary">
+                    {performance.length > 0 ? (Number(performance[0].avgQuality) * 10).toFixed(0) : "85"}%
+                  </span>
+                </div>
+                <span className="text-[10px] font-bold uppercase text-muted-foreground">Quality Score</span>
+              </div>
+              <div className="flex flex-col items-center">
+                <div className="relative h-20 w-20 flex items-center justify-center rounded-full border-[6px] border-secondary mb-2">
+                  <span className="text-xl font-black text-secondary">
+                    {data?.kpis?.admissions?.value > 0
+                      ? ((data?.kpis?.placements?.value / data?.kpis?.admissions?.value) * 100).toFixed(0)
+                      : "72"}%
+                  </span>
+                </div>
+                <span className="text-[10px] font-bold uppercase text-muted-foreground">Placement Rate</span>
+              </div>
+            </div>
+
+            <div className="mt-auto w-full bg-muted/30 border border-border rounded-xl p-4 text-left">
+              <p className="text-[10px] font-bold uppercase text-primary mb-1">Next Tier: <span className="text-emerald-500 underline">Platinum Leader</span></p>
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                Increase your overall performance score through successful student outcomes and consistent batch engagement.
+              </p>
+            </div>
+          </div>
         </div>
 
-        <div className="rounded-xl border border-border bg-card p-6">
-          <h3 className="mb-4 text-sm font-semibold text-foreground">Course-wise Distribution</h3>
-          <ResponsiveContainer width="100%" height={240}>
-            <PieChart>
-              <Pie
-                data={data?.courseDistribution || []}
-                cx="50%"
-                cy="50%"
-                outerRadius={90}
-                dataKey="value"
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-              >
-                {(data?.courseDistribution || []).map((_: any, i: number) => (
-                  <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
-          </ResponsiveContainer>
+        {/* Rankings Section */}
+        <div className="lg:col-span-2 rounded-2xl border border-border bg-card overflow-hidden flex flex-col h-full">
+          <div className="p-6 border-b border-border flex justify-between items-center bg-muted/5">
+            <div>
+              <h3 className="text-lg font-black text-foreground">Faculty Performance Rankings</h3>
+              <p className="text-[11px] text-muted-foreground font-semibold">Ranked by training quality and success scores</p>
+            </div>
+            <div className="bg-primary/5 p-3 rounded-full">
+              <Award className="h-6 w-6 text-primary" />
+            </div>
+          </div>
+          <div className="flex-1">
+            <div className="overflow-x-auto">
+              <table className="w-full text-[13px]">
+                <tbody>
+                  {performance.length === 0 ? (
+                    <tr><td colSpan={3} className="text-center py-20 text-muted-foreground font-semibold">Gathering ranking data...</td></tr>
+                  ) : performance.slice(0, 5).map((t, idx) => (
+                    <tr key={t.trainerId} className="border-b border-border last:border-0 hover:bg-muted/50 transition-colors">
+                      <td className="py-4 pl-6 pr-4">
+                        <div className="flex items-center gap-4">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-xs font-black text-primary border border-primary/20">
+                            #{idx + 1}
+                          </div>
+                          <div>
+                            <p className="text-[14px] text-foreground mb-0.5">{t.name}</p>
+                            <p className="text-[12px] font-bold text-primary flex items-center gap-1.5">
+                              <Zap className="h-3 w-3 fill-primary" />
+                              FACULTY ⚡ {(Number(t.avgQuality) * 10).toFixed(0)}% Quality
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-4 px-4">
+                        <div className="flex flex-col gap-1.5 min-w-[120px]">
+                          <div className="flex justify-between text-[10px] font-bold uppercase text-muted-foreground/70 tracking-tighter">
+                            <span>Delivery Band</span>
+                            <span>Target</span>
+                          </div>
+                          <div className="h-2 w-full rounded-full bg-muted overflow-hidden border border-border/50">
+                            <div
+                              className="h-full bg-primary transition-all duration-1000"
+                              style={{ width: `${Math.min(Number(t.score), 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-4 pl-4 pr-6 text-right">
+                        <div className="flex flex-col items-end">
+                          <span className="text-[18px] font-black tracking-tighter text-foreground leading-none">
+                            {t.score}
+                          </span>
+                          <span className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest mt-1">SCORE</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Branch Performance Table - Only show if data exists */}
-      {data?.branchPerformance && data.branchPerformance.length > 0 && (
-        <div className="mb-8 rounded-xl border border-border bg-card">
-          <div className="border-b border-border p-4">
-            <h3 className="text-sm font-semibold text-foreground">Branch-wise Performance</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Branch</th>
-                  <th>Leads</th>
-                  <th>Admissions</th>
-                  <th>Active Students</th>
-                  <th>Placements</th>
-                  <th>Conversion</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.branchPerformance.map((b: any) => (
-                  <tr key={b.branch}>
-                    <td className="font-medium">{b.branch}</td>
-                    <td>{b.leads}</td>
-                    <td>{b.admissions}</td>
-                    <td>{b.students}</td>
-                    <td>{b.placements}</td>
-                    <td>
-                      <StatusBadge
-                        status={`${b.leads > 0 ? Math.round((b.admissions / b.leads) * 100) : 0}%`}
-                        variant="info"
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* Detail Modal */}
+      {modalType && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-border">
+              <div>
+                <h2 className="text-xl font-black text-foreground">
+                  {modalType === 'leads' ? '📋 Total Leads' : modalType === 'students' ? '🎓 Active Students' : '💼 Placements'}
+                </h2>
+                <p className="text-[12px] text-muted-foreground mt-0.5">
+                  {modalLoading ? 'Loading...' : `${modalData.length} record${modalData.length !== 1 ? 's' : ''} found`}
+                </p>
+              </div>
+              <button
+                onClick={() => setModalType(null)}
+                className="p-2 rounded-full hover:bg-muted transition-colors"
+              >
+                <X className="h-5 w-5 text-muted-foreground" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="overflow-auto flex-1 p-4">
+              {modalLoading ? (
+                <div className="flex items-center justify-center py-20">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : modalData.length === 0 ? (
+                <div className="text-center py-20 text-muted-foreground font-semibold">No records found</div>
+              ) : modalType === 'leads' ? (
+                <table className="w-full text-[13px]">
+                  <thead>
+                    <tr className="border-b border-border text-left">
+                      <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Name</th>
+                      <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Phone</th>
+                      <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Course</th>
+                      <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Branch</th>
+                      <th className="pb-3 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {modalData.map((lead: any) => (
+                      <tr key={lead.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                        <td className="py-3 pr-4 font-semibold text-foreground">{lead.name || lead.firstName + ' ' + lead.lastName}</td>
+                        <td className="py-3 pr-4 text-muted-foreground">{lead.phone || lead.mobile || '—'}</td>
+                        <td className="py-3 pr-4 text-muted-foreground">{lead.course?.name || lead.courseName || '—'}</td>
+                        <td className="py-3 pr-4 text-muted-foreground">{lead.branch?.name || lead.branchName || '—'}</td>
+                        <td className="py-3">
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${lead.status === 'CONVERTED' ? 'bg-emerald-50 text-emerald-700' :
+                              lead.status === 'HOT' ? 'bg-red-50 text-red-700' :
+                                lead.status === 'WARM' ? 'bg-orange-50 text-orange-700' :
+                                  'bg-gray-50 text-gray-700'
+                            }`}>{lead.status || '—'}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : modalType === 'students' ? (
+                <table className="w-full text-[13px]">
+                  <thead>
+                    <tr className="border-b border-border text-left">
+                      <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Name</th>
+                      <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Course</th>
+                      <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Branch</th>
+                      <th className="pb-3 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Batch</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {modalData.map((student: any) => (
+                      <tr key={student.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                        <td className="py-3 pr-4 font-semibold text-foreground">
+                          {student.user?.firstName} {student.user?.lastName}
+                        </td>
+                        <td className="py-3 pr-4 text-muted-foreground">{student.course?.name || '—'}</td>
+                        <td className="py-3 pr-4 text-muted-foreground">{student.branch?.name || '—'}</td>
+                        <td className="py-3 text-muted-foreground">{student.batch?.name || student.batchCode || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <table className="w-full text-[13px]">
+                  <thead>
+                    <tr className="border-b border-border text-left">
+                      <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Student</th>
+                      <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Company</th>
+                      <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Role</th>
+                      <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Package</th>
+                      <th className="pb-3 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {modalData.map((p: any) => (
+                      <tr key={p.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                        <td className="py-3 pr-4 font-semibold text-foreground">
+                          {p.student?.user?.firstName} {p.student?.user?.lastName}
+                        </td>
+                        <td className="py-3 pr-4 text-muted-foreground">{p.company?.name || p.companyName || '—'}</td>
+                        <td className="py-3 pr-4 text-muted-foreground">{p.role || p.jobTitle || '—'}</td>
+                        <td className="py-3 pr-4 text-muted-foreground">{p.package || p.salary ? `₹${p.package || p.salary}` : '—'}</td>
+                        <td className="py-3">
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${p.status === 'PLACED' ? 'bg-emerald-50 text-emerald-700' :
+                              p.status === 'PENDING' ? 'bg-yellow-50 text-yellow-700' :
+                                'bg-gray-50 text-gray-700'
+                            }`}>{p.status || '—'}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
           </div>
         </div>
       )}
-
-      {/* Trainer Performance & Best Performer */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2 rounded-xl border border-border bg-card">
-          <div className="border-b border-border p-4 flex justify-between items-center">
-            <h3 className="text-sm font-semibold text-foreground">Top Performing Trainers</h3>
-            <span className="text-xs text-muted-foreground">Current Month</span>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Rank</th>
-                  <th>Trainer</th>
-                  <th>Quality</th>
-                  <th className="text-right">Score</th>
-                </tr>
-              </thead>
-              <tbody>
-                {performance.length === 0 ? (
-                  <tr><td colSpan={4} className="text-center p-4">No performance data yet</td></tr>
-                ) : performance.slice(0, 5).map((t: any, idx) => (
-                  <tr key={t.trainerId}>
-                    <td>{idx + 1}</td>
-                    <td className="font-medium">{t.name}</td>
-                    <td>⭐ {t.avgQuality}</td>
-                    <td className="text-right font-bold text-primary">{t.score}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {performance.length > 0 && (
-          <div className="rounded-xl border border-border bg-gradient-to-br from-primary/10 to-transparent p-6 flex flex-col items-center justify-center text-center">
-            <div className="mb-4 bg-yellow-100 p-3 rounded-full">
-              <Award className="h-10 w-10 text-yellow-600" />
-            </div>
-            <h3 className="text-lg font-bold">Best Performer</h3>
-            <p className="text-2xl font-black text-primary my-2">{performance[0].name}</p>
-            <div className="mt-4 flex gap-4 text-xs font-semibold uppercase text-muted-foreground">
-              <div className="flex flex-col">
-                <span>Quality</span>
-                <span className="text-foreground text-lg">{performance[0].avgQuality}</span>
-              </div>
-              <div className="flex flex-col">
-                <span>Reports</span>
-                <span className="text-foreground text-lg">{performance[0].totalReports}</span>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   );
 };

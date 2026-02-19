@@ -424,7 +424,25 @@ export const deleteAttendance = async (req: AuthRequest, res: Response): Promise
 
 export const getAttendanceStats = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
-    // Get all attendance records grouped by student and status
+    const { branchId, date } = req.query;
+
+    // Define effective branchId
+    const effectiveBranchId = req.user?.role === UserRole.CEO
+      ? (branchId as string || undefined)
+      : (req.user?.branchId || undefined);
+
+    // Build date filter if a specific date is provided
+    let dateFilter: any = {};
+    if (date) {
+      const selectedDate = new Date(date as string);
+      const startOfDay = new Date(selectedDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(selectedDate);
+      endOfDay.setHours(23, 59, 59, 999);
+      dateFilter = { date: { gte: startOfDay, lte: endOfDay } };
+    }
+
+    // Get attendance records grouped by student and status (with optional date filter)
     const stats = await prisma.attendance.groupBy({
       by: ['studentId', 'status'],
       _count: {
@@ -432,22 +450,25 @@ export const getAttendanceStats = async (req: AuthRequest, res: Response): Promi
       },
       where: {
         student: {
-          branchId: req.user?.role !== UserRole.CEO ? (req.user?.branchId || undefined) : undefined
-        }
+          branchId: effectiveBranchId
+        },
+        ...dateFilter
       }
     });
 
-    // Get student details for the IDs found
-    const studentIds = [...new Set(stats.map(s => s.studentId))];
+    // Get ALL students from the branch (or all branches if CEO and no branchId provided)
     const students = await prisma.student.findMany({
       where: {
-        id: { in: studentIds }
+        branchId: effectiveBranchId
       },
       include: {
         user: {
           select: { firstName: true, lastName: true }
         },
         course: {
+          select: { name: true }
+        },
+        branch: {
           select: { name: true }
         }
       }
@@ -465,6 +486,7 @@ export const getAttendanceStats = async (req: AuthRequest, res: Response): Promi
         id: student.id,
         student: `${student.user?.firstName} ${student.user?.lastName}`,
         course: student.course?.name || 'N/A',
+        branch: student.branch?.name || 'N/A',
         present,
         absent,
         percentage: `${percentage}%`

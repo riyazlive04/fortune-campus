@@ -183,12 +183,6 @@ const Students = () => {
       <PageHeader
         title="Students"
         description="View and manage all student records"
-        actions={
-          <Button onClick={handleAddNew} className="gap-2">
-            <Plus className="h-4 w-4" />
-            New Student
-          </Button>
-        }
       />
       <DataTable columns={columns} data={students} searchPlaceholder="Search students..." />
 

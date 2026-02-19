@@ -128,10 +128,24 @@ model Admission {
   feeAmount       Float
   feePaid         Float         @default(0)
   feeBalance      Float         @default(0)
+  // paymentPlan     String?
   
   status          String @default("PENDING") // PENDING, DROPOUT, etc.
   admissionDate   DateTime        @default(now())
-  
+
+  // New Fields matching Student model for history
+  dateOfJoining   DateTime?
+  dateOfBirth     DateTime?
+  gender          String?
+  parentPhone     String?
+  address         String?
+  qualification   String?
+  leadSource      String?
+  aadhaarNumber   String?
+  panNumber       String?
+  selectedSoftware String?
+  paymentPlan     String?
+
   softwareFinishedAt DateTime?    // To trigger conduct exam reminders
   
   branchId        String
@@ -165,6 +179,18 @@ model Student {
   branchId        String
   courseId        String
   batchId         String?
+  
+  // New Fields (Enabled)
+  dateOfJoining   DateTime?
+  dateOfBirth     DateTime?
+  gender          String?
+  parentPhone     String?
+  address         String?
+  qualification   String?
+  leadSource      String?
+  aadhaarNumber   String?   @unique
+  panNumber       String?
+  selectedSoftware String?
   
   isActive        Boolean  @default(true)
   placementEligible Boolean @default(false)

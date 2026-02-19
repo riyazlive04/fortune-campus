@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { trainersApi, branchesApi, storage } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Copy, Check } from "lucide-react";
 
 interface TrainerModalProps {
     isOpen: boolean;
@@ -28,15 +28,20 @@ interface TrainerModalProps {
     onSuccess: () => void;
     trainerId?: string | null;
     readonly?: boolean;
+    initialData?: any;
 }
 
-const TrainerModal = ({ isOpen, onClose, onSuccess, trainerId, readonly = false }: TrainerModalProps) => {
+const TrainerModal = ({ isOpen, onClose, onSuccess, trainerId, readonly = false, initialData }: TrainerModalProps) => {
     const [loading, setLoading] = useState(false);
     const [fetching, setFetching] = useState(false);
     const [branches, setBranches] = useState<any[]>([]);
     const { toast } = useToast();
     const user = storage.getUser();
-    const isAdmin = user?.role === 'CEO'; // Only CEO can assign branches freely, usually
+    const isChannelPartner = user?.role === 'CHANNEL_PARTNER';
+    const isAdmin = user?.role === 'CEO' || user?.role === 'ADMIN';
+
+    const [tempPassword, setTempPassword] = useState<string | null>(null);
+    const [showPasswordDialog, setShowPasswordDialog] = useState(false);
 
     const [formData, setFormData] = useState({
         firstName: "",
@@ -64,7 +69,7 @@ const TrainerModal = ({ isOpen, onClose, onSuccess, trainerId, readonly = false 
             }
         };
 
-        if (isOpen && isAdmin) {
+        if (isOpen) {
             fetchBranches();
         }
     }, [isOpen, isAdmin]);
@@ -107,20 +112,20 @@ const TrainerModal = ({ isOpen, onClose, onSuccess, trainerId, readonly = false 
                 fetchTrainerDetails(trainerId);
             } else {
                 setFormData({
-                    firstName: "",
-                    lastName: "",
-                    email: "",
-                    phone: "",
+                    firstName: initialData?.firstName || "",
+                    lastName: initialData?.lastName || "",
+                    email: initialData?.email || "",
+                    phone: initialData?.phone || "",
                     employeeId: "",
-                    specialization: "",
-                    experience: "",
+                    specialization: initialData?.specialization || "",
+                    experience: initialData?.experience || "",
                     qualification: "",
-                    branchId: user?.branchId || "",
+                    branchId: user?.branchId || initialData?.branchId || "",
                     isActive: true,
                 });
             }
         }
-    }, [isOpen, trainerId, user?.branchId]);
+    }, [isOpen, trainerId, user?.branchId, initialData]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -135,11 +140,24 @@ const TrainerModal = ({ isOpen, onClose, onSuccess, trainerId, readonly = false 
                 await trainersApi.updateTrainer(trainerId, payload);
                 toast({ title: "Success", description: "Trainer updated successfully" });
             } else {
-                await trainersApi.createTrainer(payload);
+                const res = await trainersApi.createTrainer(payload);
+                const responseData = res.data || res;
+
+                if (responseData.tempPassword) {
+                    setTempPassword(responseData.tempPassword);
+                    setShowPasswordDialog(true);
+                    onSuccess();
+                    setLoading(false);
+                    return;
+                }
+
                 toast({ title: "Success", description: "Trainer created successfully" });
             }
-            onSuccess();
-            onClose();
+
+            if (!showPasswordDialog) {
+                onSuccess();
+                onClose();
+            }
         } catch (error: any) {
             toast({
                 variant: "destructive",
@@ -150,6 +168,51 @@ const TrainerModal = ({ isOpen, onClose, onSuccess, trainerId, readonly = false 
             setLoading(false);
         }
     };
+
+    if (showPasswordDialog && tempPassword) {
+        return (
+            <Dialog open={showPasswordDialog} onOpenChange={(open) => {
+                if (!open) {
+                    setShowPasswordDialog(false);
+                    onClose();
+                }
+            }}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Trainer Created Successfully</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="bg-muted p-4 rounded-lg text-center space-y-2">
+                            <Label>Temporary Password</Label>
+                            <div className="text-2xl font-bold tracking-wider text-primary">
+                                {tempPassword}
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                                Please share this password with the trainer immediately.
+                            </p>
+                        </div>
+                        <Button
+                            className="w-full"
+                            onClick={() => {
+                                navigator.clipboard.writeText(tempPassword);
+                                toast({ title: "Copied", description: "Password copied to clipboard" });
+                            }}
+                        >
+                            <Copy className="mr-2 h-4 w-4" /> Copy Password
+                        </Button>
+                    </div>
+                    <DialogFooter>
+                        <Button onClick={() => {
+                            setShowPasswordDialog(false);
+                            onClose();
+                        }}>
+                            Done
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        );
+    }
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -258,7 +321,7 @@ const TrainerModal = ({ isOpen, onClose, onSuccess, trainerId, readonly = false 
                                     disabled={readonly}
                                 />
                             </div>
-                            {isAdmin && branches.length > 0 && (
+                            {((isAdmin || !isChannelPartner) && branches.length > 0) && (
                                 <div className="space-y-2">
                                     <Label htmlFor="branch">Branch</Label>
                                     <Select
@@ -275,6 +338,16 @@ const TrainerModal = ({ isOpen, onClose, onSuccess, trainerId, readonly = false 
                                             ))}
                                         </SelectContent>
                                     </Select>
+                                </div>
+                            )}
+                            {isChannelPartner && (
+                                <div className="space-y-2">
+                                    <Label htmlFor="branch">Branch</Label>
+                                    <Input
+                                        value={branches.find(b => b.id === user?.branchId)?.name || "My Branch"}
+                                        disabled
+                                        className="bg-muted"
+                                    />
                                 </div>
                             )}
                         </div>
@@ -295,6 +368,7 @@ const TrainerModal = ({ isOpen, onClose, onSuccess, trainerId, readonly = false 
             </DialogContent>
         </Dialog>
     );
+
 };
 
 export default TrainerModal;

@@ -16,9 +16,9 @@ import {
     SelectTrigger,
     SelectValue
 } from "@/components/ui/select";
-import { studentsApi, coursesApi, branchesApi } from "@/lib/api";
+import { studentsApi, coursesApi, branchesApi, storage } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Copy, Check } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -27,6 +27,7 @@ interface StudentModalProps {
     onClose: () => void;
     onSuccess: () => void;
     student?: any | null;
+    initialData?: any;
 }
 
 const SOFTWARE_OPTIONS = [
@@ -45,12 +46,17 @@ const SOFTWARE_OPTIONS = [
     "Tally Erp9"
 ];
 
-const StudentModal = ({ isOpen, onClose, onSuccess, student }: StudentModalProps) => {
+const StudentModal = ({ isOpen, onClose, onSuccess, student, initialData }: StudentModalProps) => {
     const [loading, setLoading] = useState(false);
     const [courses, setCourses] = useState<any[]>([]);
     const [branches, setBranches] = useState<any[]>([]);
     const [selectedSoftware, setSelectedSoftware] = useState<string[]>([]);
+    const [tempPassword, setTempPassword] = useState<string | null>(null);
+    const [showPasswordDialog, setShowPasswordDialog] = useState(false);
     const { toast } = useToast();
+
+    const currentUser = storage.getUser();
+    const isChannelPartner = currentUser?.role === 'CHANNEL_PARTNER';
 
     const isEditMode = !!student;
 
@@ -131,19 +137,19 @@ const StudentModal = ({ isOpen, onClose, onSuccess, student }: StudentModalProps
                 const savedSoftware = student.selectedSoftware ? student.selectedSoftware.split(", ") : [];
                 setSelectedSoftware(savedSoftware);
             } else {
-                // Create mode - reset form
+                // Create mode - reset form or use initial data
                 setFormData({
-                    firstName: "",
-                    lastName: "",
+                    firstName: initialData?.firstName || "",
+                    lastName: initialData?.lastName || "",
                     dateOfJoining: "",
                     dateOfBirth: "",
                     gender: "",
-                    email: "",
-                    phone: "",
+                    email: initialData?.email || "",
+                    phone: initialData?.phone || "",
                     parentPhone: "",
                     address: "",
-                    courseId: "",
-                    branchId: "",
+                    courseId: initialData?.courseId || "",
+                    branchId: isChannelPartner ? (currentUser?.branchId || "") : (initialData?.branchId || ""),
                     qualification: "",
                     leadSource: "",
                     enrollmentNumber: "",
@@ -158,7 +164,7 @@ const StudentModal = ({ isOpen, onClose, onSuccess, student }: StudentModalProps
                 setSelectedSoftware([]);
             }
         }
-    }, [isOpen, student]);
+    }, [isOpen, student, isChannelPartner, currentUser, initialData]);
 
     const handleChange = (field: string, value: any) => {
         setFormData(prev => ({ ...prev, [field]: value }));
@@ -290,12 +296,24 @@ const StudentModal = ({ isOpen, onClose, onSuccess, student }: StudentModalProps
                     paymentPlan: formData.paymentPlan,
                 };
 
-                await studentsApi.createStudent(createData);
+                const res = await studentsApi.createStudent(createData);
+                const responseData = res.data || res;
+
+                if (responseData.tempPassword) {
+                    setTempPassword(responseData.tempPassword);
+                    setShowPasswordDialog(true);
+                    onSuccess(); // Refresh list in background
+                    setLoading(false);
+                    return; // Don't close main modal yet, allow Password Dialog to handle flow
+                }
+
                 toast({ title: "Success", description: "Student created successfully" });
             }
 
-            onSuccess();
-            onClose();
+            if (!showPasswordDialog) {
+                onSuccess();
+                onClose();
+            }
         } catch (error: any) {
             toast({
                 variant: "destructive",
@@ -306,6 +324,53 @@ const StudentModal = ({ isOpen, onClose, onSuccess, student }: StudentModalProps
             setLoading(false);
         }
     };
+
+
+
+    if (showPasswordDialog && tempPassword) {
+        return (
+            <Dialog open={showPasswordDialog} onOpenChange={(open) => {
+                if (!open) {
+                    setShowPasswordDialog(false);
+                    onClose();
+                }
+            }}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Student Created Successfully</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        <div className="bg-muted p-4 rounded-lg text-center space-y-2">
+                            <Label>Temporary Password</Label>
+                            <div className="text-2xl font-bold tracking-wider text-primary">
+                                {tempPassword}
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                                Please share this password with the student immediately.
+                            </p>
+                        </div>
+                        <Button
+                            className="w-full"
+                            onClick={() => {
+                                navigator.clipboard.writeText(tempPassword);
+                                toast({ title: "Copied", description: "Password copied to clipboard" });
+                            }}
+                        >
+                            <Copy className="mr-2 h-4 w-4" /> Copy Password
+                        </Button>
+                    </div>
+                    <DialogFooter>
+                        <Button onClick={() => {
+                            setShowPasswordDialog(false);
+                            onClose();
+                        }}>
+                            Done
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        );
+    }
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -464,22 +529,30 @@ const StudentModal = ({ isOpen, onClose, onSuccess, student }: StudentModalProps
 
                             <div className="space-y-2">
                                 <Label htmlFor="branch">Branch *</Label>
-                                <Select
-                                    value={formData.branchId}
-                                    onValueChange={(value) => handleChange("branchId", value)}
-                                    disabled={loading}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select branch" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {branches.map(branch => (
-                                            <SelectItem key={branch.id} value={branch.id}>
-                                                {branch.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                {isChannelPartner ? (
+                                    <Input
+                                        value={branches.find(b => b.id === currentUser?.branchId)?.name || "My Branch"}
+                                        disabled
+                                        className="bg-muted"
+                                    />
+                                ) : (
+                                    <Select
+                                        value={formData.branchId}
+                                        onValueChange={(value) => handleChange("branchId", value)}
+                                        disabled={loading}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select branch" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {branches.map(branch => (
+                                                <SelectItem key={branch.id} value={branch.id}>
+                                                    {branch.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                )}
                             </div>
 
                             <div className="space-y-2 col-span-2">

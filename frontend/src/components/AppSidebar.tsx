@@ -23,7 +23,7 @@ const navSections = [
       { title: "Trainers", path: "/trainers", icon: GraduationCap, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER'] },
       { title: "Students", path: "/students", icon: Users, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER', 'TRAINER'] },
       { title: "Attendance", path: "/attendance", icon: Calendar, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER', 'TRAINER'] },
-      { title: "Student Growth", path: "/growth", icon: BarChart3, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER'] },
+      { title: "Student Growth", path: "/growth", icon: BarChart3, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER', 'TRAINER'] },
     ],
   },
   {
@@ -45,7 +45,7 @@ const navSections = [
   {
     label: "System",
     items: [
-      { title: "User Management", path: "/users", icon: UsersRound, roles: ['ADMIN', 'CEO'] },
+      { title: "User Management", path: "/users", icon: UsersRound, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER'] },
     ],
   },
 ];
@@ -66,11 +66,9 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
   })).filter(section => section.items.length > 0);
 
   return (
-    <aside className={`fixed left-0 top-0 z-40 flex h-screen flex-col bg-sidebar text-sidebar-foreground transition-all duration-300 ${collapsed ? "w-16" : "w-60"}`}>
+    <aside className={`fixed left-0 top-0 z-40 flex h-screen flex-col bg-sidebar text-sidebar-foreground transition-all duration-300 border-r border-sidebar-border ${collapsed ? "w-16" : "w-60"}`}>
       {/* Logo */}
-
-      {/* Logo */}
-      <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
+      <div className="flex h-16 items-center justify-between px-4">
         {!collapsed ? (
           <div className="flex items-center gap-2">
             <img
@@ -91,11 +89,11 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-4 scrollbar-hide">
+      <nav className="flex-1 overflow-y-auto py-6 scrollbar-hide">
         {filteredSections.map((section) => (
-          <div key={section.label} className="mb-4">
+          <div key={section.label} className="mb-6">
             {!collapsed && (
-              <p className="mb-2 px-4 text-[11px] font-semibold uppercase tracking-wider text-sidebar-muted">
+              <p className="mb-2 px-4 text-[10px] font-bold uppercase tracking-[0.1em] text-sidebar-muted/70">
                 {section.label}
               </p>
             )}
@@ -106,12 +104,12 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
                   key={item.path}
                   to={item.path}
                   className={({ isActive }) =>
-                    `mx-2 mb-0.5 flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-200 ease-in-out hover:pl-5 ${isActive
-                      ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
-                      : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
-                    } ${collapsed ? "justify-center px-2 hover:pl-2" : ""}`}
+                    `mx-3 mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-semibold transition-all duration-200 ${isActive
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                    } ${collapsed ? "justify-center px-2" : ""}`}
                 >
-                  <item.icon className="h-4 w-4 shrink-0" />
+                  <item.icon className={`h-4.5 w-4.5 shrink-0 ${isActive ? "text-primary" : "text-sidebar-foreground/40"}`} />
                   {!collapsed && <span>{item.title}</span>}
                 </NavLink>
               );
@@ -123,7 +121,7 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
       {/* Collapse Toggle */}
       <button
         onClick={onToggle}
-        className="flex h-12 items-center justify-center border-t border-sidebar-border text-sidebar-muted hover:text-sidebar-accent-foreground transition-colors"
+        className="flex h-12 items-center justify-center border-t border-sidebar-border text-sidebar-muted/50 hover:text-sidebar-accent-foreground transition-colors"
       >
         {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
       </button>

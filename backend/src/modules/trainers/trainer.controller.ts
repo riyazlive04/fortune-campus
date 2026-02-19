@@ -191,7 +191,7 @@ export const createTrainer = async (req: AuthRequest, res: Response): Promise<Re
       link: '/trainers'
     });
 
-    return successResponse(res, { trainer: result }, 'Trainer created successfully', 201);
+    return successResponse(res, { trainer: result, tempPassword: 'Trainer@123' }, 'Trainer created successfully', 201);
   } catch (error: any) {
     if (error.code === 'P2002') {
       const target = error.meta?.target?.[0] || 'field';
