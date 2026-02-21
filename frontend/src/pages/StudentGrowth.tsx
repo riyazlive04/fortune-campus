@@ -8,9 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { reportsApi, studentsApi, coursesApi, storage } from "@/lib/api";
-import { Loader2, TrendingUp, Award, ClipboardCheck, UserCheck, BookOpen } from "lucide-react";
+import { Loader2, TrendingUp, Award, ClipboardCheck, UserCheck, BookOpen, Star, MessageSquare, FileText, CheckCircle } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 enum UserRole {
@@ -26,7 +27,9 @@ const StudentGrowth = () => {
     const [students, setStudents] = useState<any[]>([]);
     const [courses, setCourses] = useState<any[]>([]);
     const [performance, setPerformance] = useState<any[]>([]);
+    const [selectedPerformance, setSelectedPerformance] = useState<any | null>(null);
     const [studentReports, setStudentReports] = useState<any[]>([]);
+    const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
     const [userRole, setUserRole] = useState<string | null>(null);
     const { toast } = useToast();
 
@@ -82,7 +85,11 @@ const StudentGrowth = () => {
                     });
                     // Backend returns data directly in perfRes.data (array)
                     const perfData = Array.isArray(perfRes.data) ? perfRes.data : (perfRes.data?.data || []);
-                    setPerformance(perfData);
+                    const mappedPerfData = perfData.map((p: any) => ({
+                        ...p,
+                        displayName: p.branch ? `${p.name}\n(${p.branch})` : p.name
+                    }));
+                    setPerformance(mappedPerfData);
 
                     // Also fetch students for growth history
                     const studentsRes = await studentsApi.getStudents({ limit: 50 });
@@ -131,6 +138,7 @@ const StudentGrowth = () => {
     };
 
     const fetchStudentReports = async (studentId: string) => {
+        setSelectedStudentId(studentId);
         try {
             const res = await reportsApi.getStudentGrowthReports(studentId);
             setStudentReports(res.data || []);
@@ -151,7 +159,7 @@ const StudentGrowth = () => {
     return (
         <div className="animate-fade-in pb-10">
             <PageHeader
-                title="Student Growth & Performance"
+                title="Trainer Growth & Performance"
                 description="Track teaching quality, student progress, and trainer effectiveness"
             />
 
@@ -304,7 +312,7 @@ const StudentGrowth = () => {
                                         <ResponsiveContainer width="100%" height="100%">
                                             <BarChart data={performance}>
                                                 <CartesianGrid strokeDasharray="3 3" />
-                                                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                                                <XAxis dataKey="displayName" tick={{ fontSize: 11 }} />
                                                 <YAxis domain={[0, 10]} />
                                                 <Tooltip />
                                                 <Bar dataKey="avgQuality" name="Quality Score" fill="#3b82f6" radius={[4, 4, 0, 0]} />
@@ -324,7 +332,7 @@ const StudentGrowth = () => {
                                         <ResponsiveContainer width="100%" height="100%">
                                             <BarChart data={performance}>
                                                 <CartesianGrid strokeDasharray="3 3" />
-                                                <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                                                <XAxis dataKey="displayName" tick={{ fontSize: 11 }} />
                                                 <YAxis />
                                                 <Tooltip />
                                                 <Bar dataKey="totalReports" name="Total Reports" fill="#10b981" radius={[4, 4, 0, 0]} />
@@ -373,11 +381,18 @@ const StudentGrowth = () => {
                                                     </td>
                                                 </tr>
                                             ) : performance.map((p, idx) => (
-                                                <tr key={p.trainerId} className={idx === 0 ? "bg-primary/5 font-semibold" : "hover:bg-muted/30 transition-colors"}>
+                                                <tr
+                                                    key={p.trainerId}
+                                                    onClick={() => setSelectedPerformance(p)}
+                                                    className={`cursor-pointer ${idx === 0 ? "bg-primary/5 font-semibold" : "hover:bg-muted/30 transition-colors"}`}
+                                                >
                                                     <td className="px-4 py-4">
                                                         {idx === 0 ? <Award className="h-5 w-5 text-yellow-500" /> : <span className="text-muted-foreground font-bold">{idx + 1}</span>}
                                                     </td>
-                                                    <td className="px-4 py-4 font-medium">{p.name}</td>
+                                                    <td className="px-4 py-4">
+                                                        <div className="font-medium text-foreground">{p.name}</div>
+                                                        <div className="text-[11px] text-muted-foreground">{p.branch || 'General'}</div>
+                                                    </td>
                                                     <td className="px-4 py-4 text-center">{p.avgQuality}</td>
                                                     <td className="px-4 py-4 text-center">{p.avgDoubt}</td>
                                                     <td className="px-4 py-4 text-center">{p.totalReports}</td>
@@ -417,7 +432,7 @@ const StudentGrowth = () => {
                                             <button
                                                 key={s.id}
                                                 onClick={() => fetchStudentReports(s.id)}
-                                                className="w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors text-sm"
+                                                className={`w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors text-sm ${selectedStudentId === s.id ? 'bg-muted border-l-4 border-primary' : ''}`}
                                             >
                                                 <p className="font-semibold text-foreground">{s.user?.firstName} {s.user?.lastName}</p>
                                                 <p className="text-xs text-muted-foreground">{s.course?.name || "No course"}</p>
@@ -466,7 +481,7 @@ const StudentGrowth = () => {
                                                                     {r.doubtClearance}/10
                                                                 </span>
                                                             </td>
-                                                            <td className="px-4 py-3 text-center">{r.testScore ? `${r.testScore}%` : '-'}</td>
+                                                            <td className="px-4 py-3 text-center">{r.testScore ? `${Number(r.testScore).toFixed(2)}%` : '-'}</td>
                                                             <td className="px-4 py-3 text-muted-foreground text-xs">
                                                                 {r.trainer?.user ? `${r.trainer.user.firstName} ${r.trainer.user.lastName}` : 'N/A'}
                                                             </td>
@@ -521,6 +536,59 @@ const StudentGrowth = () => {
                     </div>
                 </TabsContent>
             </Tabs>
+
+            {/* Trainer Performance Dialog */}
+            <Dialog open={!!selectedPerformance} onOpenChange={(open) => !open && setSelectedPerformance(null)}>
+                <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <UserCheck className="h-5 w-5 text-primary" />
+                            {selectedPerformance?.name}
+                        </DialogTitle>
+                        <DialogDescription>
+                            Branch: {selectedPerformance?.branch || 'General'}
+                        </DialogDescription>
+                    </DialogHeader>
+                    {selectedPerformance && (
+                        <div className="grid gap-4 py-4">
+                            <div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
+                                <div className="flex items-center gap-3">
+                                    <Star className="h-5 w-5 text-yellow-500" />
+                                    <span className="font-medium text-sm">Quality of Teaching</span>
+                                </div>
+                                <span className="font-bold">{selectedPerformance.avgQuality}/10</span>
+                            </div>
+                            <div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
+                                <div className="flex items-center gap-3">
+                                    <MessageSquare className="h-5 w-5 text-blue-500" />
+                                    <span className="font-medium text-sm">Doubt Clearance</span>
+                                </div>
+                                <span className="font-bold">{selectedPerformance.avgDoubt}/10</span>
+                            </div>
+                            <div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
+                                <div className="flex items-center gap-3">
+                                    <FileText className="h-5 w-5 text-green-500" />
+                                    <span className="font-medium text-sm">Reports Submitted</span>
+                                </div>
+                                <span className="font-bold">{selectedPerformance.totalReports}</span>
+                            </div>
+                            <div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
+                                <div className="flex items-center gap-3">
+                                    <CheckCircle className="h-5 w-5 text-purple-500" />
+                                    <span className="font-medium text-sm">Follow-ups Done</span>
+                                </div>
+                                <span className="font-bold">{Number(selectedPerformance.portfolioChecks) + Number(selectedPerformance.classFollowUps)}</span>
+                            </div>
+
+                            <div className="mt-4 pt-4 border-t flex justify-between items-center">
+                                <span className="font-bold">Final Composite Score</span>
+                                <span className="text-xl font-black text-primary">{selectedPerformance.score}</span>
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
+
         </div>
     );
 };
