@@ -27,10 +27,10 @@ export enum LeadSource {
 }
 
 export enum AdmissionStatus {
-    PENDING = "PENDING",
-    APPROVED = "APPROVED",
-    REJECTED = "REJECTED",
-    CANCELLED = "CANCELLED"
+    NEW = "NEW",
+    CONTACTED = "CONTACTED",
+    CONVERTED = "CONVERTED",
+    CLOSED = "CLOSED"
 }
 
 export enum AttendanceStatus {

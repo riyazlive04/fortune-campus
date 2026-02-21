@@ -144,6 +144,7 @@ export const getTrainerPerformance = async (req: AuthRequest, res: Response): Pr
             where: whereClause,
             include: {
                 user: { select: { firstName: true, lastName: true } },
+                branch: { select: { name: true } },
                 growthReports: {
                     where: {
                         reportDate: {
@@ -183,6 +184,7 @@ export const getTrainerPerformance = async (req: AuthRequest, res: Response): Pr
             return {
                 trainerId: trainer.id,
                 name: `${trainer.user.firstName} ${trainer.user.lastName}`,
+                branch: trainer.branch?.name || '',
                 avgQuality: avgQuality.toFixed(2),
                 avgDoubt: avgDoubt.toFixed(2),
                 totalReports,

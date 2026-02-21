@@ -260,7 +260,7 @@ export const convertLeadToAdmission = async (req: AuthRequest, res: Response): P
     }
 
     // Branch access control
-    if (req.user?.role !== UserRole.CEO && lead.branchId !== req.user?.branchId) {
+    if (req.user?.role !== UserRole.CEO && lead.branchId && lead.branchId !== req.user?.branchId) {
       return errorResponse(res, 'Access denied', 403);
     }
 
@@ -270,10 +270,12 @@ export const convertLeadToAdmission = async (req: AuthRequest, res: Response): P
 
     // Generate admission number
     const year = new Date().getFullYear().toString().slice(-2);
+    const effectiveBranchId = lead.branchId || req.user?.branchId || '';
     const count = await prisma.admission.count({
-      where: { branchId: lead.branchId },
+      where: { branchId: effectiveBranchId },
     });
-    const admissionNumber = `ADM${year}${lead.branchId.slice(0, 4).toUpperCase()}${(count + 1).toString().padStart(4, '0')}`;
+    const branchCode = effectiveBranchId ? effectiveBranchId.slice(0, 4).toUpperCase() : 'GENE';
+    const admissionNumber = `ADM${year}${branchCode}${(count + 1).toString().padStart(4, '0')}`;
 
     // Create admission and update lead in a transaction
     const result = await prisma.$transaction(async (tx) => {
@@ -289,7 +291,7 @@ export const convertLeadToAdmission = async (req: AuthRequest, res: Response): P
           feeAmount,
           feePaid: 0,
           feeBalance: feeAmount,
-          branchId: lead.branchId,
+          branchId: effectiveBranchId,
           leadId: lead.id,
         },
       });

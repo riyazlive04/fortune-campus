@@ -161,6 +161,7 @@ export const createAdmission = async (req: AuthRequest, res: Response): Promise<
                     feeBalance: Number(feeAmount),
                     branchId: effectiveBranchId,
                     leadId: leadId || undefined,
+                    status: req.body.status || AdmissionStatus.NEW,
                 },
                 include: {
                     branch: {
@@ -297,14 +298,14 @@ export const approveAdmission = async (req: AuthRequest, res: Response): Promise
             return errorResponse(res, 'Access denied', 403);
         }
 
-        if (admission.status === AdmissionStatus.APPROVED) {
-            return errorResponse(res, 'Admission already approved', 400);
+        if (admission.status === AdmissionStatus.CONVERTED) {
+            return errorResponse(res, 'Admission already converted to student', 400);
         }
 
         const updatedAdmission = await prisma.$transaction(async (tx) => {
             const updated = await tx.admission.update({
                 where: { id },
-                data: { status: AdmissionStatus.APPROVED },
+                data: { status: AdmissionStatus.CONVERTED },
                 include: {
                     branch: true,
                     course: true,

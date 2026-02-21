@@ -51,7 +51,7 @@ const AdmissionModal = ({ isOpen, onClose, onSuccess, admissionId, initialData, 
         branchId: "",
         batchName: "",
         feeAmount: "",
-        status: "PENDING"
+        status: "NEW"
     });
 
     const isEditMode = !!admissionId;
@@ -89,7 +89,7 @@ const AdmissionModal = ({ isOpen, onClose, onSuccess, admissionId, initialData, 
                     branchId: initialData.branchId || "",
                     batchName: "",
                     feeAmount: "",
-                    status: "PENDING"
+                    status: "NEW"
                 });
             } else {
                 setFormData({
@@ -104,7 +104,7 @@ const AdmissionModal = ({ isOpen, onClose, onSuccess, admissionId, initialData, 
                     branchId: "",
                     batchName: "",
                     feeAmount: "",
-                    status: "PENDING"
+                    status: "NEW"
                 });
             }
         }
@@ -200,7 +200,7 @@ const AdmissionModal = ({ isOpen, onClose, onSuccess, admissionId, initialData, 
                 <DialogHeader>
                     <div className="flex justify-between items-center">
                         <DialogTitle>{isEditMode ? `Admission: ${formData.firstName}` : "New Admission"}</DialogTitle>
-                        {isEditMode && <StatusBadge status={formData.status} variant={formData.status === 'APPROVED' ? 'success' : 'warning'} />}
+                        {isEditMode && <StatusBadge status={formData.status} variant={formData.status === 'CONVERTED' ? 'success' : formData.status === 'NEW' ? 'warning' : formData.status === 'CONTACTED' ? 'info' : 'danger'} />}
                     </div>
                 </DialogHeader>
 
@@ -287,12 +287,25 @@ const AdmissionModal = ({ isOpen, onClose, onSuccess, admissionId, initialData, 
                             </div>
                         </div>
 
+                        <div className="space-y-2">
+                            <Label htmlFor="status">Admission Status</Label>
+                            <Select value={formData.status} onValueChange={(v) => setFormData({ ...formData, status: v })}>
+                                <SelectTrigger><SelectValue placeholder="Select Status" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="NEW">New</SelectItem>
+                                    <SelectItem value="CONTACTED">Contacted</SelectItem>
+                                    <SelectItem value="CONVERTED">Converted</SelectItem>
+                                    <SelectItem value="CLOSED">Closed</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
                         <DialogFooter className="flex justify-between items-center pt-6">
                             <div className="flex gap-2">
-                                {isEditMode && formData.status === 'PENDING' && (
+                                {isEditMode && formData.status !== 'CONVERTED' && formData.status !== 'CLOSED' && (
                                     <Button type="button" variant="default" className="gap-2" onClick={handleApprove} disabled={approving}>
                                         {approving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
-                                        Approve
+                                        Convert to Student
                                     </Button>
                                 )}
                             </div>

@@ -88,8 +88,8 @@ model Lead {
   notes           String?
   followUpDate    DateTime?
   
-  branchId        String
-  createdById     String
+  branchId        String?
+  createdById     String?
   assignedToId    String?
   
   convertedToAdmissionId String?   @unique
@@ -98,8 +98,8 @@ model Lead {
   updatedAt       DateTime   @updatedAt
 
   // Relations
-  branch          Branch     @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  createdBy       User       @relation("LeadCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  branch          Branch?    @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  createdBy       User?      @relation("LeadCreator", fields: [createdById], references: [id], onDelete: Cascade)
   assignedTo      User?      @relation("LeadAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   admission       Admission? @relation("LeadConversion")
   whatsappLogs    WhatsAppLog[]
@@ -135,10 +135,7 @@ model Admission {
 
   // New Fields matching Student model for history
   dateOfJoining   DateTime?
-  dateOfBirth     DateTime?
-  gender          String?
   parentPhone     String?
-  address         String?
   qualification   String?
   leadSource      String?
   aadhaarNumber   String?

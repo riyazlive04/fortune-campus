@@ -110,7 +110,7 @@ const Admissions = () => {
     { key: "branch", label: "Branch" },
     { key: "date", label: "Admission Date" },
     { key: "placement", label: "Placement Support", render: (r: any) => <StatusBadge status={r.placement} variant={r.placement === "Yes" ? "success" : "neutral"} /> },
-    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} variant={r.status === "APPROVED" ? "success" : r.status === "PENDING" ? "warning" : "danger"} /> },
+    { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} variant={r.status === "CONVERTED" || r.status === "ADMITTED" || r.status === "APPROVED" ? "success" : r.status === "NEW" ? "warning" : r.status === "CONTACTED" ? "info" : "danger"} /> },
     {
       key: "actions",
       label: "",
