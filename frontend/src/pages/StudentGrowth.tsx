@@ -169,7 +169,6 @@ const StudentGrowth = () => {
                     <TabsTrigger value="trends">Growth Trends</TabsTrigger>
                     {canViewPerformance && <TabsTrigger value="performance">Performance Ranking</TabsTrigger>}
                     {canViewPerformance && <TabsTrigger value="students">Student Reports</TabsTrigger>}
-                    <TabsTrigger value="awards">Awards & Recognition</TabsTrigger>
                 </TabsList>
 
                 {/* ── Submit Daily Report (Trainer only) ── */}
@@ -496,45 +495,6 @@ const StudentGrowth = () => {
                         </div>
                     </TabsContent>
                 )}
-
-                {/* ── Awards & Recognition ── */}
-                <TabsContent value="awards">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {performance.slice(0, 3).map((p, i) => (
-                            <Card key={p.trainerId} className={`border-t-4 ${i === 0 ? 'border-t-yellow-400' : i === 1 ? 'border-t-gray-400' : 'border-t-orange-400'}`}>
-                                <CardHeader className="text-center pb-2">
-                                    <div className={`mx-auto rounded-full w-12 h-12 flex items-center justify-center mb-2 ${i === 0 ? 'bg-yellow-100' : i === 1 ? 'bg-gray-100' : 'bg-orange-100'}`}>
-                                        <Award className={`h-6 w-6 ${i === 0 ? 'text-yellow-600' : i === 1 ? 'text-gray-500' : 'text-orange-500'}`} />
-                                    </div>
-                                    <CardTitle className="text-base">{i === 0 ? "🥇 Trainer of the Month" : i === 1 ? "🥈 2nd Place" : "🥉 3rd Place"}</CardTitle>
-                                </CardHeader>
-                                <CardContent className="text-center">
-                                    <div className="space-y-1">
-                                        <p className="font-bold text-xl">{p.name}</p>
-                                        <p className="text-sm text-muted-foreground">Score: <span className="font-bold text-foreground">{p.score}</span></p>
-                                    </div>
-                                    <div className="mt-4 pt-4 border-t text-xs text-muted-foreground flex justify-between">
-                                        <span>Quality: {p.avgQuality}</span>
-                                        <span>Reports: {p.totalReports}</span>
-                                    </div>
-                                    {i === 0 && (
-                                        <div className="mt-4 bg-yellow-50 text-yellow-700 py-1 px-3 rounded-full text-xs font-medium inline-block">
-                                            🌟 Certificate Eligible
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        ))}
-
-                        {performance.length === 0 && (
-                            <div className="col-span-full py-16 text-center border-2 border-dashed rounded-xl text-muted-foreground">
-                                <Award className="mx-auto h-12 w-12 text-muted-foreground/30 mb-4" />
-                                <p className="font-semibold">Awards are announced at the end of each month.</p>
-                                <p className="text-sm mt-1">Trainers must submit daily reports to be eligible.</p>
-                            </div>
-                        )}
-                    </div>
-                </TabsContent>
             </Tabs>
 
             {/* Trainer Performance Dialog */}

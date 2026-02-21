@@ -40,24 +40,13 @@ const TrainerDashboard = () => {
     const { toast } = useToast();
     const user = storage.getUser();
 
-    // Assuming these states and API are defined elsewhere or will be added
-    const [reports, setReports] = useState<any>(null); // Added for the new useEffect
-    const trainersApi = trainerApi; // Assuming trainerApi is used for reports as well
-
     const fetchDashboardData = async () => {
         try {
             setLoading(true);
-            const [statsRes, reportsRes] = await Promise.all([
-                trainerApi.getDashboardStats().catch(e => ({ success: false, error: e })),
-                trainerApi.getBranchReports().catch(e => ({ success: false, error: e }))
-            ]);
+            const statsRes = await trainerApi.getDashboardStats().catch(e => ({ success: false, error: e }));
 
             if (statsRes.success) {
                 setStats(statsRes.data);
-            }
-
-            if (reportsRes.success) {
-                setReports(reportsRes.data);
             }
         } catch (error: any) {
             console.error("Dashboard fetch error:", error);
@@ -131,7 +120,6 @@ const TrainerDashboard = () => {
                     <TabsTrigger value="tests">Tests</TabsTrigger>
                     <TabsTrigger value="progress">Software Progress</TabsTrigger>
                     <TabsTrigger value="placement">Placement Eligibility</TabsTrigger>
-                    <TabsTrigger value="reports">Branch Reports</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="overview">
@@ -195,13 +183,6 @@ const TrainerDashboard = () => {
                                 >
                                     <Users className="mb-2 text-purple-500" />
                                     <span className="text-sm font-medium">Student Help</span>
-                                </button>
-                                <button
-                                    onClick={() => setActiveTab("reports")}
-                                    className="flex flex-col items-center justify-center p-4 bg-muted hover:bg-muted/80 rounded-lg border transition-all"
-                                >
-                                    <FileText className="mb-2 text-blue-500" />
-                                    <span className="text-sm font-medium">View Reports</span>
                                 </button>
                                 <button
                                     onClick={() => setActiveTab("incentives")}
@@ -331,6 +312,5 @@ const TrainerIncentivesList = () => {
         </div>
     );
 };
-
 
 export default TrainerDashboard;

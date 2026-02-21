@@ -23,7 +23,7 @@ const navSections = [
       { title: "Trainers", path: "/trainers", icon: GraduationCap, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER'] },
       { title: "Students", path: "/students", icon: Users, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER', 'TRAINER'] },
       { title: "Attendance", path: "/attendance", icon: Calendar, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER', 'TRAINER'] },
-      { title: "Student Growth", path: "/growth", icon: BarChart3, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER', 'TRAINER'] },
+      { title: "Trainer Growth", path: "/growth", icon: BarChart3, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER', 'TRAINER'] },
     ],
   },
   {

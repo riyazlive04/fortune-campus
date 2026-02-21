@@ -330,7 +330,67 @@ export const getBranchReports = async (req: AuthRequest, res: Response): Promise
             return errorResponse(res, 'Trainer or Branch not found', 404);
         }
 
-        const reports = await (prisma as any).branchReport.findMany({
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+        // Calculate Total Enrollments this month
+        const enrollments = await (prisma as any).admission.count({
+            where: {
+                branchId: trainer.branchId,
+                admissionDate: {
+                    gte: startOfMonth,
+                    lte: endOfMonth
+                }
+            }
+        });
+
+        // Calculate Total Collections this month (sum of feePaid)
+        const collectionsAgg = await (prisma as any).admission.aggregate({
+            where: {
+                branchId: trainer.branchId,
+                admissionDate: {
+                    gte: startOfMonth,
+                    lte: endOfMonth
+                }
+            },
+            _sum: {
+                feePaid: true
+            }
+        });
+        const totalCollections = collectionsAgg._sum.feePaid || 0;
+
+        // Calculate Trainer Expenses this month (sum of incentives amount)
+        const expensesAgg = await (prisma as any).incentive.aggregate({
+            where: {
+                trainer: {
+                    branchId: trainer.branchId
+                },
+                month: now.getMonth() + 1,
+                year: now.getFullYear()
+            },
+            _sum: {
+                amount: true
+            }
+        });
+        const trainerExpense = expensesAgg._sum.amount || 0;
+
+        // Calculate Branch Share (e.g. 70% of collections)
+        const branchShare = totalCollections * 0.70;
+
+        const liveReport = {
+            id: 'live-report-current-month',
+            month: now.toLocaleString('default', { month: 'long', year: 'numeric' }),
+            branchId: trainer.branchId,
+            status: 'Current Month Live',
+            totalCollections,
+            totalEnrollments: enrollments,
+            trainerExpense,
+            branchShare,
+            notes: "Live performance data aggregated for the current month."
+        };
+
+        const existingReports = await (prisma as any).branchReport.findMany({
             where: {
                 branchId: trainer.branchId
             },
@@ -346,6 +406,18 @@ export const getBranchReports = async (req: AuthRequest, res: Response): Promise
                 }
             }
         });
+
+        const formattedExistingReports = existingReports.map((r: any) => ({
+            ...r,
+            month: new Date(r.createdAt).toLocaleString('default', { month: 'long', year: 'numeric' }),
+            totalCollections: 0,
+            totalEnrollments: 0,
+            trainerExpense: 0,
+            branchShare: 0,
+            notes: r.description || "Historically uploaded document report."
+        }));
+
+        const reports = [liveReport, ...formattedExistingReports];
 
         console.log(`[getBranchReports] Reports found: ${reports.length}`);
         return successResponse(res, { reports }, 'Branch reports fetched successfully');

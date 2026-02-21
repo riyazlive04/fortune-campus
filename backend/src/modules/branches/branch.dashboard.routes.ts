@@ -15,7 +15,8 @@ import {
     getBranchAttendance,
     updateAdmissionFees,
     getBranchReport,
-    uploadBranchReport
+    uploadBranchReport,
+    getBranchReportsList
 } from './branch.dashboard.controller';
 import { uploadReport } from '../../middlewares/upload.middleware';
 import { authenticateToken } from '../../middlewares/auth.middleware';
@@ -43,5 +44,6 @@ router.get('/placement-readiness', getPlacementReadiness);
 router.put('/admissions/:id/fees', updateAdmissionFees);
 router.get('/reports/:type', getBranchReport);
 router.post('/reports', uploadReport.single('file'), uploadBranchReport);
+router.get('/branch-reports', getBranchReportsList);
 
 export default router;

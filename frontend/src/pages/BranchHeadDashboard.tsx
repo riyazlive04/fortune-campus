@@ -11,7 +11,8 @@ import {
     Briefcase,
     LayoutDashboard,
     ArrowRightLeft,
-    Loader2
+    Loader2,
+    AlertCircle
 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import KPICard from "@/components/KPICard";
@@ -58,7 +59,8 @@ const BranchHeadDashboard = () => {
                 safeFetch(trainerAttendanceApi.getHistory({
                     startDate: new Date().toISOString().split('T')[0],
                     endDate: new Date().toISOString().split('T')[0]
-                }), [])
+                }), []),
+                safeFetch(branchDashboardApi.getBranchReports(), { reports: [] })
             ]);
 
             if (!overviewData) {
@@ -72,7 +74,8 @@ const BranchHeadDashboard = () => {
                 pendingAdmissionsList: admissionsData?.pendingAdmissions || [],
                 attendanceStats: attendanceData,
                 performanceStats: performanceData,
-                trainerAttendanceStats: (trainerAttendanceData?.data || (Array.isArray(trainerAttendanceData) ? trainerAttendanceData : []))
+                trainerAttendanceStats: (trainerAttendanceData?.data || (Array.isArray(trainerAttendanceData) ? trainerAttendanceData : [])),
+                branchReports: (arguments[0] && Array.isArray(arguments[0][5]?.reports)) ? arguments[0][5].reports : (arguments[0] && arguments[0][5]?.data?.reports) || [] // Will fix this cleanly below
             });
         } catch (error) {
             console.error("Dashboard error:", error);
@@ -400,6 +403,10 @@ const BranchHeadDashboard = () => {
                         </Card>
                     </div>
                 </TabsContent>
+                {/* REPORTS CONTENT */}
+                <TabsContent value="reports">
+                    <BranchReportsList reports={stats?.branchReports || []} />
+                </TabsContent>
             </Tabs>
 
             <AdmissionModal
@@ -414,4 +421,68 @@ const BranchHeadDashboard = () => {
     );
 };
 
+const BranchReportsList = ({ reports }: { reports: any[] }) => {
+    if (!reports) return <div className="text-center py-8">Loading reports...</div>;
+
+    if (!Array.isArray(reports) || reports.length === 0) {
+        return (
+            <div className="bg-card border rounded-xl overflow-hidden p-8 text-center text-muted-foreground">
+                <AlertCircle className="w-8 h-8 mx-auto mb-3 text-muted-foreground/50" />
+                <p>No branch reports available at this time.</p>
+                <p className="text-xs mt-1">Branch performance reports are typically generated monthly.</p>
+            </div>
+        );
+    }
+
+    const formatCurrency = (val: number) => `₹${val.toLocaleString('en-IN')}`;
+
+    return (
+        <div className="space-y-6">
+            <h3 className="text-lg font-bold flex items-center gap-2">
+                <FileText className="w-5 h-5 text-primary" />
+                Branch Performance Reports
+            </h3>
+            <div className="grid gap-4">
+                {reports.map((report: any, i: number) => (
+                    <div key={i} className="bg-card border rounded-xl p-5 hover:shadow-md transition-shadow">
+                        <div className="flex justify-between items-start mb-4">
+                            <div>
+                                <h4 className="font-semibold text-lg">{report.month || "Monthly Report"}</h4>
+                                <p className="text-sm text-muted-foreground">Branch ID: {report.branchId || "N/A"}</p>
+                            </div>
+                            <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-bold border border-primary/20">
+                                {report.status || "Finalized"}
+                            </span>
+                        </div>
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                            <div className="bg-muted/50 p-3 rounded-lg border">
+                                <p className="text-xs text-muted-foreground mb-1">Total Collections</p>
+                                <p className="font-bold text-success">{formatCurrency(report.totalCollections || 0)}</p>
+                            </div>
+                            <div className="bg-muted/50 p-3 rounded-lg border">
+                                <p className="text-xs text-muted-foreground mb-1">Total Enrollments</p>
+                                <p className="font-bold">{report.totalEnrollments || 0}</p>
+                            </div>
+                            <div className="bg-muted/50 p-3 rounded-lg border">
+                                <p className="text-xs text-muted-foreground mb-1">Branch Share (Allocated)</p>
+                                <p className="font-bold text-warning">{formatCurrency(report.branchShare || 0)}</p>
+                            </div>
+                            <div className="bg-muted/50 p-3 rounded-lg border">
+                                <p className="text-xs text-muted-foreground mb-1">Trainer Expense</p>
+                                <p className="font-bold text-destructive">{formatCurrency(report.trainerExpense || 0)}</p>
+                            </div>
+                        </div>
+                        {report.notes && (
+                            <div className="mt-4 text-sm text-muted-foreground bg-muted/30 p-3 rounded border">
+                                <strong>Notes:</strong> {report.notes}
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
 export default BranchHeadDashboard;
+

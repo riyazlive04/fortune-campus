@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import PageHeader from "@/components/PageHeader";
 import KPICard from "@/components/KPICard";
 import { Award, Users, Building2, Plus } from "lucide-react";
-import { incentivesApi } from "@/lib/api";
+import { incentivesApi, trainersApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import AllocateIncentiveModal from "@/components/incentives/AllocateIncentiveModal";
@@ -22,7 +22,13 @@ const Incentives = () => {
   const [loading, setLoading] = useState(true);
   const [showAllocateModal, setShowAllocateModal] = useState(false);
   const [selectedTrainerId, setSelectedTrainerId] = useState<string | null>(null);
+  const [selectedAllocateTrainerId, setSelectedAllocateTrainerId] = useState<string | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+
+  const handleAllocateClick = (trainerId?: string) => {
+    setSelectedAllocateTrainerId(trainerId || null);
+    setShowAllocateModal(true);
+  };
   const { toast } = useToast();
 
   const handleViewDetails = (trainerId: string) => {
@@ -33,8 +39,12 @@ const Incentives = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const response = await incentivesApi.getIncentives({ limit: 1000 });
-      const incentives = response.data?.incentives || response.data || [];
+      const [incentivesRes, trainersRes] = await Promise.all([
+        incentivesApi.getIncentives({ limit: 1000 }),
+        trainersApi.getTrainers({ limit: 100, isActive: true })
+      ]);
+      const incentives = incentivesRes.data?.incentives || incentivesRes.data || [];
+      const allTrainers = trainersRes.data?.trainers || trainersRes.data || [];
 
       // 1. Overall Stats
       let total = 0;
@@ -59,12 +69,27 @@ const Incentives = () => {
       // 2. Trainer-wise Aggregation
       const trainerMap = new Map();
 
+      // Initialize map with ALL active trainers
+      allTrainers.forEach((t: any) => {
+        trainerMap.set(t.id, {
+          trainerId: t.id,
+          trainer: t.user?.firstName ? `${t.user.firstName} ${t.user.lastName || ''}` : 'Unknown Trainer',
+          branch: t.branch?.name || "Unknown",
+          studentIds: new Set(),
+          placementIncentives: 0,
+          totalIncentive: 0,
+          paidIncentive: 0,
+          pendingIncentive: 0
+        });
+      });
+
       incentives.forEach((inc: any) => {
         if (!inc.trainerId) return;
 
         const trainerName = inc.trainer?.user?.firstName ? `${inc.trainer.user.firstName} ${inc.trainer.user.lastName || ''}` : 'Unknown Trainer';
 
         if (!trainerMap.has(inc.trainerId)) {
+          // Fallback if trainer wasn't in the active trainers list
           trainerMap.set(inc.trainerId, {
             trainerId: inc.trainerId,
             trainer: trainerName,
@@ -156,7 +181,7 @@ const Incentives = () => {
     <div className="animate-fade-in">
       <div className="flex items-center justify-between mb-6">
         <PageHeader title="Incentives" description="Track trainer and branch-wise incentives" />
-        <Button onClick={() => setShowAllocateModal(true)}>
+        <Button onClick={() => handleAllocateClick()}>
           <Plus className="mr-2 h-4 w-4" /> Allocate Incentive
         </Button>
       </div>
@@ -165,6 +190,7 @@ const Incentives = () => {
         isOpen={showAllocateModal}
         onClose={() => setShowAllocateModal(false)}
         onSuccess={fetchData}
+        defaultTrainerId={selectedAllocateTrainerId}
       />
 
       <TrainerIncentiveDetailsModal
@@ -202,7 +228,7 @@ const Incentives = () => {
       <div className="mb-8">
         <h3 className="mb-3 text-sm font-semibold text-foreground">Trainer-wise Incentives</h3>
         <div className="rounded-xl border border-border bg-card overflow-x-auto">
-          {loading ? <div className="p-4">Loading...</div> : aggregatedTable(trainerIncentives, formatCurrency, handleViewDetails)}
+          {loading ? <div className="p-4">Loading...</div> : aggregatedTable(trainerIncentives, formatCurrency, handleViewDetails, handleAllocateClick)}
         </div>
       </div>
 
@@ -231,11 +257,11 @@ const Incentives = () => {
   );
 };
 
-const aggregatedTable = (data: any[], formatCurrency: (v: number) => string, onView: (id: string) => void) => {
+const aggregatedTable = (data: any[], formatCurrency: (v: number) => string, onView: (id: string) => void, onAllocate: (id: string) => void) => {
   if (data.length === 0) return <div className="p-4 text-muted-foreground">No incentive records found.</div>;
   return (
     <table className="data-table">
-      <thead><tr><th>Trainer</th><th>Branch</th><th>Students</th><th>Placements</th><th>Incentive</th><th>Status</th><th>Action</th></tr></thead>
+      <thead><tr><th>Trainer</th><th>Branch</th><th>Students</th><th>Placements</th><th>Incentive</th><th>Status</th><th className="text-right pr-6">Action</th></tr></thead>
       <tbody>
         {data.map((t, i) => (
           <tr key={i}>
@@ -244,9 +270,10 @@ const aggregatedTable = (data: any[], formatCurrency: (v: number) => string, onV
             <td>{t.students}</td>
             <td>{t.placements}</td>
             <td className="font-medium">{formatCurrency(t.incentive)}</td>
-            <td><span className={`status-badge ${t.status === "Paid" ? "status-badge-success" : "status-badge-warning"}`}>{t.status}</span></td>
-            <td>
-              <Button variant="ghost" size="sm" onClick={() => onView(t.trainerId)}>View</Button>
+            <td><span className={`status-badge ${t.status === "Paid" ? "status-badge-success" : (t.incentive === 0 ? "status-badge-neutral" : "status-badge-warning")}`}>{t.incentive === 0 ? "N/A" : t.status}</span></td>
+            <td className="text-right space-x-2">
+              <Button variant="outline" size="sm" onClick={() => onAllocate(t.trainerId)}>Allocate</Button>
+              <Button variant="secondary" size="sm" onClick={() => onView(t.trainerId)}>View</Button>
             </td>
           </tr>
         ))}

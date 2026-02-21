@@ -22,7 +22,8 @@ const PlacementEligibility = ({ batches }: PlacementEligibilityProps) => {
             setLoading(true);
             const res = await trainerApi.getBatchStudents(selectedBatch);
             if (res.success) {
-                setStudents(res.data);
+                const studentsData = Array.isArray(res.data) ? res.data : (res.data?.students || res.data?.data || []);
+                setStudents(studentsData);
             }
         } catch (error: any) {
             toast({ variant: "destructive", title: "Error", description: error.message });
@@ -75,7 +76,7 @@ const PlacementEligibility = ({ batches }: PlacementEligibilityProps) => {
             </div>
 
             <div className="bg-card border rounded-xl overflow-hidden">
-                {students.length === 0 ? (
+                {!Array.isArray(students) || students.length === 0 ? (
                     <div className="p-8 text-center text-muted-foreground">No students found.</div>
                 ) : (
                     <div className="overflow-x-auto">

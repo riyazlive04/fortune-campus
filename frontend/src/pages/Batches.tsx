@@ -98,6 +98,21 @@ const Batches = () => {
         loadModalStudents();
     }, [form.branchId, showModal, editBatch]);
 
+    // Auto-generate batch name when course, month or start time changes
+    useEffect(() => {
+        if (!editBatch && form.courseId && form.code) {
+            const course = courses.find((c: any) => c.id === form.courseId);
+            if (course) {
+                const shortMonth = form.code.substring(0, 3);
+                let name = `${course.code}_${shortMonth}`;
+                if (form.startTime) {
+                    name += `_${form.startTime.split(' ')[0]}`;
+                }
+                setForm(prev => ({ ...prev, name }));
+            }
+        }
+    }, [form.courseId, form.code, form.startTime, courses, editBatch]);
+
     const openCreate = () => {
         setEditBatch(null);
         setForm({ name: "", code: "", courseId: "", branchId: "", startTime: "", endTime: "" });
@@ -382,19 +397,26 @@ const Batches = () => {
                                     value={form.name}
                                     onChange={(e) => setForm({ ...form, name: e.target.value })}
                                     placeholder="e.g. Morning Batch A"
-                                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                    disabled={!editBatch}
+                                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
                                 />
                             </div>
                             <div>
-                                <label className="text-[11px] font-bold uppercase text-muted-foreground mb-1 block">Batch Code *</label>
-                                <input
-                                    type="text"
+                                <label className="text-[11px] font-bold uppercase text-muted-foreground mb-1 block">Batch Month *</label>
+                                <select
                                     value={form.code}
                                     onChange={(e) => setForm({ ...form, code: e.target.value })}
-                                    placeholder="e.g. BATCH-001"
                                     disabled={!!editBatch}
                                     className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-50"
-                                />
+                                >
+                                    <option value="">Select a month</option>
+                                    {[
+                                        "January", "February", "March", "April", "May", "June",
+                                        "July", "August", "September", "October", "November", "December"
+                                    ].map(month => (
+                                        <option key={month} value={month}>{month}</option>
+                                    ))}
+                                </select>
                             </div>
                             <div>
                                 <label className="text-[11px] font-bold uppercase text-muted-foreground mb-1 block">Course *</label>

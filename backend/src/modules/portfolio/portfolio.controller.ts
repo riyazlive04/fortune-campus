@@ -8,7 +8,7 @@ import { AuthRequest } from '../../middlewares/auth.middleware';
 export const getPortfolios = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
     const { page = 1, limit = 10, studentId, isVerified, search } = req.query;
-    
+
     const { skip, take } = paginationHelper(Number(page), Number(limit));
 
     const where: any = {};
@@ -28,11 +28,27 @@ export const getPortfolios = async (req: AuthRequest, res: Response): Promise<Re
       ];
     }
 
-    // Branch filtering
+    // Branch filtering and Role filtering
     if (req.user?.role !== UserRole.CEO) {
-      where.student = {
-        branchId: req.user?.branchId,
-      };
+      if (req.user?.role === UserRole.TRAINER) {
+        // If trainer, grab the trainerId and only allow students in their batches
+        const trainerParams = await prisma.trainer.findUnique({
+          where: { userId: req.user.id },
+          select: { id: true, branchId: true }
+        });
+        if (trainerParams) {
+          where.student = {
+            branchId: trainerParams.branchId,
+            batch: {
+              trainerId: trainerParams.id
+            }
+          };
+        }
+      } else {
+        where.student = {
+          branchId: req.user?.branchId,
+        };
+      }
     }
 
     const [portfolios, total] = await Promise.all([
@@ -91,8 +107,27 @@ export const getPortfolioById = async (req: AuthRequest, res: Response): Promise
     }
 
     // Branch access control
-    if (req.user?.role !== UserRole.CEO && portfolio.student.branchId !== req.user?.branchId) {
-      return errorResponse(res, 'Access denied', 403);
+    if (req.user?.role !== UserRole.CEO) {
+      if (req.user?.role === UserRole.TRAINER) {
+        const trainerParams = await prisma.trainer.findUnique({
+          where: { userId: req.user.id },
+          select: { id: true }
+        });
+
+        // Ensure student is in one of the trainer's batches
+        const isTrainerStudent = await prisma.student.findFirst({
+          where: {
+            id: portfolio.studentId,
+            batch: { trainerId: trainerParams?.id }
+          }
+        });
+
+        if (!isTrainerStudent) {
+          return errorResponse(res, 'Access denied', 403);
+        }
+      } else if (portfolio.student.branchId !== req.user?.branchId) {
+        return errorResponse(res, 'Access denied', 403);
+      }
     }
 
     return successResponse(res, portfolio);

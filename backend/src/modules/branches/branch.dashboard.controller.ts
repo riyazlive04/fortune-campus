@@ -816,3 +816,109 @@ export const uploadBranchReport = async (req: AuthRequest, res: Response): Promi
         return errorResponse(res, 'Failed to upload report', 500);
     }
 };
+
+export const getBranchReportsList = async (req: AuthRequest, res: Response): Promise<Response> => {
+    try {
+        const branchId = req.user?.branchId;
+        console.log(`[getBranchReportsList] Fetching reports for branch: ${branchId}`);
+
+        if (!branchId) {
+            return errorResponse(res, 'Branch not found for user', 404);
+        }
+
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+        // Calculate Total Enrollments this month
+        const enrollments = await (prisma as any).admission.count({
+            where: {
+                branchId: branchId,
+                admissionDate: {
+                    gte: startOfMonth,
+                    lte: endOfMonth
+                }
+            }
+        });
+
+        // Calculate Total Collections this month (sum of feePaid)
+        const collectionsAgg = await (prisma as any).admission.aggregate({
+            where: {
+                branchId: branchId,
+                admissionDate: {
+                    gte: startOfMonth,
+                    lte: endOfMonth
+                }
+            },
+            _sum: {
+                feePaid: true
+            }
+        });
+        const totalCollections = collectionsAgg._sum.feePaid || 0;
+
+        // Calculate Trainer Expenses this month (sum of incentives amount)
+        const expensesAgg = await (prisma as any).incentive.aggregate({
+            where: {
+                trainer: {
+                    branchId: branchId
+                },
+                month: now.getMonth() + 1,
+                year: now.getFullYear()
+            },
+            _sum: {
+                amount: true
+            }
+        });
+        const trainerExpense = expensesAgg._sum.amount || 0;
+
+        // Calculate Branch Share (e.g. 70% of collections)
+        const branchShare = totalCollections * 0.70;
+
+        const liveReport = {
+            id: 'live-report-current-month',
+            month: now.toLocaleString('default', { month: 'long', year: 'numeric' }),
+            branchId: branchId,
+            status: 'Current Month Live',
+            totalCollections,
+            totalEnrollments: enrollments,
+            trainerExpense,
+            branchShare,
+            notes: "Live performance data aggregated for the current month."
+        };
+
+        const existingReports = await (prisma as any).branchReport.findMany({
+            where: {
+                branchId: branchId
+            },
+            orderBy: {
+                createdAt: 'desc'
+            },
+            include: {
+                uploadedBy: {
+                    select: {
+                        firstName: true,
+                        lastName: true
+                    }
+                }
+            }
+        });
+
+        const formattedExistingReports = existingReports.map((r: any) => ({
+            ...r,
+            month: new Date(r.createdAt).toLocaleString('default', { month: 'long', year: 'numeric' }),
+            totalCollections: 0,
+            totalEnrollments: 0,
+            trainerExpense: 0,
+            branchShare: 0,
+            notes: r.description || "Historically uploaded document report."
+        }));
+
+        const reports = [liveReport, ...formattedExistingReports];
+
+        console.log(`[getBranchReportsList] Reports found: ${reports.length}`);
+        return successResponse(res, { reports }, 'Branch reports fetched successfully');
+    } catch (error) {
+        console.error('Fetch branch reports errors:', error);
+        return errorResponse(res, 'Failed to fetch branch reports', 500);
+    }
+};

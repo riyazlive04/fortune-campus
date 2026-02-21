@@ -35,7 +35,8 @@ const TestsManager = ({ batches = [] }: TestsManagerProps) => {
             setLoading(true);
             const res = await trainerApi.getBatchTests(selectedBatch);
             if (res.success) {
-                setTests(res.data);
+                const testsData = Array.isArray(res.data) ? res.data : (res.data?.tests || res.data?.data || []);
+                setTests(testsData);
             }
         } catch (error: any) {
             toast({ variant: "destructive", title: "Error", description: error.message });
@@ -106,11 +107,14 @@ const TestsManager = ({ batches = [] }: TestsManagerProps) => {
             ]);
 
             if (studentsRes.success && scoresRes.success) {
-                setStudents(studentsRes.data);
+                const studentsData = Array.isArray(studentsRes.data) ? studentsRes.data : (studentsRes.data?.students || studentsRes.data?.data || []);
+                const scoresData = Array.isArray(scoresRes.data) ? scoresRes.data : (scoresRes.data?.scores || scoresRes.data?.data || []);
+
+                setStudents(studentsData);
 
                 // Map students to scores (or default if no score)
-                const mappedScores = studentsRes.data.map((student: any) => {
-                    const existingScore = scoresRes.data.find((s: any) => s.studentId === student.id);
+                const mappedScores = studentsData.map((student: any) => {
+                    const existingScore = scoresData.find((s: any) => s.studentId === student.id);
                     return {
                         studentId: student.id,
                         studentName: `${student.user.firstName} ${student.user.lastName}`,
@@ -238,7 +242,7 @@ const TestsManager = ({ batches = [] }: TestsManagerProps) => {
             <div className="space-y-4">
                 {loading && tests.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">Loading tests...</div>
-                ) : tests.length === 0 ? (
+                ) : !Array.isArray(tests) || tests.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground bg-card border rounded-xl">No tests found for this batch.</div>
                 ) : (
                     tests.map(test => (

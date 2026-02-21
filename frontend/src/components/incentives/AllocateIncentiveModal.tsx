@@ -12,9 +12,10 @@ interface AllocateIncentiveModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSuccess: () => void;
+    defaultTrainerId?: string | null;
 }
 
-const AllocateIncentiveModal = ({ isOpen, onClose, onSuccess }: AllocateIncentiveModalProps) => {
+const AllocateIncentiveModal = ({ isOpen, onClose, onSuccess, defaultTrainerId }: AllocateIncentiveModalProps) => {
     const [loading, setLoading] = useState(false);
     const [trainers, setTrainers] = useState<any[]>([]);
     const [formData, setFormData] = useState({
@@ -30,8 +31,21 @@ const AllocateIncentiveModal = ({ isOpen, onClose, onSuccess }: AllocateIncentiv
     useEffect(() => {
         if (isOpen) {
             fetchTrainers();
+            if (defaultTrainerId) {
+                setFormData(prev => ({ ...prev, trainerId: defaultTrainerId }));
+            }
+        } else {
+            // Reset form when closed
+            setFormData({
+                trainerId: "",
+                amount: "",
+                type: "PERFORMANCE",
+                description: "",
+                month: new Date().getMonth() + 1,
+                year: new Date().getFullYear(),
+            });
         }
-    }, [isOpen]);
+    }, [isOpen, defaultTrainerId]);
 
     const fetchTrainers = async () => {
         try {

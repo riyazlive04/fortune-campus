@@ -565,6 +565,15 @@ export const branchDashboardApi = {
     if (!response.ok) throw new Error(result.message || 'Failed to fetch compliance');
     return result;
   },
+  getBranchReports: async () => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/branch-dashboard/branch-reports`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch branch reports');
+    return result;
+  },
   getPlacementStats: async () => {
     const token = storage.getToken();
     const response = await fetch(`${API_BASE_URL}/branch-dashboard/placements`, {
