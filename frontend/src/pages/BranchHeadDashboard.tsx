@@ -51,7 +51,7 @@ const BranchHeadDashboard = () => {
                 }
             };
 
-            const [overviewData, admissionsData, attendanceData, performanceData, trainerAttendanceData] = await Promise.all([
+            const [overviewData, admissionsData, attendanceData, performanceData, trainerAttendanceData, branchReportsData] = await Promise.all([
                 branchDashboardApi.getOverview().then(res => res.data).catch(() => null),
                 safeFetch(branchDashboardApi.getAdmissions(), { recentLeads: [], pendingAdmissions: [] }),
                 safeFetch(branchDashboardApi.getAttendance(), []),
@@ -75,7 +75,7 @@ const BranchHeadDashboard = () => {
                 attendanceStats: attendanceData,
                 performanceStats: performanceData,
                 trainerAttendanceStats: (trainerAttendanceData?.data || (Array.isArray(trainerAttendanceData) ? trainerAttendanceData : [])),
-                branchReports: (arguments[0] && Array.isArray(arguments[0][5]?.reports)) ? arguments[0][5].reports : (arguments[0] && arguments[0][5]?.data?.reports) || [] // Will fix this cleanly below
+                branchReports: branchReportsData?.reports || (Array.isArray(branchReportsData) ? branchReportsData : [])
             });
         } catch (error) {
             console.error("Dashboard error:", error);

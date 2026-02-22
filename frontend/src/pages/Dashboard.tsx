@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
-import { Users, UserPlus, GraduationCap, Briefcase, Award, Zap, X, Loader2 } from "lucide-react";
+import { Users, UserPlus, GraduationCap, Briefcase, Award, Zap, X, Loader2, Clock, Calendar } from "lucide-react";
 import KPICard from "@/components/KPICard";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
-import { dashboardApi, reportsApi, storage, leadsApi, studentsApi, placementsApi, admissionsApi } from "@/lib/api";
+import { dashboardApi, reportsApi, storage, leadsApi, studentsApi, placementsApi, admissionsApi, trainerAttendanceApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import TrainerDashboard from "./TrainerDashboard";
 import StudentDashboard from "./StudentDashboard";
@@ -36,6 +36,7 @@ const Dashboard = () => {
 
   const [data, setData] = useState<any>(null);
   const [performance, setPerformance] = useState<any[]>([]);
+  const [trainerAttendance, setTrainerAttendance] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -83,7 +84,7 @@ const Dashboard = () => {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000); // Increased to 15s
 
-      const [statsRes, perfRes] = await Promise.all([
+      const [statsRes, perfRes, attendanceRes] = await Promise.all([
         dashboardApi.getStats().then(res => {
           console.log("✅ getStats resolved");
           return res;
@@ -93,6 +94,13 @@ const Dashboard = () => {
           year: new Date().getFullYear()
         }).catch((err) => {
           console.warn("⚠️ getTrainerPerformance failed:", err);
+          return { success: true, data: [] };
+        }),
+        trainerAttendanceApi.getHistory({
+          startDate: new Date().toISOString().split('T')[0],
+          endDate: new Date().toISOString().split('T')[0]
+        }).catch((err) => {
+          console.warn("⚠️ getTrainerAttendance failed:", err);
           return { success: true, data: [] };
         })
       ]);
@@ -109,6 +117,11 @@ const Dashboard = () => {
       if (perfRes.success) {
         setPerformance(perfRes.data);
       }
+
+      if (attendanceRes?.data) {
+        setTrainerAttendance(Array.isArray(attendanceRes.data) ? attendanceRes.data : []);
+      }
+
     } catch (error: any) {
       console.error("🔥 Dashboard Fetch Error:", error);
       toast({
@@ -311,6 +324,71 @@ const Dashboard = () => {
                       </td>
                     </tr>
                   ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Trainer Attendance Section */}
+        <div className="lg:col-span-3 rounded-2xl border border-border bg-card overflow-hidden flex flex-col h-full">
+          <div className="p-6 border-b border-border flex justify-between items-center bg-muted/5">
+            <div>
+              <h3 className="text-lg font-black text-foreground">Trainer Attendance (Today)</h3>
+              <p className="text-[11px] text-muted-foreground font-semibold">Live tracking of all trainers across branches</p>
+            </div>
+            <div className="bg-primary/5 p-3 rounded-full">
+              <Calendar className="h-6 w-6 text-primary" />
+            </div>
+          </div>
+          <div className="flex-1 p-4">
+            <div className="overflow-x-auto">
+              <table className="w-full text-[13px]">
+                <thead>
+                  <tr className="border-b border-border text-left">
+                    <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Trainer</th>
+                    <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Branch</th>
+                    <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Status</th>
+                    <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">In-Time</th>
+                    <th className="pb-3 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Out-Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {trainerAttendance.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="text-center py-10">
+                        <div className="flex flex-col items-center justify-center text-muted-foreground">
+                          <Clock className="h-6 w-6 mb-2 opacity-20" />
+                          <p className="text-xs italic font-semibold">No trainer attendance marked for today.</p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    trainerAttendance.map((att: any) => (
+                      <tr key={att.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                        <td className="py-3 pr-4 font-semibold text-foreground">
+                          {att.trainer?.user?.firstName} {att.trainer?.user?.lastName}
+                        </td>
+                        <td className="py-3 pr-4 text-muted-foreground">
+                          {att.trainer?.branch?.name || "General"}
+                        </td>
+                        <td className="py-3 pr-4">
+                          <StatusBadge
+                            status={att.status}
+                            variant={att.status === 'PRESENT' ? 'success' : att.status === 'ABSENT' ? 'danger' : 'warning'}
+                          />
+                        </td>
+                        <td className="py-3 pr-4 text-muted-foreground font-medium">
+                          {att.inTime ? new Date(att.inTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—"}
+                        </td>
+                        <td className="py-3 font-medium text-muted-foreground">
+                          {att.outTime ? new Date(att.outTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—"}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

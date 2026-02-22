@@ -1022,6 +1022,21 @@ export const attendanceApi = {
     return result;
   },
 
+  markBatchAttendance: async (data: { courseId: string; date: string; trainerId?: string; attendanceRecords: { studentId: string; status: string; remarks?: string }[] }) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/attendance/bulk`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to mark bulk attendance');
+    return result;
+  },
+
   getAttendance: async (params?: any) => {
     const token = storage.getToken();
     const queryString = params ? new URLSearchParams(params).toString() : '';

@@ -31,6 +31,7 @@ const Attendance = () => {
   const { toast } = useToast();
   const currentUser = storage.getUser();
   const isCEO = currentUser?.role === "CEO";
+  const isTrainer = currentUser?.role === "TRAINER";
 
   // ── Batch-wise attendance state ──────────────────────────────
   const [selectedBatchId, setSelectedBatchId] = useState<string>("");
@@ -120,25 +121,35 @@ const Attendance = () => {
   // ── Submit attendance ────────────────────────────────────────
   const handleSubmit = async () => {
     if (!selectedBatchId || batchStudents.length === 0) return;
+
+    const courseId = batchStudents[0]?.courseId;
+    if (!courseId) {
+      toast({ variant: "destructive", title: "Error", description: "Course ID not found for this batch" });
+      return;
+    }
+
     setSubmitting(true);
     const dateStr = selectedDate.toISOString();
-    let errors = 0;
-    for (const student of batchStudents) {
-      try {
-        await attendanceApi.markAttendance({
-          studentId: student.id,
-          status: attendanceMap[student.id] || "PRESENT",
-          date: dateStr,
-        });
-      } catch { errors++; }
-    }
-    setSubmitting(false);
-    if (errors === 0) {
+
+    const attendanceRecords = batchStudents.map(student => ({
+      studentId: student.id,
+      status: attendanceMap[student.id] || "PRESENT"
+    }));
+
+    try {
+      await attendanceApi.markBatchAttendance({
+        courseId,
+        date: dateStr,
+        attendanceRecords
+      });
+
       toast({ title: "Attendance Saved", description: `Marked ${batchStudents.length} students for ${format(selectedDate, "dd MMM yyyy")}` });
       setSubmitted(true);
       fetchSummary();
-    } else {
-      toast({ variant: "destructive", title: "Partial Error", description: `${errors} record(s) failed to save` });
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Error", description: error.message || "Failed to save attendance" });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -200,136 +211,138 @@ const Attendance = () => {
       </div>
 
       {/* ── BATCH-WISE ATTENDANCE SECTION ── */}
-      <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
-        {/* Header */}
-        <div className="flex flex-wrap items-center justify-between px-6 py-4 border-b border-border bg-muted/30 gap-4">
-          <div className="flex items-center gap-2">
-            <ClipboardList className="h-5 w-5 text-primary" />
-            <h3 className="text-sm font-black text-foreground uppercase tracking-wide">Take Attendance</h3>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {/* Batch selector */}
-            <div className="w-64">
-              <Select onValueChange={(v) => { setSelectedBatchId(v); }} value={selectedBatchId}>
-                <SelectTrigger className="h-9 text-sm">
-                  <SelectValue placeholder="Select a batch…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {displayedBatches.map(b => (
-                    <SelectItem key={b.id} value={b.id}>
-                      {b.name} <span className="text-muted-foreground text-xs ml-1">({b.code})</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+      {isTrainer && (
+        <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+          {/* Header */}
+          <div className="flex flex-wrap items-center justify-between px-6 py-4 border-b border-border bg-muted/30 gap-4">
+            <div className="flex items-center gap-2">
+              <ClipboardList className="h-5 w-5 text-primary" />
+              <h3 className="text-sm font-black text-foreground uppercase tracking-wide">Take Attendance</h3>
             </div>
-          </div>
-        </div>
 
-        {/* Body */}
-        {!selectedBatchId ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
-            <Users className="h-10 w-10 opacity-20" />
-            <p className="text-sm font-semibold">Select a batch to take attendance</p>
-          </div>
-        ) : loadingStudents ? (
-          <div className="flex items-center justify-center py-16 gap-3 text-muted-foreground">
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
-            <p className="text-sm">Loading students…</p>
-          </div>
-        ) : batchStudents.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
-            <Users className="h-10 w-10 opacity-20" />
-            <p className="text-sm font-semibold">No students assigned to this batch yet</p>
-          </div>
-        ) : (
-          <>
-            {/* Stats + bulk actions */}
-            <div className="flex items-center justify-between px-6 py-3 bg-muted/20 border-b border-border">
-              <div className="flex items-center gap-4 text-sm">
-                <span className="flex items-center gap-1.5 font-semibold text-emerald-600">
-                  <CheckCircle2 className="h-4 w-4" /> {presentCount} Present
-                </span>
-                <span className="flex items-center gap-1.5 font-semibold text-red-500">
-                  <XCircle className="h-4 w-4" /> {absentCount} Absent
-                </span>
-                <span className="text-muted-foreground text-xs">/ {batchStudents.length} total</span>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => markAll("PRESENT")}
-                  className="text-xs px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-semibold hover:bg-emerald-100 transition-colors border border-emerald-200"
-                >All Present</button>
-                <button
-                  onClick={() => markAll("ABSENT")}
-                  className="text-xs px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-semibold hover:bg-red-100 transition-colors border border-red-200"
-                >All Absent</button>
+            <div className="flex items-center gap-3">
+              {/* Batch selector */}
+              <div className="w-64">
+                <Select onValueChange={(v) => { setSelectedBatchId(v); }} value={selectedBatchId}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Select a batch…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {displayedBatches.map(b => (
+                      <SelectItem key={b.id} value={b.id}>
+                        {b.name} <span className="text-muted-foreground text-xs ml-1">({b.code})</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
+          </div>
 
-            {/* Student list */}
-            <div className="divide-y divide-border">
-              {batchStudents.map((student: any, idx: number) => {
-                const isPresent = attendanceMap[student.id] === "PRESENT";
-                const name = `${student.user?.firstName || ""} ${student.user?.lastName || ""}`.trim() || "Unknown";
-                const enroll = student.enrollmentNumber || student.user?.email || "";
-                return (
-                  <div
-                    key={student.id}
-                    className={`flex items-center justify-between px-6 py-3.5 transition-colors ${isPresent ? "hover:bg-emerald-50/30" : "hover:bg-red-50/30 bg-red-50/10"}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-muted-foreground w-6 text-right">{idx + 1}</span>
-                      <div className={`h-9 w-9 rounded-full flex items-center justify-center text-sm font-black ${isPresent ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-600"}`}>
-                        {name.charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{name}</p>
-                        <p className="text-[11px] text-muted-foreground">{enroll}</p>
-                      </div>
-                    </div>
-                    {/* Toggle button */}
-                    <button
-                      onClick={() => toggle(student.id)}
-                      className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all border ${isPresent
-                        ? "bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600"
-                        : "bg-red-500 text-white border-red-500 hover:bg-red-600"
-                        }`}
-                    >
-                      {isPresent
-                        ? <><CheckCircle2 className="h-3.5 w-3.5" /> Present</>
-                        : <><XCircle className="h-3.5 w-3.5" /> Absent</>
-                      }
-                    </button>
-                  </div>
-                );
-              })}
+          {/* Body */}
+          {!selectedBatchId ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
+              <Users className="h-10 w-10 opacity-20" />
+              <p className="text-sm font-semibold">Select a batch to take attendance</p>
             </div>
-
-            {/* Submit */}
-            <div className="px-6 py-4 border-t border-border bg-muted/10 flex items-center justify-between">
-              <p className="text-xs text-muted-foreground">
-                Date: <span className="font-semibold text-foreground">{format(selectedDate, "EEEE, dd MMM yyyy")}</span>
-              </p>
-              {submitted ? (
-                <div className="flex items-center gap-2 text-emerald-600 font-semibold text-sm">
-                  <CheckCircle2 className="h-4 w-4" /> Attendance Saved!
+          ) : loadingStudents ? (
+            <div className="flex items-center justify-center py-16 gap-3 text-muted-foreground">
+              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <p className="text-sm">Loading students…</p>
+            </div>
+          ) : batchStudents.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
+              <Users className="h-10 w-10 opacity-20" />
+              <p className="text-sm font-semibold">No students assigned to this batch yet</p>
+            </div>
+          ) : (
+            <>
+              {/* Stats + bulk actions */}
+              <div className="flex items-center justify-between px-6 py-3 bg-muted/20 border-b border-border">
+                <div className="flex items-center gap-4 text-sm">
+                  <span className="flex items-center gap-1.5 font-semibold text-emerald-600">
+                    <CheckCircle2 className="h-4 w-4" /> {presentCount} Present
+                  </span>
+                  <span className="flex items-center gap-1.5 font-semibold text-red-500">
+                    <XCircle className="h-4 w-4" /> {absentCount} Absent
+                  </span>
+                  <span className="text-muted-foreground text-xs">/ {batchStudents.length} total</span>
                 </div>
-              ) : (
-                <button
-                  onClick={handleSubmit}
-                  disabled={submitting}
-                  className="flex items-center gap-2 px-6 py-2 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-colors disabled:opacity-50"
-                >
-                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                  {submitting ? "Saving…" : "Submit Attendance"}
-                </button>
-              )}
-            </div>
-          </>
-        )}
-      </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => markAll("PRESENT")}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-semibold hover:bg-emerald-100 transition-colors border border-emerald-200"
+                  >All Present</button>
+                  <button
+                    onClick={() => markAll("ABSENT")}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-semibold hover:bg-red-100 transition-colors border border-red-200"
+                  >All Absent</button>
+                </div>
+              </div>
+
+              {/* Student list */}
+              <div className="divide-y divide-border">
+                {batchStudents.map((student: any, idx: number) => {
+                  const isPresent = attendanceMap[student.id] === "PRESENT";
+                  const name = `${student.user?.firstName || ""} ${student.user?.lastName || ""}`.trim() || "Unknown";
+                  const enroll = student.enrollmentNumber || student.user?.email || "";
+                  return (
+                    <div
+                      key={student.id}
+                      className={`flex items-center justify-between px-6 py-3.5 transition-colors ${isPresent ? "hover:bg-emerald-50/30" : "hover:bg-red-50/30 bg-red-50/10"}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-muted-foreground w-6 text-right">{idx + 1}</span>
+                        <div className={`h-9 w-9 rounded-full flex items-center justify-center text-sm font-black ${isPresent ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-600"}`}>
+                          {name.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">{name}</p>
+                          <p className="text-[11px] text-muted-foreground">{enroll}</p>
+                        </div>
+                      </div>
+                      {/* Toggle button */}
+                      <button
+                        onClick={() => toggle(student.id)}
+                        className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all border ${isPresent
+                          ? "bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600"
+                          : "bg-red-500 text-white border-red-500 hover:bg-red-600"
+                          }`}
+                      >
+                        {isPresent
+                          ? <><CheckCircle2 className="h-3.5 w-3.5" /> Present</>
+                          : <><XCircle className="h-3.5 w-3.5" /> Absent</>
+                        }
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Submit */}
+              <div className="px-6 py-4 border-t border-border bg-muted/10 flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">
+                  Date: <span className="font-semibold text-foreground">{format(selectedDate, "EEEE, dd MMM yyyy")}</span>
+                </p>
+                {submitted ? (
+                  <div className="flex items-center gap-2 text-emerald-600 font-semibold text-sm">
+                    <CheckCircle2 className="h-4 w-4" /> Attendance Saved!
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleSubmit}
+                    disabled={submitting}
+                    className="flex items-center gap-2 px-6 py-2 rounded-xl bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-colors disabled:opacity-50"
+                  >
+                    {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                    {submitting ? "Saving…" : "Submit Attendance"}
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* ── Schedule table ── */}
       <div>

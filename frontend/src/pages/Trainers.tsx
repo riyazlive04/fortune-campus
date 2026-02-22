@@ -3,7 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Search, Trash2 } from "lucide-react";
-import { trainersApi } from "@/lib/api";
+import { trainersApi, storage } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import TrainerModal from "@/components/TrainerModal";
 import TrainerAttendanceModal from "@/components/TrainerAttendanceModal";
@@ -22,6 +22,9 @@ const Trainers = () => {
     const [attendanceTrainer, setAttendanceTrainer] = useState<{ id: string, name: string } | null>(null);
 
     const { toast } = useToast();
+
+    const currentUser = storage.getUser();
+    const isChannelPartner = currentUser?.role === "CHANNEL_PARTNER";
 
     const fetchTrainers = async () => {
         try {
@@ -188,15 +191,17 @@ const Trainers = () => {
                                                     >
                                                         View
                                                     </Button>
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        className="text-green-600 border-green-200 hover:bg-green-50"
-                                                        onClick={() => handleMarkAttendance(trainer)}
-                                                    >
-                                                        <CheckSquare className="h-3.5 w-3.5 mr-1" />
-                                                        Mark attendance
-                                                    </Button>
+                                                    {isChannelPartner && (
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="text-green-600 border-green-200 hover:bg-green-50"
+                                                            onClick={() => handleMarkAttendance(trainer)}
+                                                        >
+                                                            <CheckSquare className="h-3.5 w-3.5 mr-1" />
+                                                            Mark attendance
+                                                        </Button>
+                                                    )}
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"

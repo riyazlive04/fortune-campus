@@ -252,31 +252,65 @@ export const markAttendanceIdempotent = async (req: AuthRequest, res: Response):
 export const bulkMarkAttendance = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
     const { courseId, date, trainerId, attendanceRecords } = req.body;
-    // attendanceRecords: [{ studentId, status, remarks }]
 
     if (!Array.isArray(attendanceRecords) || attendanceRecords.length === 0) {
       return errorResponse(res, 'Invalid attendance records', 400);
     }
 
-    const attendanceDate = new Date(date);
+    const now = new Date();
+    const attendanceDate = date ? new Date(date) : now;
+    attendanceDate.setHours(0, 0, 0, 0);
 
-    const result = await prisma.$transaction(
-      attendanceRecords.map((record: any) =>
-        prisma.attendance.create({
-          data: {
+    const result = await prisma.$transaction(async (tx) => {
+      const results = [];
+      for (const record of attendanceRecords) {
+        const period = record.period || 1;
+
+        const existing = await tx.attendance.findFirst({
+          where: {
             studentId: record.studentId,
             courseId,
-            date: attendanceDate,
-            status: record.status,
-            remarks: record.remarks,
-            trainerId: trainerId || undefined,
-          },
-        })
-      )
-    );
+            period: Number(period),
+            date: {
+              gte: attendanceDate,
+              lt: new Date(attendanceDate.getTime() + 24 * 60 * 60 * 1000)
+            }
+          }
+        });
 
-    return successResponse(res, { result }, `${result.length} attendance records created successfully`, 201);
+        if (existing) {
+          const updated = await tx.attendance.update({
+            where: { id: existing.id },
+            data: {
+              status: record.status,
+              remarks: record.remarks,
+              trainerId: trainerId || undefined,
+              updatedAt: now
+            }
+          });
+          results.push(updated);
+        } else {
+          const created = await tx.attendance.create({
+            data: {
+              studentId: record.studentId,
+              courseId,
+              date: attendanceDate,
+              status: record.status,
+              remarks: record.remarks,
+              period: Number(period),
+              isVerified: true,
+              trainerId: trainerId || undefined,
+            }
+          });
+          results.push(created);
+        }
+      }
+      return results;
+    });
+
+    return successResponse(res, { result }, `${result.length} attendance records processed successfully`, 201);
   } catch (error) {
+    console.error(`[Attendance] Bulk mark error:`, error);
     return errorResponse(res, 'Failed to mark bulk attendance', 500, error);
   }
 };
