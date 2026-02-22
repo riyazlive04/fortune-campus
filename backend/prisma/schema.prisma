@@ -366,7 +366,7 @@ model TrainerAttendance {
 model Batch {
   id              String   @id @default(uuid())
   name            String
-  code            String   @unique
+  code            String
   
   branchId        String
   courseId        String

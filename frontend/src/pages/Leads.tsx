@@ -210,7 +210,6 @@ const Leads = () => {
             <SelectItem value="all">All Status</SelectItem>
             <SelectItem value="NEW">New</SelectItem>
             <SelectItem value="CONTACTED">Contacted</SelectItem>
-            <SelectItem value="QUALIFIED">Qualified</SelectItem>
             <SelectItem value="CONVERTED">Converted</SelectItem>
             <SelectItem value="LOST">Lost</SelectItem>
           </SelectContent>

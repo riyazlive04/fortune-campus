@@ -93,7 +93,7 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId }: LeadModalProps) => {
         try {
             setFetching(true);
             const res = await leadsApi.getLeadById(id);
-            const lead = res.data;
+            const lead = res.data?.lead || res.data;
 
             if (lead) {
                 setFormData({
@@ -165,6 +165,7 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId }: LeadModalProps) => {
                                     value={formData.firstName}
                                     onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                                     required
+                                    disabled={isEditMode}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -174,6 +175,7 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId }: LeadModalProps) => {
                                     value={formData.lastName}
                                     onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
                                     required
+                                    disabled={isEditMode}
                                 />
                             </div>
                         </div>
@@ -186,6 +188,7 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId }: LeadModalProps) => {
                                     type="email"
                                     value={formData.email}
                                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                    disabled={isEditMode}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -195,6 +198,7 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId }: LeadModalProps) => {
                                     value={formData.phone}
                                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                                     required
+                                    disabled={isEditMode}
                                 />
                             </div>
                         </div>
@@ -205,6 +209,7 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId }: LeadModalProps) => {
                                 <Select
                                     value={formData.source}
                                     onValueChange={(v) => setFormData({ ...formData, source: v })}
+                                    disabled={isEditMode}
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select Source" />
@@ -232,7 +237,6 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId }: LeadModalProps) => {
                                     <SelectContent>
                                         <SelectItem value="NEW">New</SelectItem>
                                         <SelectItem value="CONTACTED">Contacted</SelectItem>
-                                        <SelectItem value="QUALIFIED">Qualified</SelectItem>
                                         <SelectItem value="NEGOTIATING">Negotiating</SelectItem>
                                         <SelectItem value="CONVERTED">Converted</SelectItem>
                                         <SelectItem value="LOST">Lost</SelectItem>
@@ -247,6 +251,7 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId }: LeadModalProps) => {
                                 <Select
                                     value={formData.interestedCourse}
                                     onValueChange={(v) => setFormData({ ...formData, interestedCourse: v })}
+                                    disabled={isEditMode}
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select Course" />
@@ -263,6 +268,7 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId }: LeadModalProps) => {
                                 <Select
                                     value={formData.branchId}
                                     onValueChange={(v) => setFormData({ ...formData, branchId: v })}
+                                    disabled={isEditMode}
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select Branch" />
@@ -283,6 +289,7 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId }: LeadModalProps) => {
                                 type="date"
                                 value={formData.followUpDate}
                                 onChange={(e) => setFormData({ ...formData, followUpDate: e.target.value })}
+                                disabled={isEditMode}
                             />
                         </div>
 
@@ -293,6 +300,7 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId }: LeadModalProps) => {
                                 value={formData.notes}
                                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                                 placeholder="Add any additional context here..."
+                                disabled={isEditMode}
                             />
                         </div>
 

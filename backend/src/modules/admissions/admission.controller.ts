@@ -86,10 +86,6 @@ export const getAdmissionById = async (req: AuthRequest, res: Response): Promise
                         },
                     },
                 },
-                whatsappLogs: {
-                    orderBy: { sentAt: 'desc' },
-                    take: 10,
-                },
             },
         });
 

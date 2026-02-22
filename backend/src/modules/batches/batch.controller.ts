@@ -117,11 +117,6 @@ export const createBatch = async (req: AuthRequest, res: Response): Promise<Resp
             return errorResponse(res, 'Branch ID is required', 400);
         }
 
-        // Check for duplicate code
-        const existingBatch = await prisma.batch.findUnique({ where: { code } });
-        if (existingBatch) {
-            return errorResponse(res, 'Batch code already exists', 400);
-        }
 
         const batch = await prisma.batch.create({
             data: {
