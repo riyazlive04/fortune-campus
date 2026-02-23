@@ -26,6 +26,9 @@ import Reports from "./pages/Reports";
 import StudentGrowth from "./pages/StudentGrowth";
 import BranchInsights from "./pages/BranchInsights";
 import Notifications from "./pages/Notifications";
+import TelecallerDashboard from "./pages/telecaller/TelecallerDashboard";
+import LeadPipeline from "./pages/telecaller/LeadPipeline";
+import TelecallerAnalytics from "./pages/telecaller/TelecallerAnalytics";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -60,6 +63,9 @@ const App = () => (
               <Route path="/growth" element={<StudentGrowth />} />
               <Route path="/branch-insights" element={<BranchInsights />} />
               <Route path="/notifications" element={<Notifications />} />
+              <Route path="/telecaller/dashboard" element={<TelecallerDashboard />} />
+              <Route path="/telecaller/pipeline" element={<LeadPipeline />} />
+              <Route path="/telecaller/analytics" element={<TelecallerAnalytics />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

@@ -18,9 +18,10 @@ import {
     SelectTrigger,
     SelectValue
 } from "@/components/ui/select";
-import { leadsApi, coursesApi, branchesApi } from "@/lib/api";
+import { leadsApi, coursesApi, branchesApi, storage } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, Phone, History, GraduationCap } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface LeadModalProps {
     isOpen: boolean;
@@ -49,7 +50,31 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId }: LeadModalProps) => {
         followUpDate: "",
     });
 
+    const [callLogs, setCallLogs] = useState<any[]>([]);
+    const [history, setHistory] = useState<any[]>([]);
+    const [activeTab, setActiveTab] = useState("details");
+    const [callData, setCallData] = useState({
+        callStatus: "Connected",
+        notes: "",
+        nextFollowUpDate: "",
+    });
+
     const isEditMode = !!leadId;
+    const user = storage.getUser();
+    const isTelecaller = user?.role === "TELECALLER";
+
+    const fetchActivity = async (id: string) => {
+        try {
+            const [logsRes, historyRes] = await Promise.all([
+                leadsApi.getCallLogs(id),
+                leadsApi.getHistory(id)
+            ]);
+            if (logsRes.success) setCallLogs(logsRes.data);
+            if (historyRes.success) setHistory(historyRes.data);
+        } catch (error) {
+            console.error("Failed to fetch activity", error);
+        }
+    };
 
     useEffect(() => {
         const fetchData = async () => {
@@ -71,6 +96,7 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId }: LeadModalProps) => {
             fetchData();
             if (leadId) {
                 fetchLeadDetails(leadId);
+                fetchActivity(leadId);
             } else {
                 // Reset form for new lead
                 setFormData({
@@ -85,6 +111,9 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId }: LeadModalProps) => {
                     notes: "",
                     followUpDate: "",
                 });
+                setCallLogs([]);
+                setHistory([]);
+                setActiveTab("details");
             }
         }
     }, [isOpen, leadId]);
@@ -120,6 +149,41 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId }: LeadModalProps) => {
         }
     };
 
+    const handleLogCall = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!leadId) return;
+        try {
+            setLoading(true);
+            await leadsApi.logCall(leadId, callData);
+            toast({ title: "Success", description: "Call logged successfully" });
+            setCallData({ callStatus: "Connected", notes: "", nextFollowUpDate: "" });
+            fetchActivity(leadId);
+        } catch (error: any) {
+            toast({ variant: "destructive", title: "Error", description: error.message });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleConvert = async () => {
+        if (!leadId) return;
+        try {
+            setLoading(true);
+            const course = courses.find(c => c.name === formData.interestedCourse);
+            await leadsApi.convertLeadToAdmission(leadId, {
+                courseId: course?.id || "",
+                feeAmount: 0
+            });
+            toast({ title: "Success", description: "Lead converted successfully" });
+            onSuccess();
+            onClose();
+        } catch (error: any) {
+            toast({ variant: "destructive", title: "Error", description: error.message });
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
@@ -146,9 +210,16 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId }: LeadModalProps) => {
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[500px]">
+            <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>{isEditMode ? "Edit Lead" : "New Lead"}</DialogTitle>
+                    <div className="flex items-center justify-between pr-8">
+                        <DialogTitle>{isEditMode ? "Lead Console" : "New Lead"}</DialogTitle>
+                        {isEditMode && formData.status !== 'CONVERTED' && (
+                            <Button size="sm" className="gap-2 bg-green-600 hover:bg-green-700 text-white" onClick={handleConvert} disabled={loading}>
+                                <GraduationCap className="h-4 w-4" /> Convert
+                            </Button>
+                        )}
+                    </div>
                 </DialogHeader>
 
                 {fetching ? (
@@ -156,162 +227,201 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId }: LeadModalProps) => {
                         <Loader2 className="h-8 w-8 animate-spin text-primary" />
                     </div>
                 ) : (
-                    <form onSubmit={handleSubmit} className="space-y-4 py-4">
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            <div className="space-y-2">
-                                <Label htmlFor="firstName">First Name</Label>
-                                <Input
-                                    id="firstName"
-                                    value={formData.firstName}
-                                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                                    required
-                                    disabled={isEditMode}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="lastName">Last Name</Label>
-                                <Input
-                                    id="lastName"
-                                    value={formData.lastName}
-                                    onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                                    required
-                                    disabled={isEditMode}
-                                />
-                            </div>
-                        </div>
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full mt-2">
+                        <TabsList className="grid w-full grid-cols-2">
+                            <TabsTrigger value="details">Details</TabsTrigger>
+                            <TabsTrigger value="activity">Activity & Logs</TabsTrigger>
+                        </TabsList>
 
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            <div className="space-y-2">
-                                <Label htmlFor="email">Email</Label>
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    value={formData.email}
-                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                    disabled={isEditMode}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="phone">Phone</Label>
-                                <Input
-                                    id="phone"
-                                    value={formData.phone}
-                                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                    required
-                                    disabled={isEditMode}
-                                />
-                            </div>
-                        </div>
+                        <TabsContent value="details" className="pt-4">
+                            <form onSubmit={handleSubmit} className="space-y-4">
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="firstName">First Name</Label>
+                                        <Input
+                                            id="firstName"
+                                            value={formData.firstName}
+                                            onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                                            required
+                                            disabled={isEditMode && !isTelecaller}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="lastName">Last Name</Label>
+                                        <Input
+                                            id="lastName"
+                                            value={formData.lastName}
+                                            onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                                            required
+                                            disabled={isEditMode && !isTelecaller}
+                                        />
+                                    </div>
+                                </div>
 
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            <div className="space-y-2">
-                                <Label htmlFor="source">Source</Label>
-                                <Select
-                                    value={formData.source}
-                                    onValueChange={(v) => setFormData({ ...formData, source: v })}
-                                    disabled={isEditMode}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select Source" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="WEBSITE">Website</SelectItem>
-                                        <SelectItem value="PHONE">Phone</SelectItem>
-                                        <SelectItem value="WALK_IN">Walk-in</SelectItem>
-                                        <SelectItem value="REFERRAL">Referral</SelectItem>
-                                        <SelectItem value="SOCIAL_MEDIA">Social Media</SelectItem>
-                                        <SelectItem value="ADVERTISEMENT">Advertisement</SelectItem>
-                                        <SelectItem value="OTHER">Other</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="status">Status</Label>
-                                <Select
-                                    value={formData.status}
-                                    onValueChange={(v) => setFormData({ ...formData, status: v })}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select Status" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="NEW">New</SelectItem>
-                                        <SelectItem value="CONTACTED">Contacted</SelectItem>
-                                        <SelectItem value="NEGOTIATING">Negotiating</SelectItem>
-                                        <SelectItem value="CONVERTED">Converted</SelectItem>
-                                        <SelectItem value="LOST">Lost</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="email">Email</Label>
+                                        <Input
+                                            id="email"
+                                            type="email"
+                                            value={formData.email}
+                                            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                            disabled={isEditMode && !isTelecaller}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="phone">Phone</Label>
+                                        <Input
+                                            id="phone"
+                                            value={formData.phone}
+                                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                                            required
+                                            disabled={isEditMode}
+                                        />
+                                    </div>
+                                </div>
 
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            <div className="space-y-2">
-                                <Label htmlFor="course">Interested Course</Label>
-                                <Select
-                                    value={formData.interestedCourse}
-                                    onValueChange={(v) => setFormData({ ...formData, interestedCourse: v })}
-                                    disabled={isEditMode}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select Course" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {courses.map((c) => (
-                                            <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="source">Source</Label>
+                                        <Select
+                                            value={formData.source}
+                                            onValueChange={(v) => setFormData({ ...formData, source: v })}
+                                            disabled={isEditMode && !isTelecaller}
+                                        >
+                                            <SelectTrigger><SelectValue placeholder="Source" /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="WEBSITE">Website</SelectItem>
+                                                <SelectItem value="PHONE">Phone</SelectItem>
+                                                <SelectItem value="WALK_IN">Walk-in</SelectItem>
+                                                <SelectItem value="REFERRAL">Referral</SelectItem>
+                                                <SelectItem value="SOCIAL_MEDIA">Social Media</SelectItem>
+                                                <SelectItem value="OTHER">Other</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="status">Status</Label>
+                                        <Select
+                                            value={formData.status}
+                                            onValueChange={(v) => setFormData({ ...formData, status: v })}
+                                        >
+                                            <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="NEW">New</SelectItem>
+                                                <SelectItem value="CONTACTED">Contacted</SelectItem>
+                                                <SelectItem value="INTERESTED">Interested</SelectItem>
+                                                <SelectItem value="NOT_INTERESTED">Not Interested</SelectItem>
+                                                <SelectItem value="CALL_BACK_LATER">Call Back Later</SelectItem>
+                                                <SelectItem value="DEMO_SCHEDULED">Demo Scheduled</SelectItem>
+                                                <SelectItem value="READY_FOR_ADMISSION">Ready</SelectItem>
+                                                <SelectItem value="CONVERTED">Converted</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="course">Course</Label>
+                                        <Select
+                                            value={formData.interestedCourse}
+                                            onValueChange={(v) => setFormData({ ...formData, interestedCourse: v })}
+                                        >
+                                            <SelectTrigger><SelectValue placeholder="Course" /></SelectTrigger>
+                                            <SelectContent>
+                                                {courses.map((c) => (
+                                                    <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="branch">Branch</Label>
+                                        <Select value={formData.branchId} onValueChange={(v) => setFormData({ ...formData, branchId: v })} disabled={isEditMode}>
+                                            <SelectTrigger><SelectValue placeholder="Branch" /></SelectTrigger>
+                                            <SelectContent>
+                                                {branches.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-end gap-3 pt-4 border-t">
+                                    <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+                                    <Button type="submit" disabled={loading}>
+                                        {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                        {isEditMode ? "Update Details" : "Create Lead"}
+                                    </Button>
+                                </div>
+                            </form>
+                        </TabsContent>
+
+                        <TabsContent value="activity" className="pt-4 space-y-6">
+                            {/* Call Logging Form */}
+                            {isEditMode && (
+                                <form onSubmit={handleLogCall} className="bg-muted/30 p-4 rounded-lg space-y-3">
+                                    <h4 className="font-semibold text-sm flex items-center gap-2">
+                                        <Phone className="h-4 w-4" /> Log New Call
+                                    </h4>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <Select value={callData.callStatus} onValueChange={(v) => setCallData({ ...callData, callStatus: v })}>
+                                            <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Connected">Connected</SelectItem>
+                                                <SelectItem value="Not Picked">Not Picked</SelectItem>
+                                                <SelectItem value="Switched Off">Switched Off</SelectItem>
+                                                <SelectItem value="Busy">Busy</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <Input
+                                            type="date"
+                                            className="h-8"
+                                            value={callData.nextFollowUpDate}
+                                            onChange={(e) => setCallData({ ...callData, nextFollowUpDate: e.target.value })}
+                                        />
+                                    </div>
+                                    <Textarea
+                                        placeholder="Call notes..."
+                                        className="min-h-[60px] text-sm"
+                                        value={callData.notes}
+                                        onChange={(e) => setCallData({ ...callData, notes: e.target.value })}
+                                    />
+                                    <Button type="submit" size="sm" className="w-full" disabled={loading}>
+                                        Log Call Attempt
+                                    </Button>
+                                </form>
+                            )}
+
+                            {/* Activity Feed */}
+                            <div className="space-y-4">
+                                <h4 className="font-semibold text-sm flex items-center gap-2">
+                                    <History className="h-4 w-4" /> Activity History
+                                </h4>
+                                <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
+                                    {callLogs.map((log: any) => (
+                                        <div key={log.id} className="text-xs p-2 border rounded bg-card">
+                                            <div className="flex justify-between font-medium">
+                                                <span>{log.callStatus}</span>
+                                                <span className="text-muted-foreground">{new Date(log.callDate).toLocaleString()}</span>
+                                            </div>
+                                            <p className="mt-1">{log.notes}</p>
+                                        </div>
+                                    ))}
+                                    {history.map((h: any) => (
+                                        <div key={h.id} className="text-[10px] p-2 border-l-2 border-primary bg-primary/5 text-muted-foreground italic">
+                                            Status changed from {h.oldStatus || 'NONE'} to {h.newStatus} by {h.changedBy?.firstName}
+                                        </div>
+                                    ))}
+                                    {callLogs.length === 0 && history.length === 0 && (
+                                        <div className="text-center text-muted-foreground py-8 italic text-sm">
+                                            No activity logged yet.
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="branch">Branch</Label>
-                                <Select
-                                    value={formData.branchId}
-                                    onValueChange={(v) => setFormData({ ...formData, branchId: v })}
-                                    disabled={isEditMode}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select Branch" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {branches.map((b) => (
-                                            <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="followUpDate">Next Follow-up</Label>
-                            <Input
-                                id="followUpDate"
-                                type="date"
-                                value={formData.followUpDate}
-                                onChange={(e) => setFormData({ ...formData, followUpDate: e.target.value })}
-                                disabled={isEditMode}
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="notes">Notes</Label>
-                            <Textarea
-                                id="notes"
-                                value={formData.notes}
-                                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                                placeholder="Add any additional context here..."
-                                disabled={isEditMode}
-                            />
-                        </div>
-
-                        <DialogFooter>
-                            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-                            <Button type="submit" disabled={loading}>
-                                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                {isEditMode ? "Update Lead" : "Create Lead"}
-                            </Button>
-                        </DialogFooter>
-                    </form>
+                        </TabsContent>
+                    </Tabs>
                 )}
             </DialogContent>
         </Dialog>

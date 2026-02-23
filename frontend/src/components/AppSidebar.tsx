@@ -12,7 +12,9 @@ const navSections = [
     label: "Main",
     items: [
       { title: "Dashboard", path: "/", icon: LayoutDashboard },
-      { title: "Leads & Enquiries", path: "/leads", icon: UserPlus, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER'] },
+      { title: "Telecaller Desk", path: "/telecaller/dashboard", icon: LayoutDashboard, roles: ['TELECALLER', 'ADMIN'] },
+      { title: "Lead Pipeline", path: "/telecaller/pipeline", icon: FolderKanban, roles: ['TELECALLER', 'ADMIN', 'CEO', 'CHANNEL_PARTNER'] },
+      { title: "Leads & Enquiries", path: "/leads", icon: UserPlus, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER', 'TELECALLER'] },
       { title: "Admissions", path: "/admissions", icon: ClipboardList, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER'] },
       { title: "Fees", path: "/fees", icon: DollarSign, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER'] },
     ],
@@ -39,6 +41,7 @@ const navSections = [
   {
     label: "Analytics",
     items: [
+      { title: "Telecaller Analytics", path: "/telecaller/analytics", icon: BarChart3, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER'] },
       { title: "Reports", path: "/reports", icon: BarChart3, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER'] },
       { title: "Branch Insights", path: "/branch-insights", icon: LayoutDashboard, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER'] },
       { title: "Notifications", path: "/notifications", icon: Bell },

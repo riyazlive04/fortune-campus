@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
     Dialog,
     DialogContent,
@@ -28,6 +28,7 @@ interface StudentModalProps {
     onSuccess: () => void;
     student?: any | null;
     initialData?: any;
+    mode?: 'full' | 'fees';
 }
 
 const SOFTWARE_OPTIONS = [
@@ -46,7 +47,12 @@ const SOFTWARE_OPTIONS = [
     "Tally Erp9"
 ];
 
-const StudentModal = ({ isOpen, onClose, onSuccess, student, initialData }: StudentModalProps) => {
+// Global cache to prevent redundant fetches and infinite loops across remounts
+let cachedCourses: any[] | null = null;
+let cachedBranches: any[] | null = null;
+let isFetchingSupportData = false;
+
+const StudentModal = ({ isOpen, onClose, onSuccess, student, initialData, mode = 'full' }: StudentModalProps) => {
     const [loading, setLoading] = useState(false);
     const [courses, setCourses] = useState<any[]>([]);
     const [branches, setBranches] = useState<any[]>([]);
@@ -55,7 +61,7 @@ const StudentModal = ({ isOpen, onClose, onSuccess, student, initialData }: Stud
     const [showPasswordDialog, setShowPasswordDialog] = useState(false);
     const { toast } = useToast();
 
-    const currentUser = storage.getUser();
+    const currentUser = useMemo(() => storage.getUser(), []);
     const isChannelPartner = currentUser?.role === 'CHANNEL_PARTNER';
     const isTrainer = currentUser?.role === 'TRAINER';
 
@@ -95,77 +101,97 @@ const StudentModal = ({ isOpen, onClose, onSuccess, student, initialData }: Stud
 
     useEffect(() => {
         const fetchData = async () => {
+            if (cachedCourses && cachedBranches) {
+                setCourses(cachedCourses);
+                setBranches(cachedBranches);
+                return;
+            }
+
+            if (isFetchingSupportData) return;
+            isFetchingSupportData = true;
+
             try {
                 const [coursesData, branchesData] = await Promise.all([
                     coursesApi.getCourses(),
                     branchesApi.getBranches()
                 ]);
 
-                setCourses(coursesData.success ? (coursesData.data.courses || coursesData.data) : []);
-                setBranches(branchesData.success ? (branchesData.data.branches || branchesData.data) : []);
+                const cData = coursesData.success ? (coursesData.data.courses || coursesData.data) : [];
+                const bData = branchesData.success ? (branchesData.data.branches || branchesData.data) : [];
+
+                cachedCourses = cData;
+                cachedBranches = bData;
+
+                setCourses(cData);
+                setBranches(bData);
             } catch (error) {
                 console.error("Failed to fetch support data", error);
+            } finally {
+                isFetchingSupportData = false;
             }
         };
 
         if (isOpen) {
             fetchData();
-            if (student) {
-                // Edit mode - populate with existing student data
-                setFormData({
-                    firstName: student.user?.firstName || "",
-                    lastName: student.user?.lastName || "",
-                    dateOfJoining: student.dateOfJoining || "",
-                    dateOfBirth: student.dateOfBirth || "",
-                    gender: student.gender || "",
-                    email: student.user?.email || "",
-                    phone: student.user?.phone || "",
-                    parentPhone: student.parentPhone || "",
-                    address: student.address || "",
-                    courseId: student.courseId || "",
-                    branchId: student.branchId || "",
-                    qualification: student.qualification || "",
-                    leadSource: student.leadSource || "",
-                    enrollmentNumber: student.enrollmentNumber || "",
-                    aadhaarNumber: student.aadhaarNumber || "",
-                    panNumber: student.panNumber || "",
-                    photo: null,
-                    totalFee: student.admission?.feeAmount?.toString() || "",
-                    paymentPlan: student.admission?.paymentPlan || "",
-                    initialPaid: student.admission?.feePaid?.toString() || "",
-                });
-                // Set selected software from student data
-                const savedSoftware = student.selectedSoftware ? student.selectedSoftware.split(", ") : [];
-                setSelectedSoftware(savedSoftware);
-            } else {
-                // Create mode - reset form or use initial data
-                setFormData({
-                    firstName: initialData?.firstName || "",
-                    lastName: initialData?.lastName || "",
-                    dateOfJoining: "",
-                    dateOfBirth: "",
-                    gender: "",
-                    email: initialData?.email || "",
-                    phone: initialData?.phone || "",
-                    parentPhone: "",
-                    address: "",
-                    courseId: initialData?.courseId || "",
-                    branchId: isChannelPartner ? (currentUser?.branchId || "") : (initialData?.branchId || ""),
-                    qualification: "",
-                    leadSource: "",
-                    enrollmentNumber: "",
-                    aadhaarNumber: "",
-                    panNumber: "",
-                    photo: null,
-                    totalFee: "",
-                    paymentPlan: "",
-                    initialPaid: "",
-                });
-                // Reset selected software
-                setSelectedSoftware([]);
-            }
         }
-    }, [isOpen, student, isChannelPartner, currentUser, initialData]);
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (isOpen) {
+            // Edit mode - populate with existing student data
+            setFormData({
+                firstName: student.user?.firstName || "",
+                lastName: student.user?.lastName || "",
+                dateOfJoining: student.dateOfJoining || "",
+                dateOfBirth: student.dateOfBirth || "",
+                gender: student.gender || "",
+                email: student.user?.email || "",
+                phone: student.user?.phone || "",
+                parentPhone: student.parentPhone || "",
+                address: student.address || "",
+                courseId: student.courseId || "",
+                branchId: student.branchId || "",
+                qualification: student.qualification || "",
+                leadSource: student.leadSource || "",
+                enrollmentNumber: student.enrollmentNumber || "",
+                aadhaarNumber: student.aadhaarNumber || "",
+                panNumber: student.panNumber || "",
+                photo: null,
+                totalFee: student.admission?.feeAmount?.toString() || "",
+                paymentPlan: student.admission?.paymentPlan || "SINGLE",
+                initialPaid: student.admission?.feePaid?.toString() || "",
+            });
+            // Set selected software from student data
+            const savedSoftware = student.selectedSoftware ? student.selectedSoftware.split(", ") : [];
+            setSelectedSoftware(savedSoftware);
+        } else {
+            // Create mode - reset form or use initial data
+            setFormData({
+                firstName: initialData?.firstName || "",
+                lastName: initialData?.lastName || "",
+                dateOfJoining: "",
+                dateOfBirth: "",
+                gender: "",
+                email: initialData?.email || "",
+                phone: initialData?.phone || "",
+                parentPhone: "",
+                address: "",
+                courseId: initialData?.courseId || "",
+                branchId: isChannelPartner ? (currentUser?.branchId || "") : (initialData?.branchId || ""),
+                qualification: "",
+                leadSource: "",
+                enrollmentNumber: "",
+                aadhaarNumber: "",
+                panNumber: "",
+                photo: null,
+                totalFee: "",
+                paymentPlan: "SINGLE",
+                initialPaid: "",
+            });
+            // Reset selected software
+            setSelectedSoftware([]);
+        }
+    }, [isOpen, student?.id, initialData, isChannelPartner, currentUser?.branchId]);
 
     const handleChange = (field: string, value: any) => {
         setFormData(prev => ({ ...prev, [field]: value }));
@@ -197,22 +223,29 @@ const StudentModal = ({ isOpen, onClose, onSuccess, student, initialData }: Stud
         e.preventDefault();
 
         // Validation
-        if (!formData.firstName || !formData.lastName || !formData.email ||
-            !formData.phone || !formData.dateOfJoining || !formData.dateOfBirth ||
-            !formData.gender || !formData.parentPhone || !formData.address ||
-            !formData.courseId || !formData.branchId || selectedSoftware.length === 0 ||
-            !formData.qualification || !formData.leadSource || !formData.aadhaarNumber ||
-            !formData.totalFee || !formData.paymentPlan || !formData.initialPaid) {
+        const isFeesMode = mode === 'fees';
+        const requiredFields = isFeesMode
+            ? ['totalFee', 'paymentPlan', 'initialPaid']
+            : ['firstName', 'lastName', 'email', 'phone', 'dateOfJoining', 'dateOfBirth', 'gender', 'parentPhone', 'address', 'courseId', 'branchId', 'qualification', 'leadSource', 'aadhaarNumber', 'totalFee', 'paymentPlan', 'initialPaid'];
+
+        const missingFields = requiredFields.filter(field => {
+            const value = formData[field as keyof typeof formData];
+            // For initialPaid, we allow empty string (treat as 0)
+            if (field === 'initialPaid') return false;
+            return !value;
+        });
+
+        if (missingFields.length > 0 || (!isFeesMode && selectedSoftware.length === 0)) {
             toast({
                 variant: "destructive",
                 title: "Validation Error",
-                description: "Please fill in all required fields marked with *",
+                description: `Please fill in all required fields marked with *`,
             });
             return;
         }
 
-        // Validate Aadhaar (12 digits)
-        if (!/^\d{12}$/.test(formData.aadhaarNumber)) {
+        // Validate Aadhaar (12 digits) - Only in full mode
+        if (!isFeesMode && !/^\d{12}$/.test(formData.aadhaarNumber)) {
             toast({
                 variant: "destructive",
                 title: "Validation Error",
@@ -263,8 +296,8 @@ const StudentModal = ({ isOpen, onClose, onSuccess, student, initialData }: Stud
                     aadhaarNumber: formData.aadhaarNumber,
                     panNumber: formData.panNumber,
                     // Fee Info
-                    feeAmount: parseFloat(formData.totalFee),
-                    feePaid: parseFloat(formData.initialPaid),
+                    feeAmount: Number(formData.totalFee) || 0,
+                    feePaid: Number(formData.initialPaid) || 0,
                     paymentPlan: formData.paymentPlan,
                 };
 
@@ -381,313 +414,316 @@ const StudentModal = ({ isOpen, onClose, onSuccess, student, initialData }: Stud
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                    <DialogTitle>{isEditMode ? "Edit Student" : "Add New Student"}</DialogTitle>
+                    <DialogTitle>{isEditMode ? (mode === 'fees' ? "Edit Fees" : "Edit Student") : "Add New Student"}</DialogTitle>
                 </DialogHeader>
-
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Section 1: Personal Information */}
-                    <div className="border rounded-lg p-4 space-y-4">
-                        <h3 className="text-lg font-semibold text-primary">1. Personal Information</h3>
+                    {mode === 'full' && (
+                        <>
+                            {/* Section 1: Personal Information */}
+                            <div className="border rounded-lg p-4 space-y-4">
+                                <h3 className="text-lg font-semibold text-primary">1. Personal Information</h3>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="firstName">First Name *</Label>
-                                <Input
-                                    id="firstName"
-                                    value={formData.firstName}
-                                    onChange={(e) => handleChange("firstName", e.target.value)}
-                                    disabled={loading}
-                                    required
-                                />
-                            </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="firstName">First Name *</Label>
+                                        <Input
+                                            id="firstName"
+                                            value={formData.firstName}
+                                            onChange={(e) => handleChange("firstName", e.target.value)}
+                                            disabled={loading}
+                                            required
+                                        />
+                                    </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="lastName">Last Name *</Label>
-                                <Input
-                                    id="lastName"
-                                    value={formData.lastName}
-                                    onChange={(e) => handleChange("lastName", e.target.value)}
-                                    disabled={loading}
-                                    required
-                                />
-                            </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="lastName">Last Name *</Label>
+                                        <Input
+                                            id="lastName"
+                                            value={formData.lastName}
+                                            onChange={(e) => handleChange("lastName", e.target.value)}
+                                            disabled={loading}
+                                            required
+                                        />
+                                    </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="dateOfJoining">Date of Joining *</Label>
-                                <Input
-                                    id="dateOfJoining"
-                                    type="date"
-                                    value={formData.dateOfJoining}
-                                    onChange={(e) => handleChange("dateOfJoining", e.target.value)}
-                                    disabled={loading}
-                                    required
-                                />
-                            </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="dateOfJoining">Date of Joining *</Label>
+                                        <Input
+                                            id="dateOfJoining"
+                                            type="date"
+                                            value={formData.dateOfJoining}
+                                            onChange={(e) => handleChange("dateOfJoining", e.target.value)}
+                                            disabled={loading}
+                                            required
+                                        />
+                                    </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="dateOfBirth">Date of Birth *</Label>
-                                <Input
-                                    id="dateOfBirth"
-                                    type="date"
-                                    value={formData.dateOfBirth}
-                                    onChange={(e) => handleChange("dateOfBirth", e.target.value)}
-                                    disabled={loading}
-                                    required
-                                />
-                            </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="dateOfBirth">Date of Birth *</Label>
+                                        <Input
+                                            id="dateOfBirth"
+                                            type="date"
+                                            value={formData.dateOfBirth}
+                                            onChange={(e) => handleChange("dateOfBirth", e.target.value)}
+                                            disabled={loading}
+                                            required
+                                        />
+                                    </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="gender">Gender *</Label>
-                                <Select
-                                    value={formData.gender}
-                                    onValueChange={(value) => handleChange("gender", value)}
-                                    disabled={loading}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select gender" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="MALE">Male</SelectItem>
-                                        <SelectItem value="FEMALE">Female</SelectItem>
-                                        <SelectItem value="OTHER">Other</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="gender">Gender *</Label>
+                                        <Select
+                                            value={formData.gender}
+                                            onValueChange={(value) => handleChange("gender", value)}
+                                            disabled={loading}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select gender" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="MALE">Male</SelectItem>
+                                                <SelectItem value="FEMALE">Female</SelectItem>
+                                                <SelectItem value="OTHER">Other</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="email">Email *</Label>
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    value={formData.email}
-                                    onChange={(e) => handleChange("email", e.target.value)}
-                                    disabled={loading || isEditMode}
-                                    required
-                                />
-                                {isEditMode && (
-                                    <p className="text-xs text-muted-foreground">Email cannot be changed</p>
-                                )}
-                            </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="email">Email *</Label>
+                                        <Input
+                                            id="email"
+                                            type="email"
+                                            value={formData.email}
+                                            onChange={(e) => handleChange("email", e.target.value)}
+                                            disabled={loading || isEditMode}
+                                            required
+                                        />
+                                        {isEditMode && (
+                                            <p className="text-xs text-muted-foreground">Email cannot be changed</p>
+                                        )}
+                                    </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="phone">Phone *</Label>
-                                <Input
-                                    id="phone"
-                                    type="tel"
-                                    value={formData.phone}
-                                    onChange={(e) => handleChange("phone", e.target.value)}
-                                    disabled={loading}
-                                    required
-                                />
-                            </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="phone">Phone *</Label>
+                                        <Input
+                                            id="phone"
+                                            type="tel"
+                                            value={formData.phone}
+                                            onChange={(e) => handleChange("phone", e.target.value)}
+                                            disabled={loading}
+                                            required
+                                        />
+                                    </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="parentPhone">Parent Phone *</Label>
-                                <Input
-                                    id="parentPhone"
-                                    type="tel"
-                                    value={formData.parentPhone}
-                                    onChange={(e) => handleChange("parentPhone", e.target.value)}
-                                    disabled={loading}
-                                    required
-                                />
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="address">Address *</Label>
-                            <Textarea
-                                id="address"
-                                value={formData.address}
-                                onChange={(e) => handleChange("address", e.target.value)}
-                                disabled={loading}
-                                rows={2}
-                                required
-                            />
-                        </div>
-                    </div>
-
-                    {/* Section 2: Academic Information */}
-                    <div className="border rounded-lg p-4 space-y-4">
-                        <h3 className="text-lg font-semibold text-primary">2. Academic Information</h3>
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="course">Course *</Label>
-                                <Select
-                                    value={formData.courseId}
-                                    onValueChange={(value) => handleChange("courseId", value)}
-                                    disabled={loading}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select course" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {courses.map(course => (
-                                            <SelectItem key={course.id} value={course.id}>
-                                                {course.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="branch">Branch *</Label>
-                                {isChannelPartner ? (
-                                    <Input
-                                        value={branches.find(b => b.id === currentUser?.branchId)?.name || "My Branch"}
-                                        disabled
-                                        className="bg-muted"
-                                    />
-                                ) : (
-                                    <Select
-                                        value={formData.branchId}
-                                        onValueChange={(value) => handleChange("branchId", value)}
-                                        disabled={loading}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select branch" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {branches.map(branch => (
-                                                <SelectItem key={branch.id} value={branch.id}>
-                                                    {branch.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                )}
-                            </div>
-
-                            <div className="space-y-2 col-span-2">
-                                <Label>Selected Software(s) *</Label>
-                                <div className="grid grid-cols-3 gap-3 border rounded-lg p-4">
-                                    {SOFTWARE_OPTIONS.map((software) => (
-                                        <div key={software} className="flex items-center space-x-2">
-                                            <Checkbox
-                                                id={`software-${software}`}
-                                                checked={selectedSoftware.includes(software)}
-                                                onCheckedChange={() => handleSoftwareToggle(software)}
-                                                disabled={loading}
-                                            />
-                                            <label
-                                                htmlFor={`software-${software}`}
-                                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                                            >
-                                                {software}
-                                            </label>
-                                        </div>
-                                    ))}
+                                    <div className="space-y-2">
+                                        <Label htmlFor="parentPhone">Parent Phone *</Label>
+                                        <Input
+                                            id="parentPhone"
+                                            type="tel"
+                                            value={formData.parentPhone}
+                                            onChange={(e) => handleChange("parentPhone", e.target.value)}
+                                            disabled={loading}
+                                            required
+                                        />
+                                    </div>
                                 </div>
-                                <p className="text-xs text-muted-foreground">
-                                    Select one or more software applications
-                                </p>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="address">Address *</Label>
+                                    <Textarea
+                                        id="address"
+                                        value={formData.address}
+                                        onChange={(e) => handleChange("address", e.target.value)}
+                                        disabled={loading}
+                                        rows={2}
+                                        required
+                                    />
+                                </div>
                             </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="qualification">Qualification *</Label>
-                                <Select
-                                    value={formData.qualification}
-                                    onValueChange={(value) => handleChange("qualification", value)}
-                                    disabled={loading}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select qualification" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="10TH">10th Standard</SelectItem>
-                                        <SelectItem value="12TH">12th Standard</SelectItem>
-                                        <SelectItem value="DIPLOMA">Diploma</SelectItem>
-                                        <SelectItem value="BACHELORS">Bachelor's Degree</SelectItem>
-                                        <SelectItem value="MASTERS">Master's Degree</SelectItem>
-                                        <SelectItem value="OTHER">Other</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                            {/* Section 2: Academic Information */}
+                            <div className="border rounded-lg p-4 space-y-4">
+                                <h3 className="text-lg font-semibold text-primary">2. Academic Information</h3>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="course">Course *</Label>
+                                        <Select
+                                            value={formData.courseId}
+                                            onValueChange={(value) => handleChange("courseId", value)}
+                                            disabled={loading}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select course" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {courses.map(course => (
+                                                    <SelectItem key={course.id} value={course.id}>
+                                                        {course.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="branch">Branch *</Label>
+                                        {isChannelPartner ? (
+                                            <Input
+                                                value={branches.find(b => b.id === currentUser?.branchId)?.name || "My Branch"}
+                                                disabled
+                                                className="bg-muted"
+                                            />
+                                        ) : (
+                                            <Select
+                                                value={formData.branchId}
+                                                onValueChange={(value) => handleChange("branchId", value)}
+                                                disabled={loading}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select branch" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {branches.map(branch => (
+                                                        <SelectItem key={branch.id} value={branch.id}>
+                                                            {branch.name}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        )}
+                                    </div>
+
+                                    <div className="space-y-2 col-span-2">
+                                        <Label>Selected Software(s) *</Label>
+                                        <div className="grid grid-cols-3 gap-3 border rounded-lg p-4">
+                                            {SOFTWARE_OPTIONS.map((software) => (
+                                                <div key={software} className="flex items-center space-x-2">
+                                                    <Checkbox
+                                                        id={`software-${software}`}
+                                                        checked={selectedSoftware.includes(software)}
+                                                        onCheckedChange={() => handleSoftwareToggle(software)}
+                                                        disabled={loading}
+                                                    />
+                                                    <label
+                                                        htmlFor={`software-${software}`}
+                                                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                                                    >
+                                                        {software}
+                                                    </label>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                            Select one or more software applications
+                                        </p>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="qualification">Qualification *</Label>
+                                        <Select
+                                            value={formData.qualification}
+                                            onValueChange={(value) => handleChange("qualification", value)}
+                                            disabled={loading}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select qualification" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="10TH">10th Standard</SelectItem>
+                                                <SelectItem value="12TH">12th Standard</SelectItem>
+                                                <SelectItem value="DIPLOMA">Diploma</SelectItem>
+                                                <SelectItem value="BACHELORS">Bachelor's Degree</SelectItem>
+                                                <SelectItem value="MASTERS">Master's Degree</SelectItem>
+                                                <SelectItem value="OTHER">Other</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="leadSource">Lead Source *</Label>
+                                        <Select
+                                            value={formData.leadSource}
+                                            onValueChange={(value) => handleChange("leadSource", value)}
+                                            disabled={loading}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select lead source" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="WEBSITE">Website</SelectItem>
+                                                <SelectItem value="PHONE">Phone Call</SelectItem>
+                                                <SelectItem value="WALK_IN">Walk-in</SelectItem>
+                                                <SelectItem value="REFERRAL">Referral</SelectItem>
+                                                <SelectItem value="SOCIAL_MEDIA">Social Media</SelectItem>
+                                                <SelectItem value="ADVERTISEMENT">Advertisement</SelectItem>
+                                                <SelectItem value="OTHER">Other</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="enrollmentNumber">Enrollment Number</Label>
+                                        <Input
+                                            id="enrollmentNumber"
+                                            value={formData.enrollmentNumber || "Auto-generated"}
+                                            disabled
+                                            className="bg-muted"
+                                        />
+                                        <p className="text-xs text-muted-foreground">Auto-generated upon creation</p>
+                                    </div>
+                                </div>
                             </div>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="leadSource">Lead Source *</Label>
-                                <Select
-                                    value={formData.leadSource}
-                                    onValueChange={(value) => handleChange("leadSource", value)}
-                                    disabled={loading}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select lead source" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="WEBSITE">Website</SelectItem>
-                                        <SelectItem value="PHONE">Phone Call</SelectItem>
-                                        <SelectItem value="WALK_IN">Walk-in</SelectItem>
-                                        <SelectItem value="REFERRAL">Referral</SelectItem>
-                                        <SelectItem value="SOCIAL_MEDIA">Social Media</SelectItem>
-                                        <SelectItem value="ADVERTISEMENT">Advertisement</SelectItem>
-                                        <SelectItem value="OTHER">Other</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
+                            {/* Section 3: Identity & Compliance */}
+                            <div className="border rounded-lg p-4 space-y-4">
+                                <h3 className="text-lg font-semibold text-primary">3. Identity & Compliance</h3>
 
-                            <div className="space-y-2">
-                                <Label htmlFor="enrollmentNumber">Enrollment Number</Label>
-                                <Input
-                                    id="enrollmentNumber"
-                                    value={formData.enrollmentNumber || "Auto-generated"}
-                                    disabled
-                                    className="bg-muted"
-                                />
-                                <p className="text-xs text-muted-foreground">Auto-generated upon creation</p>
-                            </div>
-                        </div>
-                    </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="aadhaarNumber">Aadhaar Number *</Label>
+                                        <Input
+                                            id="aadhaarNumber"
+                                            value={formData.aadhaarNumber}
+                                            onChange={(e) => handleChange("aadhaarNumber", e.target.value)}
+                                            disabled={loading}
+                                            placeholder="12-digit Aadhaar number"
+                                            maxLength={12}
+                                            pattern="\d{12}"
+                                            required
+                                        />
+                                        <p className="text-xs text-muted-foreground">Must be exactly 12 digits</p>
+                                    </div>
 
-                    {/* Section 3: Identity & Compliance */}
-                    <div className="border rounded-lg p-4 space-y-4">
-                        <h3 className="text-lg font-semibold text-primary">3. Identity & Compliance</h3>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="panNumber">PAN Number (Optional)</Label>
+                                        <Input
+                                            id="panNumber"
+                                            value={formData.panNumber}
+                                            onChange={(e) => handleChange("panNumber", e.target.value.toUpperCase())}
+                                            disabled={loading}
+                                            placeholder="ABCDE1234F"
+                                            maxLength={10}
+                                        />
+                                        <p className="text-xs text-muted-foreground">Format: ABCDE1234F</p>
+                                    </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="aadhaarNumber">Aadhaar Number *</Label>
-                                <Input
-                                    id="aadhaarNumber"
-                                    value={formData.aadhaarNumber}
-                                    onChange={(e) => handleChange("aadhaarNumber", e.target.value)}
-                                    disabled={loading}
-                                    placeholder="12-digit Aadhaar number"
-                                    maxLength={12}
-                                    pattern="\d{12}"
-                                    required
-                                />
-                                <p className="text-xs text-muted-foreground">Must be exactly 12 digits</p>
+                                    <div className="space-y-2 col-span-2">
+                                        <Label htmlFor="photo">Photo Upload {!isEditMode && "*"}</Label>
+                                        <Input
+                                            id="photo"
+                                            type="file"
+                                            onChange={handleFileChange}
+                                            disabled={loading}
+                                            accept="image/*"
+                                            required={!isEditMode}
+                                        />
+                                        <p className="text-xs text-muted-foreground">Upload a recent passport-size photo</p>
+                                    </div>
+                                </div>
                             </div>
-
-                            <div className="space-y-2">
-                                <Label htmlFor="panNumber">PAN Number (Optional)</Label>
-                                <Input
-                                    id="panNumber"
-                                    value={formData.panNumber}
-                                    onChange={(e) => handleChange("panNumber", e.target.value.toUpperCase())}
-                                    disabled={loading}
-                                    placeholder="ABCDE1234F"
-                                    maxLength={10}
-                                />
-                                <p className="text-xs text-muted-foreground">Format: ABCDE1234F</p>
-                            </div>
-
-                            <div className="space-y-2 col-span-2">
-                                <Label htmlFor="photo">Photo Upload {!isEditMode && "*"}</Label>
-                                <Input
-                                    id="photo"
-                                    type="file"
-                                    onChange={handleFileChange}
-                                    disabled={loading}
-                                    accept="image/*"
-                                    required={!isEditMode}
-                                />
-                                <p className="text-xs text-muted-foreground">Upload a recent passport-size photo</p>
-                            </div>
-                        </div>
-                    </div>
+                        </>
+                    )}
 
                     {/* Section 4: Fee Information */}
                     <div className="border rounded-lg p-4 space-y-4">
@@ -727,7 +763,7 @@ const StudentModal = ({ isOpen, onClose, onSuccess, student, initialData }: Stud
                             </div>
 
                             <div className="space-y-2">
-                                <Label htmlFor="initialPaid">Initial Amount Paid *</Label>
+                                <Label htmlFor="initialPaid">{mode === 'fees' ? "Total Paid Amount *" : "Amount Paid *"}</Label>
                                 <Input
                                     id="initialPaid"
                                     type="number"
@@ -737,7 +773,6 @@ const StudentModal = ({ isOpen, onClose, onSuccess, student, initialData }: Stud
                                     placeholder="Enter amount paid"
                                     min="0"
                                     step="0.01"
-                                    required
                                 />
                             </div>
 
@@ -760,12 +795,12 @@ const StudentModal = ({ isOpen, onClose, onSuccess, student, initialData }: Stud
                         </Button>
                         <Button type="submit" disabled={loading}>
                             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            {isEditMode ? "Update Student" : "Add Student"}
+                            {isEditMode ? "Update Details" : "Add Student"}
                         </Button>
                     </DialogFooter>
                 </form>
-            </DialogContent>
-        </Dialog>
+            </DialogContent >
+        </Dialog >
     );
 };
 

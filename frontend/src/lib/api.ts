@@ -247,6 +247,87 @@ export const leadsApi = {
 
     return result;
   },
+
+  logCall: async (id: string, data: any) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/leads/${id}/calls`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to log call');
+    return result;
+  },
+
+  getCallLogs: async (id: string) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/leads/${id}/calls`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch call logs');
+    return result;
+  },
+
+  getHistory: async (id: string) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/leads/${id}/history`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch lead history');
+    return result;
+  },
+
+  getTelecallerStats: async () => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/leads/stats/telecaller`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch telecaller stats');
+    return result;
+  },
+
+  getCPAnalytics: async () => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/leads/stats/cp`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch CP analytics');
+    return result;
+  },
+
+  getCEOAnalytics: async () => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/leads/stats/ceo`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch CEO analytics');
+    return result;
+  },
+
+  convertLeadToAdmission: async (id: string, data: { courseId: string; feeAmount: number; batchName?: string }) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/leads/${id}/convert`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to convert lead');
+    return result;
+  },
 };
 
 // Courses API Service

@@ -251,6 +251,7 @@ const Fees = () => {
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 student={selectedStudent}
+                mode="fees"
                 onSuccess={() => {
                     setIsModalOpen(false);
                     fetchStudents();

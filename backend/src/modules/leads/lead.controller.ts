@@ -1,6 +1,5 @@
-import { UserRole, LeadStatus } from '../../types/enums';;
+import { UserRole, LeadStatus } from '../../types/enums';
 import { Response, Request } from 'express';
-;
 import { prisma } from '../../config/database';
 import { successResponse, errorResponse, paginationHelper, getPaginationMeta } from '../../utils/response';
 import { AuthRequest } from '../../middlewares/auth.middleware';
@@ -124,6 +123,32 @@ export const createLead = async (req: AuthRequest, res: Response): Promise<Respo
       return errorResponse(res, 'Unauthorized', 401);
     }
 
+    const leadBranchId = branchId || req.user.branchId!;
+    let finalAssignedToId = assignedToId;
+
+    // Round-robin assignment if no specific telecaller assigned
+    if (!finalAssignedToId) {
+      const telecallers = await prisma.user.findMany({
+        where: { branchId: leadBranchId, role: UserRole.TELECALLER, isActive: true },
+        select: { id: true }
+      });
+
+      if (telecallers.length > 0) {
+        // Simple round-robin based on lead count
+        const assignments = await prisma.lead.groupBy({
+          by: ['assignedToId'],
+          where: { assignedToId: { in: telecallers.map(t => t.id) } },
+          _count: { assignedToId: true }
+        });
+
+        const countsMap = new Map(assignments.map(a => [a.assignedToId, a._count.assignedToId]));
+        telecallers.sort((a, b) => (countsMap.get(a.id) || 0) - (countsMap.get(b.id) || 0));
+        finalAssignedToId = telecallers[0].id;
+      } else {
+        finalAssignedToId = req.user.id; // Fallback to creator
+      }
+    }
+
     const lead = await prisma.lead.create({
       data: {
         firstName,
@@ -132,11 +157,9 @@ export const createLead = async (req: AuthRequest, res: Response): Promise<Respo
         phone,
         source,
         interestedCourse,
-        notes,
-        followUpDate: followUpDate ? new Date(followUpDate) : undefined,
-        branchId: branchId || req.user.branchId!,
+        branchId: leadBranchId,
         createdById: req.user.id,
-        assignedToId: assignedToId || req.user.id,
+        assignedToId: finalAssignedToId,
         location,
         status: LeadStatus.NEW,
       },
@@ -147,7 +170,20 @@ export const createLead = async (req: AuthRequest, res: Response): Promise<Respo
         createdBy: {
           select: { id: true, firstName: true, lastName: true },
         },
+        assignedTo: {
+          select: { id: true, firstName: true, lastName: true },
+        },
       },
+    });
+
+    // Initial status history log
+    await prisma.leadStatusHistory.create({
+      data: {
+        leadId: lead.id,
+        newStatus: LeadStatus.NEW,
+        changedById: req.user.id,
+        notes: 'Initial creation',
+      }
     });
 
     // Send WhatsApp notification (async, don't wait)
@@ -200,8 +236,6 @@ export const updateLead = async (req: AuthRequest, res: Response): Promise<Respo
         status,
         interestedCourse,
         branchId,
-        notes,
-        followUpDate: followUpDate ? new Date(followUpDate) : undefined,
         assignedToId,
         location,
       },
@@ -214,6 +248,19 @@ export const updateLead = async (req: AuthRequest, res: Response): Promise<Respo
         },
       },
     });
+
+    // Log status change if status updated
+    if (status && status !== existingLead.status) {
+      await prisma.leadStatusHistory.create({
+        data: {
+          leadId: lead.id,
+          oldStatus: existingLead.status,
+          newStatus: status,
+          changedById: req.user!.id!,
+          notes: notes || 'Status updated via lead management',
+        }
+      });
+    }
 
     return successResponse(res, lead, 'Lead updated successfully');
   } catch (error) {
@@ -300,8 +347,25 @@ export const convertLeadToAdmission = async (req: AuthRequest, res: Response): P
         where: { id: lead.id },
         data: {
           status: LeadStatus.CONVERTED,
-          convertedToAdmissionId: admission.id,
         },
+      });
+
+      await tx.leadConversionLog.create({
+        data: {
+          leadId: lead.id,
+          admissionId: admission.id,
+          convertedById: req.user!.id!,
+        }
+      });
+
+      await tx.leadStatusHistory.create({
+        data: {
+          leadId: lead.id,
+          oldStatus: lead.status,
+          newStatus: LeadStatus.CONVERTED,
+          changedById: req.user!.id!,
+          notes: 'Lead converted to admission',
+        }
       });
 
       return admission;
@@ -384,3 +448,133 @@ export const createPublicLead = async (req: Request, res: Response): Promise<Res
   }
 };
 
+
+export const logCall = async (req: AuthRequest, res: Response): Promise<Response> => {
+  try {
+    const { id: leadId } = req.params;
+    const { callStatus, notes, nextFollowUpDate, followupType } = req.body;
+
+    const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+    if (!lead) return errorResponse(res, 'Lead not found', 404);
+
+    const result = await prisma.$transaction(async (tx) => {
+      const callLog = await tx.callLog.create({
+        data: {
+          leadId,
+          telecallerId: req.user!.id!,
+          callStatus,
+          notes,
+          nextFollowUpDate: nextFollowUpDate ? new Date(nextFollowUpDate) : null,
+        }
+      });
+
+      if (nextFollowUpDate) {
+        await tx.followUp.create({
+          data: {
+            leadId,
+            telecallerId: req.user!.id!,
+            scheduledDate: new Date(nextFollowUpDate),
+            type: followupType || 'CALL',
+            notes,
+          }
+        });
+      }
+
+      return callLog;
+    });
+
+    return successResponse(res, result, 'Call logged successfully');
+  } catch (error) {
+    return errorResponse(res, 'Failed to log call', 500, error);
+  }
+};
+
+export const getCallLogs = async (req: AuthRequest, res: Response): Promise<Response> => {
+  try {
+    const { id: leadId } = req.params;
+    const logs = await prisma.callLog.findMany({
+      where: { leadId },
+      include: { telecaller: { select: { firstName: true, lastName: true } } },
+      orderBy: { callDate: 'desc' }
+    });
+    return successResponse(res, logs);
+  } catch (error) {
+    return errorResponse(res, 'Failed to fetch call logs', 500, error);
+  }
+};
+
+export const getLeadStatusHistory = async (req: AuthRequest, res: Response): Promise<Response> => {
+  try {
+    const { id: leadId } = req.params;
+    const history = await prisma.leadStatusHistory.findMany({
+      where: { leadId },
+      include: { changedBy: { select: { firstName: true, lastName: true, role: true } } },
+      orderBy: { createdAt: 'desc' }
+    });
+    return successResponse(res, history);
+  } catch (error) {
+    return errorResponse(res, 'Failed to fetch status history', 500, error);
+  }
+};
+
+export const getTelecallerDashboard = async (req: AuthRequest, res: Response): Promise<Response> => {
+  try {
+    const userId = req.user!.id!;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const [stats, followUpsToday, followUpsOverdue] = await Promise.all([
+      prisma.lead.groupBy({
+        by: ['status'],
+        where: { assignedToId: userId },
+        _count: true
+      }),
+      prisma.followUp.findMany({
+        where: { telecallerId: userId, scheduledDate: { gte: today, lt: new Date(today.getTime() + 86400000) }, status: 'PENDING' },
+        include: { lead: true }
+      }),
+      prisma.followUp.findMany({
+        where: { telecallerId: userId, scheduledDate: { lt: today }, status: 'PENDING' },
+        include: { lead: true }
+      })
+    ]);
+
+    return successResponse(res, { stats, followUpsToday, followUpsOverdue });
+  } catch (error) {
+    return errorResponse(res, 'Failed to fetch telecaller dashboard', 500, error);
+  }
+};
+
+export const getCPTelecallerAnalytics = async (req: AuthRequest, res: Response): Promise<Response> => {
+  try {
+    const branchId = req.user!.branchId!;
+    const telecallers = await prisma.user.findMany({
+      where: { branchId, role: UserRole.TELECALLER },
+      include: {
+        _count: { select: { leadsAssigned: true, callLogs: true, conversions: true } }
+      }
+    });
+
+    return successResponse(res, telecallers);
+  } catch (error) {
+    return errorResponse(res, 'Failed to fetch CP analytics', 500, error);
+  }
+};
+
+export const getCEOTelecallerAnalytics = async (req: AuthRequest, res: Response): Promise<Response> => {
+  try {
+    const branchStats = await prisma.branch.findMany({
+      include: {
+        _count: { select: { leads: true } },
+        leads: {
+          where: { status: LeadStatus.CONVERTED },
+          _count: true
+        }
+      }
+    });
+
+    return successResponse(res, branchStats);
+  } catch (error) {
+    return errorResponse(res, 'Failed to fetch CEO analytics', 500, error);
+  }
+};

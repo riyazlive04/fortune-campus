@@ -447,6 +447,7 @@ const Users = () => {
       ADMIN: "success",
       CHANNEL_PARTNER: "warning",
       TRAINER: "info",
+      TELECALLER: "info",
       STUDENT: "neutral",
     };
     return map[role] || "neutral";
@@ -526,10 +527,16 @@ const Users = () => {
                   <span>New Trainer</span>
                 </DropdownMenuItem>
                 {isAdmin && (
-                  <DropdownMenuItem className="cursor-pointer py-2.5" onClick={() => handleCreateUser('CHANNEL_PARTNER')}>
-                    <UserPlus className="mr-2 h-4 w-4 text-emerald-600" />
-                    <span>Channel Partner</span>
-                  </DropdownMenuItem>
+                  <>
+                    <DropdownMenuItem className="cursor-pointer py-2.5" onClick={() => handleCreateUser('TELECALLER')}>
+                      <UserPlus className="mr-2 h-4 w-4 text-emerald-600" />
+                      <span>New Telecaller</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="cursor-pointer py-2.5" onClick={() => handleCreateUser('CHANNEL_PARTNER')}>
+                      <UserPlus className="mr-2 h-4 w-4 text-emerald-600" />
+                      <span>Channel Partner</span>
+                    </DropdownMenuItem>
+                  </>
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
@@ -683,7 +690,9 @@ const Users = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="ADMIN">Admin</SelectItem>
+                      <SelectItem value="CEO">CEO</SelectItem>
                       <SelectItem value="CHANNEL_PARTNER">Channel Partner</SelectItem>
+                      <SelectItem value="TELECALLER">Telecaller</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

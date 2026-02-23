@@ -33,6 +33,10 @@ model User {
   // Role-specific relations
   leadsCreated  Lead[]   @relation("LeadCreator")
   leadsAssigned Lead[]   @relation("LeadAssignee")
+  callLogs      CallLog[]
+  followUps     FollowUp[]
+  statusChanges LeadStatusHistory[]
+  conversions   LeadConversionLog[]
   studentProfile Student? @relation("StudentUser")
   trainerProfile Trainer?
   incentives    Incentive[]
@@ -80,28 +84,29 @@ model Lead {
   firstName       String
   lastName        String
   email           String?
-  phone           String
+  phone           String     @unique
   location        String?
-  source          String @default("OTHER")
-  status          String @default("NEW")
+  source          String     @default("OTHER")
+  status          String     @default("NEW")
   interestedCourse String?
-  notes           String?
-  followUpDate    DateTime?
   
-  branchId        String?
+  branchId        String
   createdById     String?
-  assignedToId    String?
-  
-  convertedToAdmissionId String?   @unique
+  assignedToId    String?    // Nullable initially for system leads before auto-assignment
   
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
   // Relations
-  branch          Branch?    @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  createdBy       User?      @relation("LeadCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  branch          Branch     @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  createdBy       User?      @relation("LeadCreator", fields: [createdById], references: [id], onDelete: SetNull)
   assignedTo      User?      @relation("LeadAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   admission       Admission? @relation("LeadConversion")
+  
+  callLogs        CallLog[]
+  followUps       FollowUp[]
+  statusHistory   LeadStatusHistory[]
+  conversionLogs  LeadConversionLog[]
   whatsappLogs    WhatsAppLog[]
   
   @@index([branchId])
@@ -109,6 +114,87 @@ model Lead {
   @@index([assignedToId])
   @@index([status])
   @@map("leads")
+}
+
+model CallLog {
+  id              String     @id @default(uuid())
+  leadId          String
+  telecallerId    String
+  
+  callDate        DateTime   @default(now())
+  callStatus      String     // Connected, Not Picked, Switched Off, etc.
+  notes           String?
+  
+  nextFollowUpDate DateTime?
+  
+  createdAt       DateTime   @default(now())
+
+  // Relations
+  lead            Lead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  telecaller      User       @relation(fields: [telecallerId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([telecallerId])
+  @@map("call_logs")
+}
+
+model FollowUp {
+  id              String     @id @default(uuid())
+  leadId          String
+  telecallerId    String
+  
+  scheduledDate   DateTime
+  status          String     @default("PENDING") // PENDING, COMPLETED, OVERDUE, CANCELLED
+  type            String?    // CALL, DEMO, VISIT
+  notes           String?
+  
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  // Relations
+  lead            Lead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  telecaller      User       @relation(fields: [telecallerId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([telecallerId])
+  @@index([scheduledDate])
+  @@index([status])
+  @@map("follow_ups")
+}
+
+model LeadStatusHistory {
+  id              String     @id @default(uuid())
+  leadId          String
+  oldStatus       String?
+  newStatus       String
+  changedById     String
+  notes           String?
+  
+  createdAt       DateTime   @default(now())
+
+  // Relations
+  lead            Lead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  changedBy       User       @relation(fields: [changedById], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@map("lead_status_history")
+}
+
+model LeadConversionLog {
+  id              String     @id @default(uuid())
+  leadId          String
+  admissionId     String     @unique
+  convertedById   String
+  
+  createdAt       DateTime   @default(now())
+
+  // Relations
+  lead            Lead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  admission       Admission  @relation(fields: [admissionId], references: [id], onDelete: Cascade)
+  convertedBy     User       @relation(fields: [convertedById], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@map("lead_conversion_logs")
 }
 
 model Admission {
@@ -156,6 +242,7 @@ model Admission {
   course          Course          @relation(fields: [courseId], references: [id])
   lead            Lead?           @relation("LeadConversion", fields: [leadId], references: [id])
   student         Student?
+  conversionLog   LeadConversionLog?
   whatsappLogs    WhatsAppLog[]
   
   @@index([branchId])

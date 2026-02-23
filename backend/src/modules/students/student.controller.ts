@@ -299,7 +299,7 @@ export const updateStudent = async (req: AuthRequest, res: Response): Promise<Re
       where: { id },
       include: {
         user: { select: { id: true } },
-        admission: { select: { id: true } },
+        admission: { select: { id: true, feeAmount: true, feePaid: true } },
         placements: { orderBy: { createdAt: 'desc' }, take: 1 }
       }
     });
@@ -327,13 +327,13 @@ export const updateStudent = async (req: AuthRequest, res: Response): Promise<Re
 
       // Update associated Admission record if fee info provided
       if (feeAmount !== undefined || feePaid !== undefined || paymentPlan !== undefined) {
-        const updatedFeeAmount = feeAmount !== undefined ? Number(feeAmount) : undefined;
-        const updatedFeePaid = feePaid !== undefined ? Number(feePaid) : undefined;
+        const updatedFeeAmount = feeAmount !== undefined ? (Number(feeAmount) || 0) : undefined;
+        const updatedFeePaid = feePaid !== undefined ? (Number(feePaid) || 0) : undefined;
 
         let feeBalance = undefined;
         if (updatedFeeAmount !== undefined || updatedFeePaid !== undefined) {
-          const finalFeeAmount = updatedFeeAmount !== undefined ? updatedFeeAmount : (existingStudent.admission as any)?.feeAmount || 0;
-          const finalFeePaid = updatedFeePaid !== undefined ? updatedFeePaid : (existingStudent.admission as any)?.feePaid || 0;
+          const finalFeeAmount = updatedFeeAmount !== undefined ? updatedFeeAmount : Number((existingStudent.admission as any)?.feeAmount) || 0;
+          const finalFeePaid = updatedFeePaid !== undefined ? updatedFeePaid : Number((existingStudent.admission as any)?.feePaid) || 0;
           feeBalance = finalFeeAmount - finalFeePaid;
         }
 

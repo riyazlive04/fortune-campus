@@ -28,7 +28,8 @@ const Login = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.email || !formData.password) {
+    const emailStr = formData.email.trim();
+    if (!emailStr || !formData.password) {
       setError("Please enter both email and password");
       return;
     }
@@ -37,7 +38,8 @@ const Login = () => {
     setError(null);
 
     try {
-      const result = await authApi.login(formData.email, formData.password);
+      console.log(`Attempting login with email: '${emailStr}'`);
+      const result = await authApi.login(emailStr, formData.password);
 
       if (result.success && result.data) {
         // Store token and user data
@@ -47,10 +49,11 @@ const Login = () => {
         // Redirect to dashboard
         navigate("/", { replace: true });
       } else {
-        setError(result.message || "Login failed");
+        setError(result.message || "Login failed - no data");
       }
     } catch (err: any) {
-      setError(err.message || "Invalid email or password");
+      console.error("Login catch error:", err);
+      setError(`Login Error: ${err.message || 'Unknown'}`);
     } finally {
       setLoading(false);
     }
