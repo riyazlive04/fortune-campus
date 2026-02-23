@@ -16,6 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import TrainerHistoryModal from "@/components/TrainerHistoryModal";
 
 const COLORS = ["hsl(217, 71%, 53%)", "hsl(142, 71%, 45%)", "hsl(38, 92%, 50%)", "hsl(262, 60%, 55%)"];
 
@@ -45,6 +46,7 @@ const Dashboard = () => {
   const [modalData, setModalData] = useState<any[]>([]);
   const [modalLoading, setModalLoading] = useState(false);
   const [isTopPerformerModalOpen, setIsTopPerformerModalOpen] = useState(false);
+  const [selectedHistoryTrainer, setSelectedHistoryTrainer] = useState<{ id: string, name: string } | null>(null);
 
   const openModal = async (type: 'leads' | 'students' | 'placements' | 'admissions') => {
     setModalType(type);
@@ -366,13 +368,19 @@ const Dashboard = () => {
                       </td>
                     </tr>
                   ) : (
-                    trainerAttendance.map((att: any) => (
-                      <tr key={att.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                        <td className="py-3 pr-4 font-semibold text-foreground">
-                          {att.trainer?.user?.firstName} {att.trainer?.user?.lastName}
-                        </td>
-                        <td className="py-3 pr-4 text-muted-foreground">
-                          {att.trainer?.branch?.name || "General"}
+                    trainerAttendance.map((att) => (
+                      <tr key={att.id} className="border-b border-border/30 hover:bg-muted/30 transition-colors group">
+                        <td className="py-3 pr-4">
+                          <button
+                            onClick={() => setSelectedHistoryTrainer({
+                              id: att.trainer?.id,
+                              name: `${att.trainer?.user?.firstName} ${att.trainer?.user?.lastName}`
+                            })}
+                            className="font-bold text-foreground hover:text-primary transition-colors text-left"
+                          >
+                            {att.trainer?.user?.firstName} {att.trainer?.user?.lastName}
+                          </button>
+                          <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider">{att.trainer?.branch?.name || "General"}</p>
                         </td>
                         <td className="py-3 pr-4">
                           <StatusBadge
@@ -603,6 +611,14 @@ const Dashboard = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Trainer Attendance History Modal */}
+      <TrainerHistoryModal
+        isOpen={!!selectedHistoryTrainer}
+        onClose={() => setSelectedHistoryTrainer(null)}
+        trainerId={selectedHistoryTrainer?.id || null}
+        trainerName={selectedHistoryTrainer?.name || null}
+      />
     </div>
   );
 };

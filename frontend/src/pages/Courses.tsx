@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
+import { Switch } from "@/components/ui/switch";
 import { storage, API_BASE_URL } from "@/lib/api";
 import CourseModal from "@/components/CourseModal";
 
@@ -88,6 +89,41 @@ const Courses = () => {
     }
   };
 
+  const handleToggleStatus = async (id: string, newStatus: boolean) => {
+    try {
+      const token = storage.getToken();
+      const response = await fetch(`${API_BASE_URL}/courses/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ isActive: newStatus })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        toast({
+          title: "Status updated",
+          description: `Course is now ${newStatus ? 'active' : 'inactive'}`,
+        });
+        fetchCourses();
+      } else {
+        toast({
+          title: "Update failed",
+          description: result.message,
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Failed to update status",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleOpenModal = (id?: string | null, readonly: boolean = false) => {
     setSelectedCourseId(id || null);
     setIsReadOnly(readonly);
@@ -152,10 +188,22 @@ const Courses = () => {
                   <h3 className="text-sm font-semibold text-foreground mb-1">{course.name}</h3>
                   <p className="text-xs text-muted-foreground">{course.code}</p>
                 </div>
-                <StatusBadge
-                  status={course.isActive ? "Active" : "Inactive"}
-                  variant={course.isActive ? "success" : "neutral"}
-                />
+                <div className="flex items-center gap-2">
+                  <StatusBadge
+                    status={course.isActive ? "Active" : "Inactive"}
+                    variant={course.isActive ? "success" : "danger"}
+                  />
+                  {user?.role === 'CHANNEL_PARTNER' && (
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <Switch
+                        checked={course.isActive}
+                        onCheckedChange={(checked) => handleToggleStatus(course.id, checked)}
+                        title={course.isActive ? "Make Inactive" : "Make Active"}
+                        className="data-[state=unchecked]:bg-destructive"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
 
               {course.description && (

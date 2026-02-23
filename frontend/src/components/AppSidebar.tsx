@@ -2,9 +2,10 @@ import { NavLink, useLocation } from "react-router-dom";
 import {
   LayoutDashboard, Users, UserPlus, GraduationCap, BookOpen,
   ClipboardList, Briefcase, Calendar, FolderKanban, Award,
-  BarChart3, Bell, MessageSquare, ChevronLeft, ChevronRight, Settings, UsersRound, Layers
+  BarChart3, Bell, MessageSquare, ChevronLeft, ChevronRight, Settings, UsersRound, Layers, DollarSign
 } from "lucide-react";
 import { storage } from "@/lib/api";
+import logo from "@/assets/logo.jpg";
 
 const navSections = [
   {
@@ -13,6 +14,7 @@ const navSections = [
       { title: "Dashboard", path: "/", icon: LayoutDashboard },
       { title: "Leads & Enquiries", path: "/leads", icon: UserPlus, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER'] },
       { title: "Admissions", path: "/admissions", icon: ClipboardList, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER'] },
+      { title: "Fees", path: "/fees", icon: DollarSign, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER'] },
     ],
   },
   {
@@ -68,19 +70,19 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
   return (
     <aside className={`fixed left-0 top-0 z-40 flex h-screen flex-col bg-sidebar text-sidebar-foreground transition-all duration-300 border-r border-sidebar-border ${collapsed ? "w-16" : "w-60"}`}>
       {/* Logo */}
-      <div className="flex h-16 items-center justify-between px-4">
+      <div className="flex h-20 items-center justify-center border-b border-sidebar-border/30 px-4">
         {!collapsed ? (
-          <div className="flex items-center gap-2">
+          <div className="flex h-full w-full items-center justify-start py-3">
             <img
-              src="/logo.png"
+              src={logo}
               alt="Fortune Innovatives"
-              className="h-10 w-auto object-contain"
+              className="h-full w-auto max-w-full object-contain"
             />
           </div>
         ) : (
-          <div className="mx-auto flex h-10 w-10 items-center justify-center">
+          <div className="flex h-full w-full items-center justify-center p-2">
             <img
-              src="/logo.png"
+              src={logo}
               alt="FI"
               className="h-full w-full object-contain"
             />

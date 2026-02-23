@@ -7,8 +7,9 @@ import { trainersApi, storage } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import TrainerModal from "@/components/TrainerModal";
 import TrainerAttendanceModal from "@/components/TrainerAttendanceModal";
+import TrainerHistoryModal from "@/components/TrainerHistoryModal";
 import PageHeader from "@/components/PageHeader";
-import { CheckSquare } from "lucide-react";
+import { CheckSquare, History as HistoryIcon } from "lucide-react";
 
 const Trainers = () => {
     const [trainers, setTrainers] = useState<any[]>([]);
@@ -20,6 +21,7 @@ const Trainers = () => {
     // Attendance Modal State
     const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
     const [attendanceTrainer, setAttendanceTrainer] = useState<{ id: string, name: string } | null>(null);
+    const [historyTrainer, setHistoryTrainer] = useState<{ id: string, name: string } | null>(null);
 
     const { toast } = useToast();
 
@@ -73,6 +75,13 @@ const Trainers = () => {
             name: `${trainer.user?.firstName} ${trainer.user?.lastName}`
         });
         setIsAttendanceModalOpen(true);
+    };
+
+    const handleViewHistory = (trainer: any) => {
+        setHistoryTrainer({
+            id: trainer.id,
+            name: `${trainer.user?.firstName} ${trainer.user?.lastName}`
+        });
     };
 
     const handleAttendanceSuccess = () => {
@@ -191,6 +200,15 @@ const Trainers = () => {
                                                     >
                                                         View
                                                     </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="text-primary hover:text-primary hover:bg-primary/10"
+                                                        onClick={() => handleViewHistory(trainer)}
+                                                    >
+                                                        <HistoryIcon className="h-4 w-4 mr-1" />
+                                                        History
+                                                    </Button>
                                                     {isChannelPartner && (
                                                         <Button
                                                             variant="outline"
@@ -233,6 +251,13 @@ const Trainers = () => {
                 onClose={() => setIsAttendanceModalOpen(false)}
                 onSuccess={handleAttendanceSuccess}
                 trainer={attendanceTrainer}
+            />
+
+            <TrainerHistoryModal
+                isOpen={!!historyTrainer}
+                onClose={() => setHistoryTrainer(null)}
+                trainerId={historyTrainer?.id || null}
+                trainerName={historyTrainer?.name || null}
             />
         </div>
     );

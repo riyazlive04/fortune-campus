@@ -295,7 +295,22 @@ export const approveAdmission = async (req: AuthRequest, res: Response): Promise
         }
 
         if (admission.status === AdmissionStatus.CONVERTED) {
-            return errorResponse(res, 'Admission already converted to student', 400);
+            // Find existing student record
+            const student = await prisma.student.findFirst({
+                where: { admissionId: id },
+                include: { user: true }
+            });
+
+            if (student && student.user) {
+                return successResponse(res, {
+                    ...admission,
+                    credentials: {
+                        username: student.user.email,
+                        password: 'Student@123 (Or previously set password)'
+                    }
+                }, 'Admission already approved. Existing credentials retrieved.');
+            }
+            return errorResponse(res, 'Admission already converted to student, but user record is missing', 400);
         }
 
         const updatedAdmission = await prisma.$transaction(async (tx) => {
@@ -342,10 +357,16 @@ export const approveAdmission = async (req: AuthRequest, res: Response): Promise
                 },
             });
 
-            return updated;
+            return { updated, userEmail: user.email, plainPassword: 'Student@123' };
         });
 
-        return successResponse(res, updatedAdmission, 'Admission approved successfully');
+        return successResponse(res, {
+            ...updatedAdmission.updated,
+            credentials: {
+                username: updatedAdmission.userEmail,
+                password: updatedAdmission.plainPassword
+            }
+        }, 'Admission approved successfully');
     } catch (error) {
         return errorResponse(res, 'Failed to approve admission', 500, error);
     }

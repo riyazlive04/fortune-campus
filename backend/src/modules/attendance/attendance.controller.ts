@@ -35,9 +35,13 @@ export const getAttendance = async (req: AuthRequest, res: Response): Promise<Re
 
     // Branch filtering
     if (req.user?.role !== UserRole.CEO) {
-      where.student = {
-        branchId: req.user?.branchId,
-      };
+      if (where.studentId) {
+        // If student is specified, check branch simultaneously
+        where.student = { id: where.studentId, branchId: req.user?.branchId };
+        delete where.studentId;
+      } else {
+        where.student = { branchId: req.user?.branchId };
+      }
     }
 
     const [attendance, total] = await Promise.all([

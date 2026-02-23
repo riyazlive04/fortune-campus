@@ -57,6 +57,7 @@ const StudentModal = ({ isOpen, onClose, onSuccess, student, initialData }: Stud
 
     const currentUser = storage.getUser();
     const isChannelPartner = currentUser?.role === 'CHANNEL_PARTNER';
+    const isTrainer = currentUser?.role === 'TRAINER';
 
     const isEditMode = !!student;
 
@@ -261,6 +262,10 @@ const StudentModal = ({ isOpen, onClose, onSuccess, student, initialData }: Stud
                     leadSource: formData.leadSource,
                     aadhaarNumber: formData.aadhaarNumber,
                     panNumber: formData.panNumber,
+                    // Fee Info
+                    feeAmount: parseFloat(formData.totalFee),
+                    feePaid: parseFloat(formData.initialPaid),
+                    paymentPlan: formData.paymentPlan,
                 };
 
                 await studentsApi.updateStudent(student.id, updateData);
@@ -696,7 +701,7 @@ const StudentModal = ({ isOpen, onClose, onSuccess, student, initialData }: Stud
                                     type="number"
                                     value={formData.totalFee}
                                     onChange={(e) => handleChange("totalFee", e.target.value)}
-                                    disabled={loading}
+                                    disabled={loading || isTrainer}
                                     placeholder="Enter total fee"
                                     min="0"
                                     step="0.01"
@@ -709,7 +714,7 @@ const StudentModal = ({ isOpen, onClose, onSuccess, student, initialData }: Stud
                                 <Select
                                     value={formData.paymentPlan}
                                     onValueChange={(value) => handleChange("paymentPlan", value)}
-                                    disabled={loading}
+                                    disabled={loading || isTrainer}
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select payment plan" />
@@ -728,7 +733,7 @@ const StudentModal = ({ isOpen, onClose, onSuccess, student, initialData }: Stud
                                     type="number"
                                     value={formData.initialPaid}
                                     onChange={(e) => handleChange("initialPaid", e.target.value)}
-                                    disabled={loading}
+                                    disabled={loading || isTrainer}
                                     placeholder="Enter amount paid"
                                     min="0"
                                     step="0.01"

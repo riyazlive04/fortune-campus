@@ -1,0 +1,38 @@
+[
+  {
+    "id": "b0c87f4b-e836-40ae-aa64-30786ac05612",
+    "date": "2026-02-17T18:30:00.000Z",
+    "status": "PRESENT",
+    "remarks": null,
+    "inTime": null,
+    "outTime": null,
+    "latitude": null,
+    "longitude": null,
+    "period": 1,
+    "isVerified": true,
+    "studentId": "80628706-b7bd-4643-80e8-db675dcaf88c",
+    "courseId": "ff4a9dfd-4e9d-4f18-a160-f44627bb78c5",
+    "batchId": null,
+    "trainerId": "3eb8f974-1e0c-4ca4-9c60-62c97b3c6d30",
+    "createdAt": "2026-02-18T10:44:23.472Z",
+    "updatedAt": "2026-02-18T11:13:35.608Z"
+  },
+  {
+    "id": "8e9c31ed-fbe4-425e-b711-61ba781d0696",
+    "date": "2026-02-17T18:30:00.000Z",
+    "status": "PRESENT",
+    "remarks": null,
+    "inTime": null,
+    "outTime": null,
+    "latitude": null,
+    "longitude": null,
+    "period": 1,
+    "isVerified": true,
+    "studentId": "87f3c51f-d234-4b61-93b8-e0b976a8dddf",
+    "courseId": "ff4a9dfd-4e9d-4f18-a160-f44627bb78c5",
+    "batchId": null,
+    "trainerId": "3eb8f974-1e0c-4ca4-9c60-62c97b3c6d30",
+    "createdAt": "2026-02-18T11:13:35.196Z",
+    "updatedAt": "2026-02-18T11:13:35.196Z"
+  }
+]

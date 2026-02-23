@@ -60,7 +60,7 @@ export const getStudents = async (req: AuthRequest, res: Response): Promise<Resp
             select: { id: true, name: true, code: true },
           },
           admission: {
-            select: { id: true, admissionNumber: true, feeBalance: true },
+            select: { id: true, admissionNumber: true, feeBalance: true, feeAmount: true, feePaid: true, paymentPlan: true },
           },
           placements: {
             take: 1,
@@ -214,7 +214,7 @@ export const createStudent = async (req: AuthRequest, res: Response): Promise<Re
           feePaid: Number(feePaid) || 0,
           feeBalance: (Number(feeAmount) || 0) - (Number(feePaid) || 0),
           paymentPlan: paymentPlan || 'SINGLE',
-          
+
           // New Fields
           parentPhone,
           qualification,
@@ -222,7 +222,7 @@ export const createStudent = async (req: AuthRequest, res: Response): Promise<Re
           aadhaarNumber,
           panNumber,
           selectedSoftware,
-          
+
           status: 'ADMITTED',
           admissionDate,
         }
@@ -239,7 +239,7 @@ export const createStudent = async (req: AuthRequest, res: Response): Promise<Re
           currentSemester: 1,
           cgpa: 0,
           isActive: true,
-          
+
           // New Fields
           dateOfJoining: dateOfJoining ? new Date(dateOfJoining) : null,
           dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : null,
@@ -287,13 +287,19 @@ export const updateStudent = async (req: AuthRequest, res: Response): Promise<Re
     const {
       firstName, lastName, phone,
       currentSemester, cgpa, isActive,
-      placementData
+      placementData,
+      feeAmount, feePaid, paymentPlan,
+      dateOfJoining, dateOfBirth, gender,
+      parentPhone, address, qualification,
+      leadSource, aadhaarNumber, panNumber,
+      selectedSoftware
     } = req.body;
 
     const existingStudent = await prisma.student.findUnique({
       where: { id },
       include: {
         user: { select: { id: true } },
+        admission: { select: { id: true } },
         placements: { orderBy: { createdAt: 'desc' }, take: 1 }
       }
     });
@@ -319,6 +325,33 @@ export const updateStudent = async (req: AuthRequest, res: Response): Promise<Re
         });
       }
 
+      // Update associated Admission record if fee info provided
+      if (feeAmount !== undefined || feePaid !== undefined || paymentPlan !== undefined) {
+        const updatedFeeAmount = feeAmount !== undefined ? Number(feeAmount) : undefined;
+        const updatedFeePaid = feePaid !== undefined ? Number(feePaid) : undefined;
+
+        let feeBalance = undefined;
+        if (updatedFeeAmount !== undefined || updatedFeePaid !== undefined) {
+          const finalFeeAmount = updatedFeeAmount !== undefined ? updatedFeeAmount : (existingStudent.admission as any)?.feeAmount || 0;
+          const finalFeePaid = updatedFeePaid !== undefined ? updatedFeePaid : (existingStudent.admission as any)?.feePaid || 0;
+          feeBalance = finalFeeAmount - finalFeePaid;
+        }
+
+        await tx.admission.update({
+          where: { id: existingStudent.admissionId },
+          data: {
+            ...(updatedFeeAmount !== undefined && { feeAmount: updatedFeeAmount }),
+            ...(updatedFeePaid !== undefined && { feePaid: updatedFeePaid }),
+            ...(feeBalance !== undefined && { feeBalance }),
+            ...(paymentPlan !== undefined && { paymentPlan }),
+            // Also sync other personal info to admission for consistency
+            ...(firstName && { firstName }),
+            ...(lastName && { lastName }),
+            ...(phone && { phone }),
+          }
+        });
+      }
+
       // Update student record
       const updatedStudent = await tx.student.update({
         where: { id },
@@ -326,6 +359,16 @@ export const updateStudent = async (req: AuthRequest, res: Response): Promise<Re
           ...(currentSemester !== undefined && { currentSemester }),
           ...(cgpa !== undefined && { cgpa }),
           ...(isActive !== undefined && { isActive }),
+          ...(dateOfJoining && { dateOfJoining: new Date(dateOfJoining) }),
+          ...(dateOfBirth && { dateOfBirth: new Date(dateOfBirth) }),
+          ...(gender && { gender }),
+          ...(parentPhone && { parentPhone }),
+          ...(address && { address }),
+          ...(qualification && { qualification }),
+          ...(leadSource && { leadSource }),
+          ...(aadhaarNumber && { aadhaarNumber }),
+          ...(panNumber && { panNumber }),
+          ...(selectedSoftware && { selectedSoftware }),
         },
         include: {
           user: {
@@ -333,7 +376,7 @@ export const updateStudent = async (req: AuthRequest, res: Response): Promise<Re
           },
           course: { select: { id: true, name: true } },
           branch: { select: { id: true, name: true } },
-          admission: { select: { id: true, feeBalance: true } },
+          admission: { select: { id: true, feeBalance: true, feeAmount: true, feePaid: true, paymentPlan: true } },
         },
       });
 

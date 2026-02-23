@@ -153,16 +153,20 @@ const Attendance = () => {
     }
   };
 
-  // ── Student history ──────────────────────────────────────────
   const fetchStudentHistory = async (student: any) => {
+    console.log("Fetching history for student:", student);
     setSelectedStudent(student);
     setIsModalOpen(true);
     setHistory([]);
     setLoadingHistory(true);
     try {
+      // The backend returns the student's ID as `id` in getAttendanceStats summary
       const r = await attendanceApi.getAttendance({ studentId: student.id });
+      console.log("History response:", r);
       setHistory(r.data?.attendance || []);
-    } catch { }
+    } catch (err: any) {
+      console.error("Failed to fetch history:", err);
+    }
     finally { setLoadingHistory(false); }
   };
 

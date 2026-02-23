@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
     Select,
     SelectContent,
@@ -11,7 +10,7 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle2, AlertCircle, Mail, Phone, MapPin, Loader2 } from "lucide-react";
+import { CheckCircle2, AlertCircle, Loader2, Sparkles, GraduationCap, ArrowRight, ShieldCheck, Zap } from "lucide-react";
 import { leadsApi, coursesApi } from "@/lib/api";
 
 const PublicEnquiry = () => {
@@ -25,16 +24,13 @@ const PublicEnquiry = () => {
         email: "",
         phone: "",
         courseId: "",
-
         location: "",
     });
 
-    // Fetch courses on component mount
     useEffect(() => {
         const fetchCourses = async () => {
             try {
                 const response = await coursesApi.getPublicCourses();
-                // API helper returns result, which contains 'data'
                 const validCourses = response.data || [];
                 setCourses(Array.isArray(validCourses) ? validCourses : []);
             } catch (err) {
@@ -44,7 +40,7 @@ const PublicEnquiry = () => {
         fetchCourses();
     }, []);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({
             ...formData,
             [e.target.name]: e.target.value,
@@ -71,11 +67,9 @@ const PublicEnquiry = () => {
                 email: "",
                 phone: "",
                 courseId: "",
-
                 location: "",
             });
 
-            // Reset success message after 5 seconds
             setTimeout(() => setSuccess(false), 5000);
         } catch (err: any) {
             setError(err.message || "Failed to submit enquiry. Please try again.");
@@ -85,140 +79,109 @@ const PublicEnquiry = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-            {/* Header */}
-            <header className="border-b bg-white/80 backdrop-blur-sm">
-                <div className="container mx-auto px-4 py-4">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-blue-800 text-lg font-bold text-white">
-                            FI
+        <div className="min-h-screen bg-slate-50 flex flex-col selection:bg-emerald-500/30 font-sans">
+            {/* Ambient Background Elements */}
+            <div className="fixed inset-0 overflow-hidden pointer-events-none">
+                <div className="absolute top-0 right-0 w-1/3 h-1/3 bg-emerald-500/5 blur-[100px] rounded-full" />
+                <div className="absolute bottom-0 left-0 w-1/4 h-1/4 bg-blue-500/5 blur-[100px] rounded-full" />
+            </div>
+
+            {/* Header / Brand */}
+            <header className="relative z-10 w-full px-6 py-10">
+                <div className="max-w-7xl mx-auto flex flex-col items-center justify-center text-center gap-4">
+                    <div className="flex items-center gap-4 group transition-transform hover:scale-105 duration-300">
+                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#10b981] shadow-xl shadow-emerald-500/20 shadow-lg shadow-emerald-500/20 ring-4 ring-emerald-500/10">
+                            <span className="text-2xl font-black text-white italic">FI</span>
                         </div>
-                        <div>
-                            <h1 className="text-lg font-bold text-gray-900">Fortune Innovatives</h1>
-                            <p className="text-xs text-gray-600">Transform Your Future</p>
+                        <div className="flex flex-col items-start">
+                            <h1 className="text-2xl md:text-3xl font-black tracking-tight text-slate-900 leading-none">
+                                FORTUNE <span className="text-[#10b981]">INNOVATIVES</span>
+                            </h1>
+                            <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-slate-400 mt-1">Transform Your Future</p>
                         </div>
                     </div>
                 </div>
             </header>
 
             {/* Main Content */}
-            <main className="container mx-auto px-4 py-12">
-                <div className="mx-auto max-w-6xl">
-                    <div className="grid gap-8 lg:grid-cols-2">
-                        {/* Left Column - Info */}
-                        <div className="space-y-8">
-                            <div className="animate-fade-in">
-                                <h2 className="text-4xl font-bold text-gray-900 lg:text-5xl">
-                                    Start Your Learning Journey Today
-                                </h2>
-                                <p className="mt-4 text-lg text-gray-600">
-                                    Join thousands of students who have transformed their careers with our industry-leading courses.
-                                </p>
-                            </div>
-
-                            {/* Features */}
-                            <div className="space-y-4 animate-fade-in" style={{ animationDelay: "0.1s" }}>
-                                <div className="flex items-start gap-4 rounded-lg bg-white p-4 shadow-sm">
-                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100">
-                                        <CheckCircle2 className="h-5 w-5 text-blue-600" />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-semibold text-gray-900">Expert Instructors</h3>
-                                        <p className="text-sm text-gray-600">Learn from industry professionals with years of experience</p>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-start gap-4 rounded-lg bg-white p-4 shadow-sm">
-                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-purple-100">
-                                        <CheckCircle2 className="h-5 w-5 text-purple-600" />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-semibold text-gray-900">Placement Support</h3>
-                                        <p className="text-sm text-gray-600">100% placement assistance with top companies</p>
-                                    </div>
-                                </div>
-
-                                <div className="flex items-start gap-4 rounded-lg bg-white p-4 shadow-sm">
-                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-green-100">
-                                        <CheckCircle2 className="h-5 w-5 text-green-600" />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-semibold text-gray-900">Hands-on Projects</h3>
-                                        <p className="text-sm text-gray-600">Build real-world projects to showcase your skills</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Contact Info */}
-                            <div className="space-y-3 rounded-lg bg-white p-6 shadow-sm animate-fade-in" style={{ animationDelay: "0.2s" }}>
-                                <h3 className="font-semibold text-gray-900">Contact Us</h3>
-                                <div className="space-y-2 text-sm text-gray-600">
-                                    <div className="flex items-center gap-2">
-                                        <Phone className="h-4 w-4" />
-                                        <span>+91 99522 70424</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Mail className="h-4 w-4" />
-                                        <span>ind.fortuneinnovatives@gmail.com</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <MapPin className="h-4 w-4" />
-                                        <span> College Road, Tiruppur</span>
-                                    </div>
-                                </div>
-                            </div>
+            <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-6 pb-20">
+                <div className="w-full max-w-xl">
+                    {/* Hero Section */}
+                    <div className="text-center mb-10 space-y-3">
+                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-100 border border-emerald-200 text-emerald-700 text-[10px] font-bold uppercase tracking-widest mb-2 animate-fade-in shadow-sm">
+                            <Sparkles className="h-3 w-3" />
+                            Launch Your Career
                         </div>
+                        <h2 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-tight">
+                            Start Your Learning <br />
+                            <span className="text-[#10b981]">Journey Today</span>
+                        </h2>
+                        <p className="text-slate-500 text-sm max-w-sm mx-auto leading-relaxed font-medium">
+                            Join thousands of students who have transformed their careers with our industry-leading courses.
+                        </p>
+                    </div>
 
-                        {/* Right Column - Form */}
-                        <div className="animate-fade-in" style={{ animationDelay: "0.3s" }}>
-                            <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-xl">
-                                <h3 className="mb-6 text-2xl font-bold text-gray-900">Get Started Now</h3>
+                    {/* Enquiry Card */}
+                    <div className="relative">
+                        {/* Decorative Background Card Shadow */}
+                        <div className="absolute -inset-4 bg-white/40 blur-2xl rounded-[3rem] -z-10" />
 
-                                {success && (
-                                    <Alert className="mb-6 border-green-200 bg-green-50">
-                                        <CheckCircle2 className="h-4 w-4 text-green-600" />
-                                        <AlertDescription className="text-green-800">
-                                            Thank you! We'll get back to you soon.
-                                        </AlertDescription>
-                                    </Alert>
-                                )}
+                        <div className="bg-white border border-slate-200/60 rounded-[2.5rem] overflow-hidden p-8 md:p-10 shadow-[0_20px_50px_rgba(0,0,0,0.05)] ring-1 ring-slate-100">
+                            {success ? (
+                                <div className="py-20 flex flex-col items-center text-center space-y-6 animate-in zoom-in-95 duration-500">
+                                    <div className="h-20 w-20 rounded-full bg-emerald-50 flex items-center justify-center border border-emerald-100">
+                                        <CheckCircle2 className="h-10 w-10 text-emerald-500" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <h3 className="text-2xl font-bold text-slate-900">Enquiry Received!</h3>
+                                        <p className="text-slate-500 font-medium">Thank you for choosing us. <br />Our counselor will contact you shortly.</p>
+                                    </div>
+                                    <Button
+                                        onClick={() => setSuccess(false)}
+                                        className="rounded-xl bg-slate-900 text-white hover:bg-slate-800 px-8 py-6 h-auto"
+                                    >
+                                        Go back
+                                    </Button>
+                                </div>
+                            ) : (
+                                <form onSubmit={handleSubmit} className="space-y-6">
+                                    {error && (
+                                        <Alert variant="destructive" className="bg-red-50 border-red-100 text-red-600 rounded-2xl animate-in shake-in duration-300">
+                                            <AlertCircle className="h-4 w-4" />
+                                            <AlertDescription className="font-medium">{error}</AlertDescription>
+                                        </Alert>
+                                    )}
 
-                                {error && (
-                                    <Alert variant="destructive" className="mb-6">
-                                        <AlertCircle className="h-4 w-4" />
-                                        <AlertDescription>{error}</AlertDescription>
-                                    </Alert>
-                                )}
-
-                                <form onSubmit={handleSubmit} className="space-y-4">
-                                    <div className="grid gap-4 sm:grid-cols-2">
+                                    <div className="grid gap-5 sm:grid-cols-2">
                                         <div className="space-y-2">
-                                            <Label htmlFor="firstName">First Name *</Label>
+                                            <Label htmlFor="firstName" className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">First Name</Label>
                                             <Input
                                                 id="firstName"
                                                 name="firstName"
                                                 value={formData.firstName}
                                                 onChange={handleChange}
-                                                placeholder="John"
+                                                placeholder="e.g. John"
                                                 required
                                                 disabled={loading}
+                                                className="h-12 bg-slate-50 border-slate-100 rounded-xl focus:ring-emerald-500/20 text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 transition-all font-medium"
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <Label htmlFor="lastName">Last Name (Optional)</Label>
+                                            <Label htmlFor="lastName" className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Last Name</Label>
                                             <Input
                                                 id="lastName"
                                                 name="lastName"
                                                 value={formData.lastName}
                                                 onChange={handleChange}
-                                                placeholder="Doe"
+                                                placeholder="Optional"
                                                 disabled={loading}
+                                                className="h-12 bg-slate-50 border-slate-100 rounded-xl focus:ring-emerald-500/20 text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 transition-all font-medium"
                                             />
                                         </div>
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label htmlFor="email">Email *</Label>
+                                        <Label htmlFor="email" className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Email Address</Label>
                                         <Input
                                             id="email"
                                             name="email"
@@ -228,50 +191,54 @@ const PublicEnquiry = () => {
                                             placeholder="john@example.com"
                                             required
                                             disabled={loading}
+                                            className="h-12 bg-slate-50 border-slate-100 rounded-xl focus:ring-emerald-500/20 text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 transition-all font-medium"
                                         />
                                     </div>
 
-                                    <div className="space-y-2">
-                                        <Label htmlFor="phone">Phone Number *</Label>
-                                        <Input
-                                            id="phone"
-                                            name="phone"
-                                            type="tel"
-                                            value={formData.phone}
-                                            onChange={handleChange}
-                                            placeholder="+91 XXXXX XXXXX"
-                                            required
-                                            disabled={loading}
-                                        />
+                                    <div className="grid gap-5 sm:grid-cols-2">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="phone" className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Work/Mobile</Label>
+                                            <Input
+                                                id="phone"
+                                                name="phone"
+                                                type="tel"
+                                                value={formData.phone}
+                                                onChange={handleChange}
+                                                placeholder="+91 Phone"
+                                                required
+                                                disabled={loading}
+                                                className="h-12 bg-slate-50 border-slate-100 rounded-xl focus:ring-emerald-500/20 text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 transition-all font-medium"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label htmlFor="location" className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Location</Label>
+                                            <Input
+                                                id="location"
+                                                name="location"
+                                                value={formData.location}
+                                                onChange={handleChange}
+                                                placeholder="City, State"
+                                                required
+                                                disabled={loading}
+                                                className="h-12 bg-slate-50 border-slate-100 rounded-xl focus:ring-emerald-500/20 text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 transition-all font-medium"
+                                            />
+                                        </div>
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label htmlFor="location">Location *</Label>
-                                        <Input
-                                            id="location"
-                                            name="location"
-                                            value={formData.location}
-                                            onChange={handleChange}
-                                            placeholder="City, State"
-                                            required
-                                            disabled={loading}
-                                        />
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label htmlFor="courseId">Course Interest *</Label>
+                                        <Label htmlFor="courseId" className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-1">Interested Course</Label>
                                         <Select
                                             value={formData.courseId}
                                             onValueChange={(value) => setFormData({ ...formData, courseId: value })}
                                             disabled={loading}
                                             required
                                         >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select a course" />
+                                            <SelectTrigger className="h-12 bg-slate-50 border-slate-100 rounded-xl focus:ring-emerald-500/20 text-slate-900 focus:border-emerald-500 transition-all font-medium">
+                                                <SelectValue placeholder="Select a program" />
                                             </SelectTrigger>
-                                            <SelectContent>
+                                            <SelectContent className="bg-white border-slate-200">
                                                 {courses.map((course) => (
-                                                    <SelectItem key={course.id} value={course.id}>
+                                                    <SelectItem key={course.id} value={course.id} className="focus:bg-emerald-50 focus:text-emerald-700 font-medium">
                                                         {course.name}
                                                     </SelectItem>
                                                 ))}
@@ -279,25 +246,35 @@ const PublicEnquiry = () => {
                                         </Select>
                                     </div>
 
-                                    <Button type="submit" className="w-full" size="lg" disabled={loading}>
-                                        {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        {loading ? "Submitting..." : "Submit Enquiry"}
+                                    <Button
+                                        type="submit"
+                                        className="w-full h-14 bg-[#10b981] hover:bg-[#059669] text-white font-black text-base rounded-2xl shadow-xl shadow-emerald-500/30 group transition-all duration-300"
+                                        disabled={loading}
+                                    >
+                                        {loading ? (
+                                            <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                                        ) : (
+                                            <span className="flex items-center gap-2">
+                                                Submit Enquiry <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                                            </span>
+                                        )}
                                     </Button>
 
-                                    <p className="text-center text-xs text-gray-500">
-                                        By submitting this form, you agree to our terms and privacy policy.
-                                    </p>
+                                    <div className="flex items-center justify-between text-[10px] text-slate-400 font-bold uppercase tracking-widest pt-2 px-2">
+                                        <span className="flex items-center gap-1.5"><ShieldCheck className="h-3 w-3 text-emerald-500" /> Secure Submission</span>
+                                        <span className="flex items-center gap-1.5"><Zap className="h-3 w-3 text-amber-500" /> Instant Reach</span>
+                                    </div>
                                 </form>
-                            </div>
+                            )}
                         </div>
                     </div>
                 </div>
             </main>
 
-            {/* Footer */}
-            <footer className="border-t bg-white py-6">
-                <div className="container mx-auto px-4 text-center text-sm text-gray-600">
-                    <p>© 2024 Fortune Innovatives. All rights reserved.</p>
+            {/* Simple Minimal Footer */}
+            <footer className="relative z-10 w-full px-6 py-10">
+                <div className="max-w-7xl mx-auto flex flex-col items-center justify-center gap-4 text-slate-400 text-[10px] font-bold uppercase tracking-[0.2em]">
+                    <p>Developed by Sirah Digital</p>
                 </div>
             </footer>
         </div>
