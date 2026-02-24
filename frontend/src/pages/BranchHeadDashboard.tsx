@@ -12,7 +12,8 @@ import {
     LayoutDashboard,
     ArrowRightLeft,
     Loader2,
-    AlertCircle
+    AlertCircle,
+    X
 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import KPICard from "@/components/KPICard";
@@ -20,7 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { branchDashboardApi, trainerAttendanceApi, storage } from "@/lib/api";
+import { branchDashboardApi, trainerAttendanceApi, leadsApi, admissionsApi, studentsApi, storage } from "@/lib/api";
 import StatusBadge from "@/components/StatusBadge";
 import AdmissionModal from "@/components/AdmissionModal";
 
@@ -35,6 +36,11 @@ const BranchHeadDashboard = () => {
     const [selectedAdmission, setSelectedAdmission] = useState<string | null>(null);
     const [initialData, setInitialData] = useState<any>(null);
     const [conversionLeadId, setConversionLeadId] = useState<string | null>(null);
+
+    // Detail Modal State
+    const [modalType, setModalType] = useState<'leads' | 'admissions' | 'students' | 'attendance' | 'revenue' | null>(null);
+    const [modalData, setModalData] = useState<any[]>([]);
+    const [modalLoading, setModalLoading] = useState(false);
 
     const fetchData = async () => {
         try {
@@ -118,6 +124,37 @@ const BranchHeadDashboard = () => {
         fetchData();
     };
 
+    const openModal = async (type: 'leads' | 'admissions' | 'students' | 'attendance' | 'revenue') => {
+        setModalType(type);
+        setModalData([]);
+        setModalLoading(true);
+        try {
+            if (type === 'leads') {
+                const res = await leadsApi.getLeads({ limit: 100 });
+                const leads = res.data?.leads || res.data || [];
+                setModalData(Array.isArray(leads) ? leads : []);
+            } else if (type === 'admissions') {
+                const res = await admissionsApi.getAdmissions({ limit: 100 });
+                const admissions = res.data?.admissions || res.data || [];
+                setModalData(Array.isArray(admissions) ? admissions : []);
+            } else if (type === 'students') {
+                const res = await studentsApi.getStudents({ limit: 100 });
+                const students = res.data?.students || res.data || [];
+                setModalData(Array.isArray(students) ? students : []);
+            } else if (type === 'attendance') {
+                const res = await branchDashboardApi.getAttendance();
+                setModalData(res.data?.summary || res.data || []);
+            } else if (type === 'revenue') {
+                const res = await branchDashboardApi.getBranchReports();
+                setModalData(res.data?.reports || res.data || []);
+            }
+        } catch (e) {
+            toast({ variant: 'destructive', title: 'Error', description: `Failed to load ${type} details` });
+        } finally {
+            setModalLoading(false);
+        }
+    };
+
     if (loading && !stats) {
         return (
             <div className="flex items-center justify-center h-[60vh]">
@@ -140,26 +177,31 @@ const BranchHeadDashboard = () => {
                     value={stats?.totalLeads || 0}
                     icon={Users}
                     accentColor="bg-blue-500"
-                    change="+12% from last month"
-                    changeType="positive"
+                    change="Click to view details"
+                    changeType="neutral"
+                    onClick={() => openModal('leads')}
                 />
                 <KPICard
                     title="Admissions"
                     value={stats?.totalAdmissions || 0}
                     icon={UserPlus}
                     accentColor="bg-green-500"
-                    change="+8% from last month"
-                    changeType="positive"
+                    change="Click to view details"
+                    changeType="neutral"
+                    onClick={() => openModal('admissions')}
                 />
                 <KPICard
                     title="Active Students"
                     value={stats?.activeStudents || 0}
                     icon={CheckCircle}
                     accentColor="bg-yellow-500"
+                    change="Click to view details"
+                    changeType="neutral"
+                    onClick={() => openModal('students')}
                 />
 
                 {/* Attendance Status Widget */}
-                <Card className="shadow-sm">
+                <Card className="shadow-sm cursor-pointer hover:border-primary/50 transition-colors" onClick={() => openModal('attendance')}>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Daily Attendance</CardTitle>
                         <Clock className="h-4 w-4 text-muted-foreground" />
@@ -216,8 +258,9 @@ const BranchHeadDashboard = () => {
                     value={`₹${stats?.revenue?.collected?.toLocaleString() || 0}`}
                     icon={IndianRupee}
                     accentColor="bg-purple-500"
-                    change="+15% from last month"
-                    changeType="positive"
+                    change="Click to view details"
+                    changeType="neutral"
+                    onClick={() => openModal('revenue')}
                 />
             </div>
 
@@ -417,6 +460,160 @@ const BranchHeadDashboard = () => {
                 initialData={initialData}
                 leadId={conversionLeadId}
             />
+
+            {/* Detail Modal */}
+            {modalType && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+                    onClick={() => setModalType(null)}
+                >
+                    <div
+                        className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between p-6 border-b border-border">
+                            <div>
+                                <h2 className="text-xl font-black text-foreground capitalize flex items-center gap-2">
+                                    {modalType === 'leads' && <Users className="w-5 h-5 text-blue-500" />}
+                                    {modalType === 'admissions' && <UserPlus className="w-5 h-5 text-green-500" />}
+                                    {modalType === 'students' && <CheckCircle className="w-5 h-5 text-yellow-500" />}
+                                    {modalType === 'attendance' && <Clock className="w-5 h-5 text-primary" />}
+                                    {modalType === 'revenue' && <IndianRupee className="w-5 h-5 text-purple-500" />}
+                                    {modalType} Details
+                                </h2>
+                                <p className="text-[12px] text-muted-foreground mt-0.5">
+                                    {modalLoading ? 'Loading...' : `${modalData.length} record${modalData.length !== 1 ? 's' : ''} found`}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setModalType(null)}
+                                className="p-2 rounded-full hover:bg-muted transition-colors"
+                            >
+                                <X className="h-5 w-5 text-muted-foreground" />
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="overflow-auto flex-1 p-4">
+                            {modalLoading ? (
+                                <div className="flex items-center justify-center py-20">
+                                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                                </div>
+                            ) : modalData.length === 0 ? (
+                                <div className="text-center py-20 text-muted-foreground font-semibold">No records found</div>
+                            ) : modalType === 'leads' ? (
+                                <table className="w-full text-[13px]">
+                                    <thead>
+                                        <tr className="border-b border-border text-left">
+                                            <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Name</th>
+                                            <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Phone</th>
+                                            <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Course</th>
+                                            <th className="pb-3 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {modalData.map((lead: any) => (
+                                            <tr key={lead.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                                                <td className="py-3 pr-4 font-semibold text-foreground">{lead.firstName} {lead.lastName}</td>
+                                                <td className="py-3 pr-4 text-muted-foreground">{lead.phone || '—'}</td>
+                                                <td className="py-3 pr-4 text-muted-foreground">{lead.course?.name || lead.interestedCourse || '—'}</td>
+                                                <td className="py-3">
+                                                    <StatusBadge status={lead.status} variant={lead.status === 'CONVERTED' ? 'success' : 'warning'} />
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            ) : modalType === 'admissions' ? (
+                                <table className="w-full text-[13px]">
+                                    <thead>
+                                        <tr className="border-b border-border text-left">
+                                            <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Name</th>
+                                            <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Course</th>
+                                            <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Fee Balance</th>
+                                            <th className="pb-3 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {modalData.map((adm: any) => (
+                                            <tr key={adm.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                                                <td className="py-3 pr-4 font-semibold text-foreground">{adm.firstName} {adm.lastName}</td>
+                                                <td className="py-3 pr-4 text-muted-foreground">{adm.course?.name || '—'}</td>
+                                                <td className="py-3 pr-4 text-muted-foreground">₹{adm.feeBalance !== undefined ? adm.feeBalance : '0'}</td>
+                                                <td className="py-3">
+                                                    <StatusBadge status={adm.status} variant={adm.status === 'CONFIRMED' ? 'success' : 'warning'} />
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            ) : modalType === 'students' ? (
+                                <table className="w-full text-[13px]">
+                                    <thead>
+                                        <tr className="border-b border-border text-left">
+                                            <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Name</th>
+                                            <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Course</th>
+                                            <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Batch</th>
+                                            <th className="pb-3 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {modalData.map((student: any) => (
+                                            <tr key={student.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                                                <td className="py-3 pr-4 font-semibold text-foreground">{student.user?.firstName} {student.user?.lastName}</td>
+                                                <td className="py-3 pr-4 text-muted-foreground">{student.course?.name || '—'}</td>
+                                                <td className="py-3 pr-4 text-muted-foreground">{student.batch?.name || student.batchCode || '—'}</td>
+                                                <td className="py-3">
+                                                    <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold bg-emerald-50 text-emerald-700">Active</span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            ) : modalType === 'attendance' ? (
+                                <table className="w-full text-[13px]">
+                                    <thead>
+                                        <tr className="border-b border-border text-left">
+                                            <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Student Name</th>
+                                            <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Course</th>
+                                            <th className="pb-3 font-bold text-muted-foreground uppercase text-[11px] tracking-wider text-right">Attendance %</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {modalData.map((att: any) => (
+                                            <tr key={att.id || att.student} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                                                <td className="py-3 pr-4 font-semibold text-foreground">{att.student}</td>
+                                                <td className="py-3 pr-4 text-muted-foreground">{att.course}</td>
+                                                <td className="py-3 text-right">
+                                                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${parseInt(att.percentage) < 75 ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
+                                                        {att.percentage}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            ) : (
+                                <div className="grid gap-4">
+                                    {modalData.map((report: any, i: number) => (
+                                        <div key={i} className="bg-muted/30 border rounded-xl p-4 flex justify-between items-center">
+                                            <div>
+                                                <h4 className="font-bold text-sm">{report.month || "Monthly Report"}</h4>
+                                                <p className="text-xs text-muted-foreground">Total Enrollments: {report.totalEnrollments || 0}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="font-black text-lg text-success">₹{(report.totalCollections || 0).toLocaleString('en-IN')}</p>
+                                                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Collections</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

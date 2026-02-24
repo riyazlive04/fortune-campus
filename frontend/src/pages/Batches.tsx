@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Search, Plus, Edit2, Trash2, Users, Clock, BookOpen, X, Loader2, ChevronRight, UserPlus, UserMinus } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import ClockPicker from "@/components/ClockPicker";
-import { batchesApi, studentsApi, branchesApi, storage, API_BASE_URL } from "@/lib/api";
+import { batchesApi, studentsApi, branchesApi, trainersApi, storage, API_BASE_URL } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
 const Batches = () => {
@@ -17,7 +17,8 @@ const Batches = () => {
     const [courses, setCourses] = useState<any[]>([]);
     const [branches, setBranches] = useState<any[]>([]);
     const [saving, setSaving] = useState(false);
-    const [form, setForm] = useState({ name: "", code: "", courseId: "", branchId: "", startTime: "", endTime: "" });
+    const [trainers, setTrainers] = useState<any[]>([]);
+    const [form, setForm] = useState({ name: "", code: "", courseId: "", branchId: "", trainerId: "", startTime: "", endTime: "" });
 
     // Branch filter for student assignment
     const [branchFilter, setBranchFilter] = useState("");
@@ -62,15 +63,20 @@ const Batches = () => {
         const loadSupportData = async () => {
             try {
                 const token = storage.getToken();
-                const [coursesRes, branchesRes] = await Promise.all([
+                const [coursesRes, branchesRes, trainersRes] = await Promise.all([
                     fetch(`${API_BASE_URL}/courses`, { headers: { 'Authorization': `Bearer ${token}` } }),
                     branchesApi.getBranches(),
+                    trainersApi.getTrainers({ limit: 1000 })
                 ]);
                 const coursesJson = await coursesRes.json();
                 const coursesData = coursesJson.data?.courses || coursesJson.data?.data || coursesJson.data || [];
                 setCourses(Array.isArray(coursesData) ? coursesData : []);
+
                 const branchesData = branchesRes.data?.branches || branchesRes.data || [];
                 setBranches(Array.isArray(branchesData) ? branchesData : []);
+
+                const trainersData = trainersRes.data?.trainers || trainersRes.data || [];
+                setTrainers(Array.isArray(trainersData) ? trainersData : []);
             } catch { }
         };
         loadSupportData();
@@ -115,7 +121,7 @@ const Batches = () => {
 
     const openCreate = () => {
         setEditBatch(null);
-        setForm({ name: "", code: "", courseId: "", branchId: "", startTime: "", endTime: "" });
+        setForm({ name: "", code: "", courseId: "", branchId: "", trainerId: "", startTime: "", endTime: "" });
         setModalStudents([]);
         setModalSelectedIds([]);
         setModalStudentSearch("");
@@ -129,6 +135,7 @@ const Batches = () => {
             code: batch.code || "",
             courseId: batch.courseId || batch.course?.id || "",
             branchId: batch.branchId || batch.branch?.id || "",
+            trainerId: batch.trainerId || batch.trainer?.id || "",
             startTime: batch.startTime || "",
             endTime: batch.endTime || "",
         });
@@ -446,6 +453,23 @@ const Batches = () => {
                                     </select>
                                 </div>
                             )}
+                            <div>
+                                <label className="text-[11px] font-bold uppercase text-muted-foreground mb-1 block">Trainer</label>
+                                <select
+                                    value={form.trainerId}
+                                    onChange={(e) => setForm({ ...form, trainerId: e.target.value })}
+                                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                >
+                                    <option value="">Select a trainer</option>
+                                    {trainers
+                                        .filter(t => !form.branchId || t.branchId === form.branchId)
+                                        .map((t: any) => (
+                                            <option key={t.id} value={t.id}>
+                                                {t.user?.firstName} {t.user?.lastName} ({t.employeeId})
+                                            </option>
+                                        ))}
+                                </select>
+                            </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <ClockPicker
                                     label="Start Time"
@@ -540,216 +564,219 @@ const Batches = () => {
                         </div>
                     </div>
                 </div>
-            )}
+            )
+            }
 
             {/* Batch Detail Modal */}
-            {detailBatch && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
-                        {/* Header */}
-                        <div className="flex items-center justify-between p-6 border-b border-border">
-                            <div>
-                                <h2 className="text-xl font-black text-foreground">{detailBatch.name}</h2>
-                                <p className="text-[12px] text-muted-foreground font-mono mt-0.5">{detailBatch.code}</p>
-                            </div>
-                            <button onClick={() => setDetailBatch(null)} className="p-2 rounded-full hover:bg-muted transition-colors">
-                                <X className="h-5 w-5 text-muted-foreground" />
-                            </button>
-                        </div>
-
-                        {/* Tabs */}
-                        <div className="flex border-b border-border px-6">
-                            {[
-                                { key: "info", label: "Batch Info" },
-                                { key: "students", label: `Enrolled (${detailBatch.students?.length ?? 0})` },
-                                { key: "assign", label: "Assign Students" },
-                            ].map((tab) => (
-                                <button
-                                    key={tab.key}
-                                    onClick={() => handleTabChange(tab.key as any)}
-                                    className={`px-4 py-3 text-[13px] font-semibold border-b-2 transition-colors ${detailTab === tab.key
-                                        ? "border-primary text-primary"
-                                        : "border-transparent text-muted-foreground hover:text-foreground"
-                                        }`}
-                                >
-                                    {tab.label}
+            {
+                detailBatch && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                        <div className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+                            {/* Header */}
+                            <div className="flex items-center justify-between p-6 border-b border-border">
+                                <div>
+                                    <h2 className="text-xl font-black text-foreground">{detailBatch.name}</h2>
+                                    <p className="text-[12px] text-muted-foreground font-mono mt-0.5">{detailBatch.code}</p>
+                                </div>
+                                <button onClick={() => setDetailBatch(null)} className="p-2 rounded-full hover:bg-muted transition-colors">
+                                    <X className="h-5 w-5 text-muted-foreground" />
                                 </button>
-                            ))}
-                        </div>
+                            </div>
 
-                        {/* Body */}
-                        <div className="overflow-auto flex-1 p-6">
-                            {detailLoading ? (
-                                <div className="flex items-center justify-center py-12">
-                                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                                </div>
-                            ) : detailTab === "info" ? (
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="rounded-xl bg-muted/30 p-4">
-                                        <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Course</p>
-                                        <p className="font-semibold text-foreground text-sm">{detailBatch.course?.name || "—"}</p>
+                            {/* Tabs */}
+                            <div className="flex border-b border-border px-6">
+                                {[
+                                    { key: "info", label: "Batch Info" },
+                                    { key: "students", label: `Enrolled (${detailBatch.students?.length ?? 0})` },
+                                    { key: "assign", label: "Assign Students" },
+                                ].map((tab) => (
+                                    <button
+                                        key={tab.key}
+                                        onClick={() => handleTabChange(tab.key as any)}
+                                        className={`px-4 py-3 text-[13px] font-semibold border-b-2 transition-colors ${detailTab === tab.key
+                                            ? "border-primary text-primary"
+                                            : "border-transparent text-muted-foreground hover:text-foreground"
+                                            }`}
+                                    >
+                                        {tab.label}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Body */}
+                            <div className="overflow-auto flex-1 p-6">
+                                {detailLoading ? (
+                                    <div className="flex items-center justify-center py-12">
+                                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
                                     </div>
-                                    <div className="rounded-xl bg-muted/30 p-4">
-                                        <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Trainer</p>
-                                        <p className="font-semibold text-foreground text-sm">
-                                            {detailBatch.trainer ? `${detailBatch.trainer.user?.firstName} ${detailBatch.trainer.user?.lastName}` : "Not assigned"}
-                                        </p>
+                                ) : detailTab === "info" ? (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="rounded-xl bg-muted/30 p-4">
+                                            <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Course</p>
+                                            <p className="font-semibold text-foreground text-sm">{detailBatch.course?.name || "—"}</p>
+                                        </div>
+                                        <div className="rounded-xl bg-muted/30 p-4">
+                                            <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Trainer</p>
+                                            <p className="font-semibold text-foreground text-sm">
+                                                {detailBatch.trainer ? `${detailBatch.trainer.user?.firstName} ${detailBatch.trainer.user?.lastName}` : "Not assigned"}
+                                            </p>
+                                        </div>
+                                        <div className="rounded-xl bg-muted/30 p-4">
+                                            <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Schedule</p>
+                                            <p className="font-semibold text-foreground text-sm">{detailBatch.startTime || "—"} – {detailBatch.endTime || "—"}</p>
+                                        </div>
+                                        <div className="rounded-xl bg-muted/30 p-4">
+                                            <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Branch</p>
+                                            <p className="font-semibold text-foreground text-sm">{detailBatch.branch?.name || "—"}</p>
+                                        </div>
+                                        <div className="rounded-xl bg-muted/30 p-4">
+                                            <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Status</p>
+                                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold ${detailBatch.isActive ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
+                                                {detailBatch.isActive ? "Active" : "Inactive"}
+                                            </span>
+                                        </div>
+                                        <div className="rounded-xl bg-muted/30 p-4">
+                                            <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Total Students</p>
+                                            <p className="font-semibold text-foreground text-sm">{detailBatch.students?.length ?? 0}</p>
+                                        </div>
                                     </div>
-                                    <div className="rounded-xl bg-muted/30 p-4">
-                                        <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Schedule</p>
-                                        <p className="font-semibold text-foreground text-sm">{detailBatch.startTime || "—"} – {detailBatch.endTime || "—"}</p>
-                                    </div>
-                                    <div className="rounded-xl bg-muted/30 p-4">
-                                        <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Branch</p>
-                                        <p className="font-semibold text-foreground text-sm">{detailBatch.branch?.name || "—"}</p>
-                                    </div>
-                                    <div className="rounded-xl bg-muted/30 p-4">
-                                        <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Status</p>
-                                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold ${detailBatch.isActive ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
-                                            {detailBatch.isActive ? "Active" : "Inactive"}
-                                        </span>
-                                    </div>
-                                    <div className="rounded-xl bg-muted/30 p-4">
-                                        <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Total Students</p>
-                                        <p className="font-semibold text-foreground text-sm">{detailBatch.students?.length ?? 0}</p>
-                                    </div>
-                                </div>
-                            ) : detailTab === "students" ? (
-                                <>
-                                    {!detailBatch.students || detailBatch.students.length === 0 ? (
-                                        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                                            <Users className="h-10 w-10 mb-3 opacity-30" />
-                                            <p className="font-semibold">No students enrolled</p>
-                                            <button
-                                                onClick={() => handleTabChange("assign")}
-                                                className="mt-3 text-sm text-primary font-semibold hover:underline"
+                                ) : detailTab === "students" ? (
+                                    <>
+                                        {!detailBatch.students || detailBatch.students.length === 0 ? (
+                                            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+                                                <Users className="h-10 w-10 mb-3 opacity-30" />
+                                                <p className="font-semibold">No students enrolled</p>
+                                                <button
+                                                    onClick={() => handleTabChange("assign")}
+                                                    className="mt-3 text-sm text-primary font-semibold hover:underline"
+                                                >
+                                                    Assign students →
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <table className="w-full text-[13px]">
+                                                <thead>
+                                                    <tr className="border-b border-border text-left">
+                                                        <th className="pb-2 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Name</th>
+                                                        <th className="pb-2 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Email</th>
+                                                        <th className="pb-2 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Course</th>
+                                                        {isCEO && <th className="pb-2 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Action</th>}
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {detailBatch.students.map((s: any) => (
+                                                        <tr key={s.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                                                            <td className="py-2.5 pr-4 font-semibold text-foreground">
+                                                                {s.user?.firstName} {s.user?.lastName}
+                                                            </td>
+                                                            <td className="py-2.5 pr-4 text-muted-foreground">{s.user?.email || "—"}</td>
+                                                            <td className="py-2.5 pr-4 text-muted-foreground">{s.course?.name || "—"}</td>
+                                                            {isCEO && (
+                                                                <td className="py-2.5">
+                                                                    <button
+                                                                        onClick={() => handleRemoveStudent(s.id)}
+                                                                        disabled={removing === s.id}
+                                                                        className="flex items-center gap-1 text-[11px] font-semibold text-red-500 hover:text-red-700 transition-colors disabled:opacity-50"
+                                                                    >
+                                                                        {removing === s.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserMinus className="h-3.5 w-3.5" />}
+                                                                        Remove
+                                                                    </button>
+                                                                </td>
+                                                            )}
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        )}
+                                    </>
+                                ) : (
+                                    /* Assign Students Tab */
+                                    <>
+                                        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                                            <div className="relative flex-1">
+                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Search students by name..."
+                                                    value={studentSearch}
+                                                    onChange={(e) => setStudentSearch(e.target.value)}
+                                                    className="w-full rounded-xl border border-border bg-background pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+                                                />
+                                            </div>
+                                            <select
+                                                value={branchFilter}
+                                                onChange={(e) => setBranchFilter(e.target.value)}
+                                                className="w-full sm:w-48 rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
                                             >
-                                                Assign students →
+                                                <option value="">All Branches</option>
+                                                {branches.map((branch: any) => (
+                                                    <option key={branch.id} value={branch.id}>{branch.name}</option>
+                                                ))}
+                                            </select>
+                                            <button
+                                                onClick={handleAssignStudents}
+                                                disabled={selectedStudentIds.length === 0 || assigning}
+                                                className="flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 transition-colors disabled:opacity-40 whitespace-nowrap"
+                                            >
+                                                {assigning ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+                                                Assign {selectedStudentIds.length > 0 ? `(${selectedStudentIds.length})` : ""}
                                             </button>
                                         </div>
-                                    ) : (
-                                        <table className="w-full text-[13px]">
-                                            <thead>
-                                                <tr className="border-b border-border text-left">
-                                                    <th className="pb-2 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Name</th>
-                                                    <th className="pb-2 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Email</th>
-                                                    <th className="pb-2 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Course</th>
-                                                    {isCEO && <th className="pb-2 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Action</th>}
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {detailBatch.students.map((s: any) => (
-                                                    <tr key={s.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                                                        <td className="py-2.5 pr-4 font-semibold text-foreground">
-                                                            {s.user?.firstName} {s.user?.lastName}
-                                                        </td>
-                                                        <td className="py-2.5 pr-4 text-muted-foreground">{s.user?.email || "—"}</td>
-                                                        <td className="py-2.5 pr-4 text-muted-foreground">{s.course?.name || "—"}</td>
-                                                        {isCEO && (
-                                                            <td className="py-2.5">
-                                                                <button
-                                                                    onClick={() => handleRemoveStudent(s.id)}
-                                                                    disabled={removing === s.id}
-                                                                    className="flex items-center gap-1 text-[11px] font-semibold text-red-500 hover:text-red-700 transition-colors disabled:opacity-50"
-                                                                >
-                                                                    {removing === s.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <UserMinus className="h-3.5 w-3.5" />}
-                                                                    Remove
-                                                                </button>
-                                                            </td>
-                                                        )}
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    )}
-                                </>
-                            ) : (
-                                /* Assign Students Tab */
-                                <>
-                                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-                                        <div className="relative flex-1">
-                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                            <input
-                                                type="text"
-                                                placeholder="Search students by name..."
-                                                value={studentSearch}
-                                                onChange={(e) => setStudentSearch(e.target.value)}
-                                                className="w-full rounded-xl border border-border bg-background pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                                            />
-                                        </div>
-                                        <select
-                                            value={branchFilter}
-                                            onChange={(e) => setBranchFilter(e.target.value)}
-                                            className="w-full sm:w-48 rounded-xl border border-border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                                        >
-                                            <option value="">All Branches</option>
-                                            {branches.map((branch: any) => (
-                                                <option key={branch.id} value={branch.id}>{branch.name}</option>
-                                            ))}
-                                        </select>
-                                        <button
-                                            onClick={handleAssignStudents}
-                                            disabled={selectedStudentIds.length === 0 || assigning}
-                                            className="flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary/90 transition-colors disabled:opacity-40 whitespace-nowrap"
-                                        >
-                                            {assigning ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-                                            Assign {selectedStudentIds.length > 0 ? `(${selectedStudentIds.length})` : ""}
-                                        </button>
-                                    </div>
 
-                                    {allStudents.length === 0 ? (
-                                        <div className="flex items-center justify-center py-12">
-                                            <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                                        </div>
-                                    ) : availableStudents.length === 0 ? (
-                                        <div className="text-center py-12 text-muted-foreground text-sm">
-                                            {studentSearch ? "No students match your search" : "All students are already enrolled in this batch"}
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            {availableStudents.map((s: any) => {
-                                                const isSelected = selectedStudentIds.includes(s.id);
-                                                return (
-                                                    <div
-                                                        key={s.id}
-                                                        onClick={() => toggleStudentSelection(s.id)}
-                                                        className={`flex items-center gap-3 rounded-xl border p-3 cursor-pointer transition-all ${isSelected
-                                                            ? "border-primary bg-primary/5"
-                                                            : "border-border hover:border-primary/40 hover:bg-muted/30"
-                                                            }`}
-                                                    >
-                                                        <div className={`h-5 w-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? "border-primary bg-primary" : "border-border"}`}>
-                                                            {isSelected && (
-                                                                <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                                                </svg>
+                                        {allStudents.length === 0 ? (
+                                            <div className="flex items-center justify-center py-12">
+                                                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                                            </div>
+                                        ) : availableStudents.length === 0 ? (
+                                            <div className="text-center py-12 text-muted-foreground text-sm">
+                                                {studentSearch ? "No students match your search" : "All students are already enrolled in this batch"}
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {availableStudents.map((s: any) => {
+                                                    const isSelected = selectedStudentIds.includes(s.id);
+                                                    return (
+                                                        <div
+                                                            key={s.id}
+                                                            onClick={() => toggleStudentSelection(s.id)}
+                                                            className={`flex items-center gap-3 rounded-xl border p-3 cursor-pointer transition-all ${isSelected
+                                                                ? "border-primary bg-primary/5"
+                                                                : "border-border hover:border-primary/40 hover:bg-muted/30"
+                                                                }`}
+                                                        >
+                                                            <div className={`h-5 w-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-colors ${isSelected ? "border-primary bg-primary" : "border-border"}`}>
+                                                                {isSelected && (
+                                                                    <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                                    </svg>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="font-semibold text-foreground text-[13px]">
+                                                                    {s.user?.firstName} {s.user?.lastName}
+                                                                </p>
+                                                                <p className="text-[11px] text-muted-foreground truncate">
+                                                                    {s.user?.email} {s.course?.name ? `• ${s.course.name}` : ""}
+                                                                </p>
+                                                            </div>
+                                                            {s.branch && (
+                                                                <span className="text-[10px] font-semibold text-muted-foreground bg-muted rounded-full px-2 py-0.5">
+                                                                    {s.branch.name}
+                                                                </span>
                                                             )}
                                                         </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <p className="font-semibold text-foreground text-[13px]">
-                                                                {s.user?.firstName} {s.user?.lastName}
-                                                            </p>
-                                                            <p className="text-[11px] text-muted-foreground truncate">
-                                                                {s.user?.email} {s.course?.name ? `• ${s.course.name}` : ""}
-                                                            </p>
-                                                        </div>
-                                                        {s.branch && (
-                                                            <span className="text-[10px] font-semibold text-muted-foreground bg-muted rounded-full px-2 py-0.5">
-                                                                {s.branch.name}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                </>
-                            )}
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 };
 

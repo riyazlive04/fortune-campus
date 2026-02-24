@@ -404,18 +404,27 @@ const AdmissionModal = ({ isOpen, onClose, onSuccess, admissionId, initialData, 
                                     <SelectContent>
                                         <SelectItem value="NEW">New</SelectItem>
                                         <SelectItem value="CONTACTED">Contacted</SelectItem>
-                                        <SelectItem value="CONVERTED">Converted</SelectItem>
+                                        <SelectItem value="APPROVED">Approved</SelectItem>
+                                        <SelectItem value="DROPOUT">Dropout</SelectItem>
                                         <SelectItem value="CLOSED">Closed</SelectItem>
+                                        {/* Status CONVERTED is hidden from manual selection because it should only be set by the conversion button */}
+                                        {formData.status === 'CONVERTED' && <SelectItem value="CONVERTED">Converted</SelectItem>}
                                     </SelectContent>
                                 </Select>
                             </div>
 
                             <DialogFooter className="flex justify-between items-center pt-6">
                                 <div className="flex gap-2">
-                                    {isEditMode && formData.status !== 'CONVERTED' && formData.status !== 'CLOSED' && (
-                                        <Button type="button" variant="default" className="gap-2" onClick={handleApprove} disabled={approving}>
-                                            {approving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
-                                            Convert to Student
+                                    {isEditMode && formData.status !== 'CLOSED' && (
+                                        <Button
+                                            type="button"
+                                            variant={formData.status === 'CONVERTED' ? "outline" : "default"}
+                                            className="gap-2"
+                                            onClick={handleApprove}
+                                            disabled={approving}
+                                        >
+                                            {approving ? <Loader2 className="h-4 w-4 animate-spin" /> : formData.status === 'CONVERTED' ? <Copy className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+                                            {formData.status === 'CONVERTED' ? "View Credentials" : "Convert to Student"}
                                         </Button>
                                     )}
                                 </div>

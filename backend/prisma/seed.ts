@@ -1,6 +1,6 @@
 
 // Enums removed for SQLite compatibility, using string literals instead
-import bcrypt from "bcryptjs";
+import * as bcrypt from "bcryptjs";
 import { prisma } from "../src/config/database";
 
 async function main() {
@@ -96,7 +96,7 @@ async function main() {
   const adminPassword = await bcrypt.hash("Admin@123", 10);
 
   // CEO / Super Admin
-  const ceo = await prisma.user.upsert({
+  await prisma.user.upsert({
     where: { email: "ceo@fortunecampus.com" },
     update: {},
     create: {
@@ -217,7 +217,7 @@ async function main() {
 
   // Seed courses for all branches
   console.log("📚 Seeding courses for all branches...");
-  const { webDev: webDevCourse, dataScience: dataScienceCourse } = await seedCoursesForBranch(mainBranch.id, "MAIN");
+  const { webDev: webDevCourse } = await seedCoursesForBranch(mainBranch.id, "MAIN");
   await seedCoursesForBranch(salemBranch.id, "SALEM");
   await seedCoursesForBranch(tiruppurBranch.id, "TIRUPPUR");
   await seedCoursesForBranch(erodeBranch.id, "ERODE");
@@ -246,9 +246,10 @@ async function main() {
   console.log("📦 Creating batches...");
   // @ts-ignore
   const batchA1 = await prisma.batch.upsert({
-    where: { code: "MAIN-FSWD-A1" },
+    where: { id: "batch-main-fswd-a1" },
     update: {},
     create: {
+      id: "batch-main-fswd-a1",
       name: "Batch A1",
       code: "MAIN-FSWD-A1",
       branchId: mainBranch.id,
@@ -274,7 +275,6 @@ async function main() {
         source: "WEBSITE",
         status: "NEW",
         interestedCourse: "Full Stack Web Development",
-        notes: "Interested in evening batch",
         branchId: mainBranch.id,
         createdById: branchHead.id,
         assignedToId: branchHead.id,
@@ -287,7 +287,6 @@ async function main() {
         source: "REFERRAL",
         status: "CONTACTED",
         interestedCourse: "Data Science & Machine Learning",
-        notes: "Referred by alumni",
         branchId: mainBranch.id,
         createdById: branchHead.id,
         assignedToId: branchHead.id,
@@ -424,21 +423,9 @@ async function main() {
   await prisma.softwareProgress.create({
     data: {
       studentId: student.id,
-      softwareName: "VS Code & Git",
-      completionPercentage: 100,
-      currentModule: "Advanced Git",
-      remainingModules: "None",
-    }
-  });
-
-  // @ts-ignore
-  await prisma.softwareProgress.create({
-    data: {
-      studentId: student.id,
-      softwareName: "React.js",
-      completionPercentage: 60,
-      currentModule: "Hooks & Context API",
-      remainingModules: "Redux, Next.js",
+      completedTopics: "HTML, CSS, Basic JS",
+      currentTopic: "Advanced Git",
+      progress: 40,
     }
   });
 

@@ -357,11 +357,6 @@ const LeadPipeline = () => {
                             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                             Refresh
                         </Button>
-                        {(isCEO || user?.role === "ADMIN") && (
-                            <Button onClick={() => handleOpenModal()} className="shadow-sm h-9">
-                                <Plus className="mr-2 h-4 w-4" /> Add Lead
-                            </Button>
-                        )}
                     </div>
                 </div>
             </div>

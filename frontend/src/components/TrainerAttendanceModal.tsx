@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
     Dialog,
     DialogContent,
@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { trainerAttendanceApi } from "@/lib/api";
+import { trainerAttendanceApi, trainersApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
@@ -41,7 +41,32 @@ const TrainerAttendanceModal = ({ isOpen, onClose, onSuccess, trainer }: Trainer
     const [inPeriod, setInPeriod] = useState<"AM" | "PM">("AM");
     const [outTime, setOutTime] = useState("");
     const [outPeriod, setOutPeriod] = useState<"AM" | "PM">("AM");
+    const [batches, setBatches] = useState<any[]>([]);
+    const [selectedBatchId, setSelectedBatchId] = useState<string>("");
+    const [fetchingBatches, setFetchingBatches] = useState(false);
     const { toast } = useToast();
+
+    useEffect(() => {
+        const fetchTrainerBatches = async () => {
+            if (!trainer?.id || !isOpen) return;
+            try {
+                setFetchingBatches(true);
+                const res = await trainersApi.getTrainerById(trainer.id);
+                if (res.success && res.data?.trainer?.batches) {
+                    setBatches(res.data.trainer.batches);
+                    if (res.data.trainer.batches.length > 0) {
+                        setSelectedBatchId(res.data.trainer.batches[0].id);
+                    }
+                }
+            } catch (error) {
+                console.error("Failed to fetch trainer batches", error);
+            } finally {
+                setFetchingBatches(false);
+            }
+        };
+
+        fetchTrainerBatches();
+    }, [trainer?.id, isOpen]);
 
     const convertTo24h = (timeStr: string, period: "AM" | "PM") => {
         if (!timeStr) return undefined;
@@ -72,6 +97,14 @@ const TrainerAttendanceModal = ({ isOpen, onClose, onSuccess, trainer }: Trainer
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!trainer) return;
+        if (!selectedBatchId && batches.length > 0) {
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Please select a batch",
+            });
+            return;
+        }
 
         try {
             setLoading(true);
@@ -93,6 +126,7 @@ const TrainerAttendanceModal = ({ isOpen, onClose, onSuccess, trainer }: Trainer
 
             await trainerAttendanceApi.markAttendance({
                 trainerId: trainer.id,
+                batchId: selectedBatchId || undefined,
                 date: today,
                 status,
                 remarks,
@@ -129,6 +163,33 @@ const TrainerAttendanceModal = ({ isOpen, onClose, onSuccess, trainer }: Trainer
                     </DialogHeader>
 
                     <div className="grid gap-4 py-4">
+                        <div className="grid gap-2">
+                            <Label htmlFor="batch">Batch</Label>
+                            {fetchingBatches ? (
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground animate-pulse">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    Fetching batches...
+                                </div>
+                            ) : batches.length > 0 ? (
+                                <Select value={selectedBatchId} onValueChange={setSelectedBatchId}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select batch" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {batches.map((batch) => (
+                                            <SelectItem key={batch.id} value={batch.id}>
+                                                {batch.name} ({batch.code})
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            ) : (
+                                <div className="text-sm text-muted-foreground italic border rounded-md p-2 bg-muted/30">
+                                    No active batches assigned to this trainer.
+                                </div>
+                            )}
+                        </div>
+
                         <div className="grid gap-2">
                             <Label htmlFor="status">Status</Label>
                             <Select value={status} onValueChange={setStatus}>

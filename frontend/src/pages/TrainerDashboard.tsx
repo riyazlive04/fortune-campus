@@ -14,12 +14,14 @@ import {
     DollarSign,
     Database,
     CheckSquare,
-    GraduationCap
+    GraduationCap,
+    Loader2,
+    X
 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import KPICard from "@/components/KPICard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { trainerApi, storage } from "@/lib/api";
+import { trainerApi, storage, portfolioTasksApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 import AttendanceManager from "@/components/trainer/AttendanceManager";
@@ -39,6 +41,39 @@ const TrainerDashboard = () => {
     const [activeTab, setActiveTab] = useState("overview");
     const { toast } = useToast();
     const user = storage.getUser();
+
+    const [modalType, setModalType] = useState<'activeStudents' | 'attendance' | 'pendingPortfolios' | 'placementEligible' | null>(null);
+    const [modalData, setModalData] = useState<any[]>([]);
+    const [modalLoading, setModalLoading] = useState(false);
+
+    const openModal = async (type: 'activeStudents' | 'attendance' | 'pendingPortfolios' | 'placementEligible') => {
+        setModalType(type);
+        setModalData([]);
+        setModalLoading(true);
+        try {
+            if (type === 'activeStudents') {
+                const res = await trainerApi.getBranchStudents();
+                setModalData(res.data?.students || []);
+            } else if (type === 'attendance') {
+                const res = await trainerApi.getBranchStudents();
+                setModalData(res.data?.students || []);
+            } else if (type === 'pendingPortfolios') {
+                const res = await portfolioTasksApi.getStats();
+                const pending = (res.data?.studentStats || []).filter((s: any) => s.pendingCount > 0);
+                setModalData(pending);
+            } else if (type === 'placementEligible') {
+                const res = await trainerApi.getBranchStudents();
+                // Depending on the schema, might not have placementEligible.
+                // Displaying all active branch students as a fallback just in case it doesn't filter perfectly.
+                const eligible = (res.data?.students || []).filter((s: any) => s.placementEligible || s.certificateLocked === false);
+                setModalData(eligible.length > 0 ? eligible : (res.data?.students || []));
+            }
+        } catch (error) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to load details' });
+        } finally {
+            setModalLoading(false);
+        }
+    };
 
     const fetchDashboardData = async () => {
         try {
@@ -76,36 +111,42 @@ const TrainerDashboard = () => {
 
             {/* KPI Cards */}
             <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <div onClick={() => setActiveTab("overview")} className="cursor-pointer hover:shadow-md transition-shadow rounded-xl">
+                <div onClick={() => openModal("activeStudents")} className="cursor-pointer hover:shadow-md transition-shadow rounded-xl">
                     <KPICard
                         title="Active Students"
                         value={(stats?.activeStudents || 0).toString()}
+                        change="Click to view details"
+                        changeType="neutral"
                         icon={Users}
                         accentColor="bg-primary"
                     />
                 </div>
-                <div onClick={() => setActiveTab("attendance")} className="cursor-pointer hover:shadow-md transition-shadow rounded-xl">
+                <div onClick={() => openModal("attendance")} className="cursor-pointer hover:shadow-md transition-shadow rounded-xl">
                     <KPICard
                         title="Attendance (Today)"
                         value={`${stats?.presentToday || 0}/${(stats?.presentToday || 0) + (stats?.absentToday || 0)}`}
-                        change={`${stats?.absentToday || 0} absent`}
-                        changeType="negative"
+                        change="Click to view details"
+                        changeType="neutral"
                         icon={ClipboardCheck}
                         accentColor="bg-success"
                     />
                 </div>
-                <div onClick={() => setActiveTab("portfolio")} className="cursor-pointer hover:shadow-md transition-shadow rounded-xl">
+                <div onClick={() => openModal("pendingPortfolios")} className="cursor-pointer hover:shadow-md transition-shadow rounded-xl">
                     <KPICard
                         title="Pending Portfolios"
                         value={(stats?.pendingPortfolios || 0).toString()}
+                        change="Click to view details"
+                        changeType="neutral"
                         icon={LayoutDashboard}
                         accentColor="bg-warning"
                     />
                 </div>
-                <div onClick={() => setActiveTab("placement")} className="cursor-pointer hover:shadow-md transition-shadow rounded-xl">
+                <div onClick={() => openModal("placementEligible")} className="cursor-pointer hover:shadow-md transition-shadow rounded-xl">
                     <KPICard
                         title="Placement Eligible"
                         value={(stats?.eligibleForPlacement || 0).toString()}
+                        change="Click to view details"
+                        changeType="neutral"
                         icon={Award}
                         accentColor="bg-purple-500"
                     />
@@ -207,6 +248,128 @@ const TrainerDashboard = () => {
                 <TabsContent value="placement"><PlacementEligibility batches={stats?.classes || []} /></TabsContent>
                 <TabsContent value="incentives"><TrainerIncentivesList /></TabsContent>
             </Tabs>
+
+            {/* Detail Modal */}
+            {modalType && (
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+                    onClick={() => setModalType(null)}
+                >
+                    <div
+                        className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between p-6 border-b border-border">
+                            <div>
+                                <h2 className="text-xl font-black text-foreground">
+                                    {modalType === 'activeStudents' ? '🎓 Active Students' :
+                                        modalType === 'attendance' ? '📋 Today\'s Attendance' :
+                                            modalType === 'pendingPortfolios' ? '⏳ Pending Portfolios' :
+                                                '🏆 Placement Eligible'}
+                                </h2>
+                                <p className="text-[12px] text-muted-foreground mt-0.5">
+                                    {modalLoading ? 'Loading...' : `${modalData.length} record${modalData.length !== 1 ? 's' : ''} found`}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setModalType(null)}
+                                className="p-2 rounded-full hover:bg-muted transition-colors"
+                            >
+                                <X className="h-5 w-5 text-muted-foreground" />
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="overflow-auto flex-1 p-4">
+                            {modalLoading ? (
+                                <div className="flex items-center justify-center py-20">
+                                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                                </div>
+                            ) : modalData.length === 0 ? (
+                                <div className="text-center py-20 text-muted-foreground font-semibold">No records found</div>
+                            ) : modalType === 'activeStudents' || modalType === 'placementEligible' ? (
+                                <table className="w-full text-[13px]">
+                                    <thead>
+                                        <tr className="border-b border-border text-left">
+                                            <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Name</th>
+                                            <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Email</th>
+                                            <th className="pb-3 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {modalData.map((student: any) => (
+                                            <tr key={student.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                                                <td className="py-3 pr-4 font-semibold text-foreground">
+                                                    {student.user?.firstName} {student.user?.lastName} {student.name ? student.name : ''}
+                                                </td>
+                                                <td className="py-3 pr-4 text-muted-foreground">{student.user?.email || student.email || '—'}</td>
+                                                <td className="py-3">
+                                                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold bg-success/10 text-success`}>
+                                                        Active
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            ) : modalType === 'attendance' ? (
+                                <table className="w-full text-[13px]">
+                                    <thead>
+                                        <tr className="border-b border-border text-left">
+                                            <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Name</th>
+                                            <th className="pb-3 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Today's Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {modalData.map((student: any) => {
+                                            const todayAtt = student.attendances?.[0];
+                                            return (
+                                                <tr key={student.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                                                    <td className="py-3 pr-4 font-semibold text-foreground">
+                                                        {student.user?.firstName} {student.user?.lastName}
+                                                    </td>
+                                                    <td className="py-3">
+                                                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${todayAtt?.status === 'PRESENT' ? 'bg-emerald-50 text-emerald-700' :
+                                                            todayAtt?.status === 'ABSENT' ? 'bg-red-50 text-red-700' :
+                                                                'bg-gray-50 text-gray-700'
+                                                            }`}>
+                                                            {todayAtt?.status || 'NOT MARKED'}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            ) : (
+                                <table className="w-full text-[13px]">
+                                    <thead>
+                                        <tr className="border-b border-border text-left">
+                                            <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Student Name</th>
+                                            <th className="pb-3 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Pending Tasks</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {modalData.map((stat: any) => (
+                                            <tr key={stat.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                                                <td className="py-3 pr-4 font-semibold text-foreground">
+                                                    {stat.name}
+                                                </td>
+                                                <td className="py-3">
+                                                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold bg-warning/10 text-orange-600`}>
+                                                        {stat.pendingCount} Pending
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

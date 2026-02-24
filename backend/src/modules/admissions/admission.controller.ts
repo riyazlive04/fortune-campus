@@ -310,7 +310,7 @@ export const approveAdmission = async (req: AuthRequest, res: Response): Promise
                     }
                 }, 'Admission already approved. Existing credentials retrieved.');
             }
-            return errorResponse(res, 'Admission already converted to student, but user record is missing', 400);
+            // If status is CONVERTED but no student record exists, proceed to create it.
         }
 
         const updatedAdmission = await prisma.$transaction(async (tx) => {
@@ -367,7 +367,10 @@ export const approveAdmission = async (req: AuthRequest, res: Response): Promise
                 password: updatedAdmission.plainPassword
             }
         }, 'Admission approved successfully');
-    } catch (error) {
+    } catch (error: any) {
+        if (error.code === 'P2002' && error.meta?.target?.includes('email')) {
+            return errorResponse(res, 'Email already exists. A student with this exact email is already registered. Please edit the admission to use a different email or uniquely suffix it.', 400);
+        }
         return errorResponse(res, 'Failed to approve admission', 500, error);
     }
 };

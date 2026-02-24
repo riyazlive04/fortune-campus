@@ -104,6 +104,32 @@ const StudentDashboard = () => {
     const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
     const { toast } = useToast();
 
+    // Modal state for Tests details
+    const [showTestsModal, setShowTestsModal] = useState(false);
+    const [testsModalData, setTestsModalData] = useState<any[]>([]);
+    const [testsModalLoading, setTestsModalLoading] = useState(false);
+
+    const fetchTestsForModal = async () => {
+        setShowTestsModal(true);
+        if (testsModalData.length > 0) return; // already loaded
+        setTestsModalLoading(true);
+        try {
+            const token = storage.getToken();
+            const response = await fetch(`${API_BASE_URL}/students/dashboard/tests`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            const data = await response.json();
+            if (data.success) {
+                const all = [...(data.data.upcoming || []), ...(data.data.results || [])];
+                setTestsModalData(all);
+            }
+        } catch {
+            toast({ variant: 'destructive', title: 'Error', description: 'Failed to load test details' });
+        } finally {
+            setTestsModalLoading(false);
+        }
+    };
+
     const fetchOverview = async () => {
         try {
             setError(null);
@@ -366,7 +392,10 @@ const StudentDashboard = () => {
                             </CardContent>
                         </Card>
 
-                        <Card>
+                        <Card
+                            className="cursor-pointer hover:shadow-md hover:border-primary/50 transition-all"
+                            onClick={fetchTestsForModal}
+                        >
                             <CardHeader className="pb-2">
                                 <CardTitle className="text-sm font-medium">Tests</CardTitle>
                             </CardHeader>
@@ -377,6 +406,7 @@ const StudentDashboard = () => {
                                 <Badge className={`mt-2 ${getStatusColor(overview.tests.status)}`}>
                                     {overview.tests.status}
                                 </Badge>
+                                <p className="text-xs text-muted-foreground mt-1">Click to view details</p>
                             </CardContent>
                         </Card>
 
@@ -395,55 +425,71 @@ const StudentDashboard = () => {
                     </div>
 
                     {/* Course & Batch Info */}
-                    <div className="grid gap-4 md:grid-cols-2">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Course Details</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-2">
-                                <div>
-                                    <p className="text-sm text-muted-foreground">Course</p>
-                                    <p className="font-medium">{overview.course.name}</p>
-                                </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">Duration</p>
-                                    <p className="font-medium">{overview.course.duration} months</p>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        {overview.batch && (
+                    {/* If student has multiple enrollments, show all; otherwise show primary */}
+                    {overview.allEnrollments && overview.allEnrollments.length > 0 ? (
+                        <div>
+                            <h3 className="text-sm font-semibold text-muted-foreground mb-2">Enrolled Courses &amp; Batches</h3>
+                            <div className="grid gap-4 md:grid-cols-2">
+                                {overview.allEnrollments.map((enrollment: any) => (
+                                    <Card key={enrollment.batchId}>
+                                        <CardHeader>
+                                            <CardTitle className="text-base">{enrollment.courseName}</CardTitle>
+                                            <CardDescription>{enrollment.batchName} ({enrollment.batchCode})</CardDescription>
+                                        </CardHeader>
+                                        <CardContent className="space-y-1 text-sm">
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Timing</span>
+                                                <span className="font-medium">{enrollment.timing}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Trainer</span>
+                                                <span className="font-medium">{enrollment.trainer}</span>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="grid gap-4 md:grid-cols-2">
                             <Card>
                                 <CardHeader>
-                                    <CardTitle>Batch Details</CardTitle>
+                                    <CardTitle>Course Details</CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-2">
                                     <div>
-                                        <p className="text-sm text-muted-foreground">Batch</p>
-                                        <p className="font-medium">{overview.batch.name}</p>
+                                        <p className="text-sm text-muted-foreground">Course</p>
+                                        <p className="font-medium">{overview.course.name}</p>
                                     </div>
                                     <div>
-                                        <p className="text-sm text-muted-foreground">Timing</p>
-                                        <p className="font-medium">{overview.batch.timing}</p>
+                                        <p className="text-sm text-muted-foreground">Duration</p>
+                                        <p className="font-medium">{overview.course.duration} months</p>
                                     </div>
-                                    <div>
-                                        <p className="font-medium">{overview.batch.trainer}</p>
-                                    </div>
-                                    {overview.batch.upcomingTest && (
-                                        <div className="pt-2 border-t mt-2">
-                                            <p className="text-sm text-primary font-semibold">Upcoming Test</p>
-                                            <div className="flex justify-between items-center mt-1">
-                                                <p className="font-medium text-sm">{overview.batch.upcomingTest.title}</p>
-                                                <p className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-                                                    {new Date(overview.batch.upcomingTest.date).toLocaleDateString()}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    )}
                                 </CardContent>
                             </Card>
-                        )}
-                    </div>
+
+                            {overview.batch && (
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>Batch Details</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-2">
+                                        <div>
+                                            <p className="text-sm text-muted-foreground">Batch</p>
+                                            <p className="font-medium">{overview.batch.name}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm text-muted-foreground">Timing</p>
+                                            <p className="font-medium">{overview.batch.timing}</p>
+                                        </div>
+                                        <div>
+                                            <p className="font-medium">{overview.batch.trainer}</p>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )}
+                        </div>
+                    )}
 
                     {/* Notifications */}
                     {notifications.length > 0 && (
@@ -903,6 +949,68 @@ const StudentDashboard = () => {
                     </Card>
                 </TabsContent>
             </Tabs>
+
+            {/* Tests Details Modal */}
+            {showTestsModal && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowTestsModal(false)}>
+                    <div className="bg-background rounded-xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-between p-5 border-b">
+                            <div>
+                                <h2 className="text-lg font-bold">Test Schedule &amp; Results</h2>
+                                <p className="text-sm text-muted-foreground">All tests assigned to your batch</p>
+                            </div>
+                            <button
+                                onClick={() => setShowTestsModal(false)}
+                                className="rounded-full p-1 hover:bg-muted transition"
+                            >
+                                <XCircle className="h-5 w-5 text-muted-foreground" />
+                            </button>
+                        </div>
+                        <div className="overflow-y-auto flex-1 p-5">
+                            {testsModalLoading ? (
+                                <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
+                                    <Clock className="h-5 w-5 animate-spin" />
+                                    Loading test details...
+                                </div>
+                            ) : testsModalData.length === 0 ? (
+                                <p className="text-center text-muted-foreground py-12">No tests found for your batch yet.</p>
+                            ) : (
+                                <div className="space-y-3">
+                                    {testsModalData.map((test: any, idx: number) => {
+                                        const statusColor =
+                                            test.status === 'PASSED' ? 'bg-green-500' :
+                                                test.status === 'FAILED' ? 'bg-red-500' :
+                                                    test.status === 'UPCOMING' ? 'bg-blue-500' :
+                                                        test.status === 'MISSED' ? 'bg-orange-400' :
+                                                            'bg-gray-400';
+                                        return (
+                                            <div key={test.id || idx} className="flex items-center justify-between border rounded-lg p-4 hover:bg-muted/40 transition-colors">
+                                                <div className="space-y-0.5">
+                                                    <p className="font-semibold">{test.title}</p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {new Date(test.date).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+                                                    </p>
+                                                    {test.marksObtained !== null && test.marksObtained !== undefined && (
+                                                        <p className="text-xs text-muted-foreground">
+                                                            Marks: {test.marksObtained} / {test.totalMarks} &nbsp;|&nbsp; Pass: {test.passMarks}
+                                                        </p>
+                                                    )}
+                                                    {(test.status === 'UPCOMING') && (
+                                                        <p className="text-xs text-blue-600 font-medium">Scheduled — prepare for this test</p>
+                                                    )}
+                                                </div>
+                                                <Badge className={`${statusColor} text-white px-3`}>
+                                                    {test.status}
+                                                </Badge>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

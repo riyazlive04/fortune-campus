@@ -3,11 +3,10 @@ import { Response } from 'express';
 import { prisma } from '../../config/database';
 import { successResponse, errorResponse } from '../../utils/response';
 import { AuthRequest } from '../../middlewares/auth.middleware';
-import { UserRole } from '../../types/enums';
 
 export const markTrainerAttendance = async (req: AuthRequest, res: Response): Promise<Response> => {
     try {
-        const { trainerId, date, status, remarks, inTime, outTime } = req.body;
+        const { trainerId, batchId, date, status, remarks, inTime, outTime } = req.body;
         let branchId = req.user?.branchId;
 
         if (!trainerId || !date || !status) {
@@ -36,8 +35,9 @@ export const markTrainerAttendance = async (req: AuthRequest, res: Response): Pr
 
         const attendance = await prisma.trainerAttendance.upsert({
             where: {
-                trainerId_date: {
+                trainerId_batchId_date: {
                     trainerId,
+                    batchId: batchId || null,
                     date: attendanceDate
                 }
             },
@@ -49,6 +49,7 @@ export const markTrainerAttendance = async (req: AuthRequest, res: Response): Pr
             },
             create: {
                 trainerId,
+                batchId: batchId || null,
                 branchId: branchId as string,
                 date: attendanceDate,
                 status,
@@ -66,14 +67,27 @@ export const markTrainerAttendance = async (req: AuthRequest, res: Response): Pr
 };
 
 export const getTrainerAttendance = async (req: AuthRequest, res: Response): Promise<Response> => {
-    try {
-        const branchId = req.user?.branchId;
-        const { trainerId, startDate, endDate } = req.query;
+    // DEBUG: Check if code is live
+    // return res.send({ message: "DEBUG_HIT", user: req.user }); 
 
-        const where: any = {
-            branchId: branchId || undefined,
-            trainerId: trainerId ? (trainerId as string) : undefined,
-        };
+    try {
+
+        const branchId = req.user?.branchId;
+        const { trainerId, startDate, endDate, batchId } = req.query;
+
+        // Build where clause conditionally — only include fields if they have values
+        const where: any = {};
+
+        // Branch heads see only their branch; CEO/Admin see all (no branchId filter)
+        if (branchId) {
+            where.branchId = branchId;
+        }
+        if (trainerId) {
+            where.trainerId = trainerId as string;
+        }
+        if (batchId) {
+            where.batchId = batchId as string;
+        }
 
         if (startDate || endDate) {
             where.date = {};
@@ -93,14 +107,18 @@ export const getTrainerAttendance = async (req: AuthRequest, res: Response): Pro
             where,
             include: {
                 trainer: {
-                    include: { user: true }
+                    include: { user: { select: { firstName: true, lastName: true, email: true } } }
+                },
+                batch: {
+                    select: { name: true, code: true }
                 }
             },
             orderBy: { date: 'desc' }
         });
 
         return successResponse(res, attendance, 'Trainer attendance fetched successfully');
-    } catch (error) {
+    } catch (error: any) {
+        console.error('getTrainerAttendance error:', error);
         return errorResponse(res, 'Failed to fetch trainer attendance', 500, error);
     }
 };

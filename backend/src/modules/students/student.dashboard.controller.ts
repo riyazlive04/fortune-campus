@@ -77,8 +77,11 @@ export const getStudentOverview = async (req: AuthRequest, res: Response): Promi
             return errorResponse(res, 'Student profile not found. Please contact admin to create your student profile.', 404);
         }
 
-        // Calculate attendance percentage
-        const totalAttendance = await prisma.attendance.count({
+        // Calculate attendance against total planned course duration
+        // Assuming ~22 working days per month
+        const totalExpectedDays = (student.course?.duration || 1) * 22;
+
+        const totalMarkedDays = await prisma.attendance.count({
             where: { studentId: student.id },
         });
 
@@ -89,9 +92,11 @@ export const getStudentOverview = async (req: AuthRequest, res: Response): Promi
             },
         });
 
-        const attendancePercentage = totalAttendance > 0
-            ? Math.round((presentAttendance / totalAttendance) * 100)
+        // Use the total expected days for percentage, but cap at 100 if present > expected
+        const attendancePercentage = totalExpectedDays > 0
+            ? Math.min(100, Math.round((presentAttendance / totalExpectedDays) * 100))
             : 0;
+
 
         // Calculate portfolio completion
         const totalPortfolioTasks = await prisma.portfolioTask.count({
@@ -114,24 +119,34 @@ export const getStudentOverview = async (req: AuthRequest, res: Response): Promi
         let passedTests = 0;
         let totalTests = 0;
         try {
-            const testScores = await prisma.testScore.findMany({
-                where: { studentId: student.id },
-                include: {
-                    test: {
-                        select: {
-                            title: true,
-                            passMarks: true,
-                        },
-                    },
-                },
-            });
+            // Find all tests assigned to this student's batch
+            if (student.batchId) {
+                const batchTests = await prisma.test.findMany({
+                    where: { batchId: student.batchId },
+                    include: {
+                        scores: {
+                            where: { studentId: student.id }
+                        }
+                    }
+                });
 
-            passedTests = testScores.filter(
-                (score: any) => score.isPass
-            ).length;
+                totalTests = batchTests.length;
 
-            totalTests = testScores.length;
-            testStatus = totalTests === 0 ? 'PENDING' : passedTests === totalTests ? 'PASSED' : 'PARTIAL';
+                // Calculate passed tests from scores
+                passedTests = batchTests.filter(test => {
+                    const score = (test as any).scores[0];
+                    return score && score.isPass;
+                }).length;
+
+                // Determine overall status
+                if (totalTests === 0) {
+                    testStatus = 'PENDING';
+                } else if (passedTests === totalTests) {
+                    testStatus = 'PASSED';
+                } else {
+                    testStatus = 'PARTIAL';
+                }
+            }
         } catch (err) {
             console.error('Error fetching tests:', (err as any).message);
         }
@@ -184,6 +199,35 @@ export const getStudentOverview = async (req: AuthRequest, res: Response): Promi
 
         const placementEligible = certificateEligible && student.placementEligible;
 
+        // Fetch ALL batches/courses the student is enrolled in
+        let allEnrollments: Array<{ batchId: string; batchName: string; batchCode: string; courseName: string; courseCode: string; timing: string; trainer: string; }> = [];
+        try {
+            const allBatches = await prisma.batch.findMany({
+                where: {
+                    students: { some: { id: student.id } }
+                },
+                include: {
+                    course: { select: { name: true, code: true, duration: true } },
+                    trainer: {
+                        include: {
+                            user: { select: { firstName: true, lastName: true } }
+                        }
+                    }
+                }
+            });
+            allEnrollments = allBatches.map(b => ({
+                batchId: b.id,
+                batchName: b.name,
+                batchCode: b.code,
+                courseName: b.course.name,
+                courseCode: b.course.code,
+                timing: `${b.startTime || 'TBD'} - ${b.endTime || 'TBD'}`,
+                trainer: b.trainer ? `${b.trainer.user.firstName} ${b.trainer.user.lastName}` : 'Not Assigned',
+            }));
+        } catch (err) {
+            console.error('Error fetching all enrollments:', (err as any).message);
+        }
+
         // Build overview response
         const overview = {
             student: {
@@ -214,7 +258,8 @@ export const getStudentOverview = async (req: AuthRequest, res: Response): Promi
                 percentage: attendancePercentage,
                 status: attendancePercentage >= 75 ? 'ELIGIBLE' : 'NOT_ELIGIBLE',
                 present: presentAttendance,
-                total: totalAttendance,
+                total: totalExpectedDays, // Show expected total rather than just marked
+                marked: totalMarkedDays
             },
             portfolio: {
                 percentage: portfolioPercentage,
@@ -227,6 +272,7 @@ export const getStudentOverview = async (req: AuthRequest, res: Response): Promi
                 passed: passedTests,
                 total: totalTests,
             },
+            allEnrollments,
             softwareProgress: {
                 percentage: softwareProgress?.progress || 0,
                 currentTopic: softwareProgress?.currentTopic || 'Not Started',
@@ -274,6 +320,13 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response): Pro
 
         const student = await prisma.student.findUnique({
             where: { userId },
+            include: {
+                course: {
+                    select: {
+                        duration: true
+                    }
+                }
+            }
         });
 
         if (!student) {
@@ -294,13 +347,18 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response): Pro
             },
         });
 
+        // Calculate attendance against total planned course duration
+        const totalExpectedDays = (student.course?.duration || 1) * 22;
+
         // Calculate stats
-        const totalDays = attendances.length;
+        const totalMarkedDays = attendances.length;
         const presentDays = attendances.filter((a) => a.status === 'PRESENT').length;
         const lateDays = attendances.filter((a) => a.status === 'LATE').length;
         const absentDays = attendances.filter((a) => a.status === 'ABSENT').length;
 
-        const attendancePercentage = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
+        const attendancePercentage = totalExpectedDays > 0
+            ? Math.min(100, Math.round((presentDays / totalExpectedDays) * 100))
+            : 0;
 
         // Check for consecutive absences
         let consecutiveAbsences = 0;
@@ -318,7 +376,8 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response): Pro
         return successResponse(res, {
             records: attendances,
             stats: {
-                total: totalDays,
+                total: totalExpectedDays,
+                marked: totalMarkedDays,
                 present: presentDays,
                 late: lateDays,
                 absent: absentDays,

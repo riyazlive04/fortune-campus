@@ -93,6 +93,9 @@ export const getTrainerById = async (req: AuthRequest, res: Response): Promise<R
           },
         },
         branch: true,
+        batches: {
+          where: { isActive: true },
+        },
         courses: {
           include: {
             course: true,

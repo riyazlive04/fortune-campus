@@ -767,6 +767,7 @@ export const branchDashboardApi = {
 export const trainerAttendanceApi = {
   markAttendance: async (data: {
     trainerId: string;
+    batchId?: string;
     date: string;
     status: string;
     remarks?: string;

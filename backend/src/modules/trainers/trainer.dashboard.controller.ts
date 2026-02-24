@@ -71,6 +71,9 @@ export const getTrainerDashboardStats = async (req: AuthRequest, res: Response):
         const students = await (prisma as any).student.findMany({
             where: { batch: { trainerId: trainer.id }, isActive: true },
             include: {
+                course: {
+                    select: { duration: true }
+                },
                 _count: {
                     select: {
                         attendances: true,
@@ -84,9 +87,9 @@ export const getTrainerDashboardStats = async (req: AuthRequest, res: Response):
         });
 
         const studentAttendanceStats = students.map((s: any) => {
-            const total = s._count.attendances;
+            const totalExpected = (s.course?.duration || 1) * 22;
             const present = s.attendances.length;
-            const percentage = total > 0 ? (present / total) * 100 : 100;
+            const percentage = totalExpected > 0 ? Math.min(100, Math.round((present / totalExpected) * 100)) : 0;
             return { id: s.id, percentage };
         });
 
@@ -173,23 +176,19 @@ export const checkBatchEligibility = async (req: AuthRequest, res: Response): Pr
         const { batchId } = req.params;
         const students = await (prisma as any).student.findMany({
             where: { batchId, isActive: true },
-            include: { attendances: true, portfolioSubmissions: true }
+            include: {
+                course: { select: { duration: true } },
+                attendances: true,
+                portfolioSubmissions: true
+            }
         });
 
         const updates = [];
         for (const student of students) {
-            // 1. Attendance Check (>75%)
-            // Calculate total days since batch started
-            const batchStartDate = new Date(student.batch?.createdAt || student.createdAt);
-            const today = new Date();
-            const timeDiff = today.getTime() - batchStartDate.getTime();
-            const daysSinceStart = Math.ceil(timeDiff / (1000 * 3600 * 24));
-
-            // Avoid division by zero, min 1 day
-            const totalDays = Math.max(1, daysSinceStart);
-
+            // 1. Attendance Check (>75%) based on expected course duration
+            const totalExpectedDays = (student.course?.duration || 1) * 22;
             const presentDays = student.attendances.filter((a: any) => a.status === 'PRESENT').length;
-            const attendancePercentage = (presentDays / totalDays) * 100;
+            const attendancePercentage = totalExpectedDays > 0 ? (presentDays / totalExpectedDays) * 100 : 0;
 
             // 2. Portfolio Check (At least one approved or specific logic)
             // Simplified: If certificate is unlocked, they are eligible for placement
@@ -296,15 +295,15 @@ export const getStudentDetailsForTrainer = async (req: AuthRequest, res: Respons
         }
 
         // Calculate some basic stats for the popup
-        const totalAttendance = await prisma.attendance.count({ where: { studentId } });
         const presentAttendance = await prisma.attendance.count({ where: { studentId, status: 'PRESENT' } });
-        const attendancePercentage = totalAttendance > 0 ? Math.round((presentAttendance / totalAttendance) * 100) : 0;
+        const totalExpectedDays = (student.course?.duration || 1) * 22;
+        const attendancePercentage = totalExpectedDays > 0 ? Math.min(100, Math.round((presentAttendance / totalExpectedDays) * 100)) : 0;
 
         return successResponse(res, {
             ...student,
             stats: {
                 attendancePercentage,
-                totalAttendance,
+                totalAttendance: totalExpectedDays,
                 presentAttendance
             }
         });

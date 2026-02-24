@@ -438,6 +438,7 @@ model TrainerAttendance {
   
   trainerId       String
   branchId        String
+  batchId         String?
   
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
@@ -445,10 +446,12 @@ model TrainerAttendance {
   // Relations
   trainer         Trainer          @relation(fields: [trainerId], references: [id], onDelete: Cascade)
   branch          Branch           @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  batch           Batch?           @relation(fields: [batchId], references: [id], onDelete: SetNull)
   
-  @@unique([trainerId, date])
+  @@unique([trainerId, batchId, date])
   @@index([trainerId])
   @@index([branchId])
+  @@index([batchId])
   @@index([date])
   @@map("trainer_attendances")
 }
@@ -475,6 +478,7 @@ model Batch {
   trainer         Trainer? @relation(fields: [trainerId], references: [id], onDelete: SetNull)
   students        Student[]
   attendances     Attendance[]
+  trainerAttendances TrainerAttendance[]
   tests           Test[]
   
   @@index([branchId])

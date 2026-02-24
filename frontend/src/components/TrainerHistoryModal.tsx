@@ -83,6 +83,7 @@ const TrainerHistoryModal = ({ isOpen, onClose, trainerId, trainerName }: Traine
                                 <thead className="bg-muted/80 backdrop-blur-sm sticky top-0 z-10">
                                     <tr className="border-b border-border text-left">
                                         <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-muted-foreground">Date</th>
+                                        <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-muted-foreground">Batch</th>
                                         <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-muted-foreground text-center">Status</th>
                                         <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-muted-foreground text-center">In-Time</th>
                                         <th className="px-6 py-4 font-black uppercase tracking-widest text-[10px] text-muted-foreground text-center">Out-Time</th>
@@ -94,6 +95,9 @@ const TrainerHistoryModal = ({ isOpen, onClose, trainerId, trainerName }: Traine
                                         <tr key={record.id} className="hover:bg-muted/50 transition-colors">
                                             <td className="px-6 py-4 whitespace-nowrap font-bold text-foreground">
                                                 {format(new Date(record.date), "dd MMM yyyy")}
+                                            </td>
+                                            <td className="px-6 py-4 text-muted-foreground font-medium">
+                                                {record.batch?.name || <span className="opacity-30 italic">No Batch</span>}
                                             </td>
                                             <td className="px-6 py-4 text-center">
                                                 <StatusBadge
