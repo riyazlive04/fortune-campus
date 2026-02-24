@@ -1,0 +1,48 @@
+{
+  "branches": [
+    {
+      "id": "1e736840-e93c-4259-8fd7-c24c28b14413",
+      "name": "Salem ",
+      "code": "SLM",
+      "leads": [
+        {
+          "id": "19965a53-7564-4b65-af9f-51f6a4875dbf",
+          "firstName": "I.Aakash",
+          "lastName": "kummar",
+          "status": "CONVERTED"
+        },
+        {
+          "id": "1065827b-5dc8-46f1-82d5-b0507236b894",
+          "firstName": "samad",
+          "lastName": "samad",
+          "status": "CONVERTED"
+        },
+        {
+          "id": "186539f7-4779-49d4-a14e-37619a4d400b",
+          "firstName": "samad",
+          "lastName": "samad",
+          "status": "CONVERTED"
+        },
+        {
+          "id": "5b2f285c-95e6-4c23-84bc-edf5f2b28631",
+          "firstName": "samad",
+          "lastName": "samad",
+          "status": "NEGOTIATING"
+        },
+        {
+          "id": "0b202fd1-36aa-40f2-a158-340b00c490e7",
+          "firstName": "Eshwanth",
+          "lastName": "B",
+          "status": "CONVERTED"
+        }
+      ]
+    }
+  ],
+  "telecallers": [
+    {
+      "id": "7b869af6-c041-45a7-8381-7260ebb70bd4",
+      "name": "Telecaller 2",
+      "branchId": "1e736840-e93c-4259-8fd7-c24c28b14413"
+    }
+  ]
+}

@@ -11,7 +11,7 @@ const navSections = [
   {
     label: "Main",
     items: [
-      { title: "Dashboard", path: "/", icon: LayoutDashboard },
+      { title: "Dashboard", path: "/", icon: LayoutDashboard, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER'] },
       { title: "Telecaller Desk", path: "/telecaller/dashboard", icon: LayoutDashboard, roles: ['TELECALLER', 'ADMIN'] },
       { title: "Lead Pipeline", path: "/telecaller/pipeline", icon: FolderKanban, roles: ['TELECALLER', 'ADMIN', 'CEO', 'CHANNEL_PARTNER'] },
       { title: "Leads & Enquiries", path: "/leads", icon: UserPlus, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER', 'TELECALLER'] },

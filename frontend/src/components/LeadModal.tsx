@@ -28,9 +28,10 @@ interface LeadModalProps {
     onClose: () => void;
     onSuccess: () => void;
     leadId?: string | null; // If provided, we are in View/Edit mode
+    defaultBranchId?: string; // Optional default for new leads
 }
 
-const LeadModal = ({ isOpen, onClose, onSuccess, leadId }: LeadModalProps) => {
+const LeadModal = ({ isOpen, onClose, onSuccess, leadId, defaultBranchId }: LeadModalProps) => {
     const [loading, setLoading] = useState(false);
     const [fetching, setFetching] = useState(false);
     const [courses, setCourses] = useState<any[]>([]);
@@ -62,6 +63,7 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId }: LeadModalProps) => {
     const isEditMode = !!leadId;
     const user = storage.getUser();
     const isTelecaller = user?.role === "TELECALLER";
+    const isCEO = user?.role === "CEO";
 
     const fetchActivity = async (id: string) => {
         try {
@@ -107,7 +109,7 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId }: LeadModalProps) => {
                     source: "WEBSITE",
                     status: "NEW",
                     interestedCourse: "",
-                    branchId: "",
+                    branchId: defaultBranchId || (isTelecaller ? user?.branchId : ""),
                     notes: "",
                     followUpDate: "",
                 });
@@ -158,6 +160,7 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId }: LeadModalProps) => {
             toast({ title: "Success", description: "Call logged successfully" });
             setCallData({ callStatus: "Connected", notes: "", nextFollowUpDate: "" });
             fetchActivity(leadId);
+            onSuccess(); // Trigger refresh in parent (dashboard stats)
         } catch (error: any) {
             toast({ variant: "destructive", title: "Error", description: error.message });
         } finally {
@@ -338,12 +341,26 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId }: LeadModalProps) => {
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="branch">Branch</Label>
-                                        <Select value={formData.branchId} onValueChange={(v) => setFormData({ ...formData, branchId: v })} disabled={isEditMode}>
+                                        <Select
+                                            value={formData.branchId}
+                                            onValueChange={(v) => setFormData({ ...formData, branchId: v })}
+                                            disabled={isEditMode && !isCEO}
+                                        >
                                             <SelectTrigger><SelectValue placeholder="Branch" /></SelectTrigger>
                                             <SelectContent>
                                                 {branches.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
                                             </SelectContent>
                                         </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="followUpDate">Next Follow-up Date</Label>
+                                        <Input
+                                            id="followUpDate"
+                                            type="date"
+                                            className="h-8"
+                                            value={formData.followUpDate}
+                                            onChange={(e) => setFormData({ ...formData, followUpDate: e.target.value })}
+                                        />
                                     </div>
                                 </div>
 

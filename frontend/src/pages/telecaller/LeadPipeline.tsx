@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, MoreHorizontal, Phone, Mail, Calendar, MessageSquare } from "lucide-react";
+import { Plus, MoreHorizontal, Phone, Mail, Calendar, MessageSquare, RefreshCw } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,9 +33,8 @@ const PIPELINE_STATUSES = [
     { id: "NEW", label: "New", color: "bg-blue-500/10 text-blue-500 border-blue-500/20" },
     { id: "CONTACTED", label: "Contacted", color: "bg-slate-500/10 text-slate-500 border-slate-500/20" },
     { id: "INTERESTED", label: "Interested", color: "bg-purple-500/10 text-purple-500 border-purple-500/20" },
-    { id: "DEMO_SCHEDULED", label: "Demo Scheduled", color: "bg-amber-500/10 text-amber-500 border-amber-500/20" },
-    { id: "DEMO_ATTENDED", label: "Demo Attended", color: "bg-indigo-500/10 text-indigo-500 border-indigo-500/20" },
-    { id: "READY_FOR_ADMISSION", label: "Ready", color: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" },
+    { id: "NEGOTIATING", label: "Negotiating", color: "bg-orange-500/10 text-orange-500 border-orange-500/20" },
+    { id: "CONVERTED", label: "Converted", color: "bg-green-500/10 text-green-500 border-green-500/20" },
 ];
 
 const SortableLeadCard = ({ lead, status, onEdit }: { lead: any; status: any; onEdit: (id: string) => void }) => {
@@ -161,9 +160,6 @@ const Lane = ({ id, label, count, loading, children }: any) => {
                         {loading ? "..." : count}
                     </Badge>
                 </div>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <Plus className="h-4 w-4 text-muted-foreground" />
-                </Button>
             </div>
             {children}
         </div>
@@ -176,7 +172,7 @@ const LeadPipeline = () => {
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
     const [branches, setBranches] = useState<any[]>([]);
-    const [selectedBranchId, setSelectedBranchId] = useState<string>("");
+    const [selectedBranchId, setSelectedBranchId] = useState<string>("all");
     const [activeId, setActiveId] = useState<string | null>(null);
     const { toast } = useToast();
 
@@ -200,16 +196,14 @@ const LeadPipeline = () => {
             const res = await branchesApi.getBranches();
             if (res.success && res.data?.branches) {
                 setBranches(res.data.branches);
-                if (res.data.branches.length > 0 && !selectedBranchId) {
-                    setSelectedBranchId(res.data.branches[0].id);
-                }
+                // No need to set selectedBranchId to first branch, keep "all" as default
             }
         } catch (error) {
             console.error("Failed to fetch branches", error);
         }
     };
 
-    const fetchLeads = async () => {
+    const fetchLeads = async (showToast = false) => {
         try {
             setLoading(true);
             const params: any = { limit: 100 };
@@ -217,14 +211,23 @@ const LeadPipeline = () => {
             // Explicitly set branchId from selector (CEO) or user state (Telecaller)
             const targetBranchId = isCEO ? selectedBranchId : user?.branchId;
 
-            if (targetBranchId) {
+            if (targetBranchId && targetBranchId !== "all") {
                 params.branchId = targetBranchId;
             }
 
-            console.log("Fetching leads with params:", params);
+            // If telecaller, we might want to filter by assignedToId
+            // However, the requested behavior seeems to be for the whole branch pipeline
+            // but let's ensure we log it for debugging.
+            console.log("Fetching leads with params:", params, "User Branch:", user?.branchId);
             const res = await leadsApi.getLeads(params);
             if (res.success && res.data?.leads) {
                 setLeads(res.data.leads);
+                if (showToast) {
+                    toast({
+                        title: "Pipeline Refreshed",
+                        description: `Loaded ${res.data.leads.length} leads.`,
+                    });
+                }
             }
         } catch (error: any) {
             toast({
@@ -242,8 +245,10 @@ const LeadPipeline = () => {
     }, []);
 
     useEffect(() => {
-        fetchLeads();
-    }, [selectedBranchId]);
+        if (isCEO || (user?.branchId)) {
+            fetchLeads();
+        }
+    }, [selectedBranchId, user?.branchId]);
 
     const getLeadsByStatus = (status: string) => {
         return leads.filter(l => l.status === status);
@@ -304,7 +309,7 @@ const LeadPipeline = () => {
     const activeStatus = activeLead ? PIPELINE_STATUSES.find(s => s.id === activeLead.status) : null;
 
     return (
-        <div className="flex flex-col h-screen -m-6">
+        <div className="flex flex-col h-[calc(100vh-4rem)] bg-slate-50/50">
             <div className="p-6 pb-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <PageHeader
                     title="Lead Pipeline"
@@ -314,7 +319,10 @@ const LeadPipeline = () => {
                     <div className="flex items-center gap-3">
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded-lg border border-muted-foreground/10">
                             <Badge variant="outline" className="h-5 px-1 bg-primary/10 text-primary border-primary/20">
-                                {user?.branch?.name || "All Branches"}
+                                {isCEO
+                                    ? (selectedBranchId === "all" ? "All Branches" : branches.find(b => b.id === selectedBranchId)?.name || "Selected Branch")
+                                    : (user?.branch?.name || "Local Branch")
+                                }
                             </Badge>
                             <span className="text-xs font-medium text-muted-foreground">Active Pipeline</span>
                         </div>
@@ -325,6 +333,7 @@ const LeadPipeline = () => {
                                     <SelectValue placeholder="Select Branch" />
                                 </SelectTrigger>
                                 <SelectContent>
+                                    <SelectItem value="all">All Branches</SelectItem>
                                     {branches.map((branch) => (
                                         <SelectItem key={branch.id} value={branch.id}>
                                             {branch.name}
@@ -335,24 +344,36 @@ const LeadPipeline = () => {
                         )}
                     </div>
                     <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" onClick={fetchLeads} disabled={loading} className="h-9">
+                        <span className="text-xs text-muted-foreground mr-2">
+                            Total: {leads.length} leads
+                        </span>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => fetchLeads(true)}
+                            disabled={loading}
+                            className="h-9 gap-2"
+                        >
+                            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
                             Refresh
                         </Button>
-                        <Button onClick={() => handleOpenModal()} className="shadow-sm h-9">
-                            <Plus className="mr-2 h-4 w-4" /> Add Lead
-                        </Button>
+                        {(isCEO || user?.role === "ADMIN") && (
+                            <Button onClick={() => handleOpenModal()} className="shadow-sm h-9">
+                                <Plus className="mr-2 h-4 w-4" /> Add Lead
+                            </Button>
+                        )}
                     </div>
                 </div>
             </div>
 
-            <div className="flex-1 overflow-x-auto p-6 pt-4">
+            <div className="flex-1 overflow-x-auto min-h-0 scrollbar-thin scrollbar-thumb-primary/20 hover:scrollbar-thumb-primary/30">
                 <DndContext
                     sensors={sensors}
                     collisionDetection={closestCorners}
                     onDragStart={handleDragStart}
                     onDragEnd={handleDragEnd}
                 >
-                    <div className="flex gap-4 h-full min-w-max">
+                    <div className="inline-flex gap-6 p-8 h-full min-w-full">
                         {PIPELINE_STATUSES.map(status => (
                             <Lane
                                 key={status.id}
@@ -424,6 +445,7 @@ const LeadPipeline = () => {
                     onClose={() => setModalOpen(false)}
                     onSuccess={fetchLeads}
                     leadId={selectedLeadId}
+                    defaultBranchId={isCEO ? selectedBranchId : user?.branchId}
                 />
             )}
         </div>

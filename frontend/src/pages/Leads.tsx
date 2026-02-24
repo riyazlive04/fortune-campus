@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { Plus, Filter, Trash2, Eye } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { Plus, Filter, Trash2, Eye, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import PageHeader from "@/components/PageHeader";
 import DataTable from "@/components/DataTable";
 import StatusBadge from "@/components/StatusBadge";
-import { leadsApi, branchesApi } from "@/lib/api";
+import { leadsApi, branchesApi, storage } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import LeadModal from "@/components/LeadModal";
 import {
@@ -26,12 +27,23 @@ const Leads = () => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
   const [filters, setFilters] = useState({
     status: "all",
     branchId: "all",
     source: "all"
   });
+  const user = storage.getUser();
+  const isAdminOrCEO = user?.role === "CEO" || user?.role === "ADMIN";
   const { toast } = useToast();
+
+  useEffect(() => {
+    const leadId = searchParams.get("id");
+    if (leadId) {
+      setSelectedLeadId(leadId);
+      setModalOpen(true);
+    }
+  }, [searchParams]);
 
   const fetchBranches = async () => {
     try {
@@ -44,7 +56,7 @@ const Leads = () => {
     }
   };
 
-  const fetchLeads = async () => {
+  const fetchLeads = async (showToast = false) => {
     try {
       setLoading(true);
 
@@ -75,6 +87,12 @@ const Leads = () => {
       }
 
       setLeads(finalLeads);
+      if (showToast) {
+        toast({
+          title: "Leads Refreshed",
+          description: `Loaded ${finalLeads.length} leads.`,
+        });
+      }
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -176,9 +194,23 @@ const Leads = () => {
         title="Leads & Enquiries"
         description="Manage all incoming leads and follow-ups"
         actions={
-          <Button size="sm" className="gap-2" onClick={() => handleOpenModal()}>
-            <Plus className="h-4 w-4" /> New Lead
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={() => fetchLeads(true)}
+              disabled={loading}
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+            {isAdminOrCEO && (
+              <Button size="sm" className="gap-2" onClick={() => handleOpenModal()}>
+                <Plus className="h-4 w-4" /> New Lead
+              </Button>
+            )}
+          </div>
         }
       />
       <div className="filter-bar mb-4">
@@ -227,6 +259,7 @@ const Leads = () => {
         onClose={handleCloseModal}
         onSuccess={fetchLeads}
         leadId={selectedLeadId}
+        defaultBranchId={filters.branchId !== "all" ? filters.branchId : undefined}
       />
 
       <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>

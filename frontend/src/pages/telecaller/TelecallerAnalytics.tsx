@@ -66,6 +66,17 @@ const TelecallerAnalytics = () => {
         return <div className="flex h-96 items-center justify-center">Loading analytics...</div>;
     }
 
+    const getChartColor = (status: string) => {
+        switch (status) {
+            case "NEW": return "#3b82f6"; // blue-500
+            case "CONTACTED": return "#64748b"; // slate-500
+            case "INTERESTED": return "#a855f7"; // purple-500
+            case "NEGOTIATING": return "#f97316"; // orange-500
+            case "CONVERTED": return "#22c55e"; // green-500
+            default: return "#6b7280"; // gray-500
+        }
+    };
+
     // Transform data for charts
     const chartData: any[] = isCEO
         ? (Array.isArray(data) ? data.map(b => ({ name: b.name, leads: b._count.leads, converted: b.leads.length, value: b.leads.length })) : [])
@@ -135,8 +146,18 @@ const TelecallerAnalytics = () => {
                                     <Tooltip
                                         contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
                                     />
-                                    <Bar dataKey="leads" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                                    <Bar dataKey="value" name={isCEO ? "Converted" : "Conversions"} fill="#10b981" radius={[4, 4, 0, 0]} />
+                                    {isTelecaller ? (
+                                        <Bar dataKey="leads" radius={[4, 4, 0, 0]}>
+                                            {chartData.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={getChartColor(entry.name)} />
+                                            ))}
+                                        </Bar>
+                                    ) : (
+                                        <>
+                                            <Bar dataKey="leads" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                                            <Bar dataKey="value" name={isCEO ? "Converted" : "Conversions"} fill="#10b981" radius={[4, 4, 0, 0]} />
+                                        </>
+                                    )}
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
@@ -162,7 +183,10 @@ const TelecallerAnalytics = () => {
                                         dataKey="leads"
                                     >
                                         {chartData.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                            <Cell
+                                                key={`cell-${index}`}
+                                                fill={isTelecaller ? getChartColor(entry.name) : COLORS[index % COLORS.length]}
+                                            />
                                         ))}
                                     </Pie>
                                     <Tooltip />

@@ -1,0 +1,72 @@
+{
+  "callLogs": [
+    {
+      "id": "e2ce891f-91db-448b-b65a-e2d12393f1dd",
+      "dateInLog": "2026-02-24T00:00:00.000Z",
+      "createdAt": "2026-02-24T08:57:28.492Z"
+    },
+    {
+      "id": "51fb23d4-8753-4f26-9e87-cd16c3c4f921",
+      "dateInLog": "2026-02-25T00:00:00.000Z",
+      "createdAt": "2026-02-24T08:46:43.724Z"
+    },
+    {
+      "id": "a6e0bfbf-5607-453e-9c19-a157c93e9e7b",
+      "dateInLog": "2026-02-25T00:00:00.000Z",
+      "createdAt": "2026-02-24T08:46:02.037Z"
+    },
+    {
+      "id": "8dd3e4f3-e98a-4380-bbc8-5a18ed9bdc9f",
+      "dateInLog": "2026-02-25T00:00:00.000Z",
+      "createdAt": "2026-02-24T08:40:30.640Z"
+    },
+    {
+      "id": "1c4f34f3-8bff-4d5a-b534-aaa98e3b2fd2",
+      "dateInLog": "2026-02-26T00:00:00.000Z",
+      "createdAt": "2026-02-24T08:39:11.748Z"
+    },
+    {
+      "id": "e5bdff48-d8c3-4745-a57a-08c8c7558669",
+      "dateInLog": "2026-02-24T00:00:00.000Z",
+      "createdAt": "2026-02-24T08:36:13.932Z"
+    }
+  ],
+  "followUps": [
+    {
+      "id": "d20edbe6-af9c-477b-9690-09322585f8c0",
+      "scheduledDate": "2026-02-24T00:00:00.000Z",
+      "status": "PENDING",
+      "createdAt": "2026-02-24T08:57:28.770Z"
+    },
+    {
+      "id": "817a5945-0896-4d62-b785-40b362da02de",
+      "scheduledDate": "2026-02-25T00:00:00.000Z",
+      "status": "PENDING",
+      "createdAt": "2026-02-24T08:46:44.090Z"
+    },
+    {
+      "id": "dc85fadc-30a1-4ec4-8df4-a984d0a59619",
+      "scheduledDate": "2026-02-25T00:00:00.000Z",
+      "status": "COMPLETED",
+      "createdAt": "2026-02-24T08:46:02.258Z"
+    },
+    {
+      "id": "36bc5f5b-c8c2-4ff6-b28d-c5dba4cc7aa3",
+      "scheduledDate": "2026-02-25T00:00:00.000Z",
+      "status": "COMPLETED",
+      "createdAt": "2026-02-24T08:40:30.864Z"
+    },
+    {
+      "id": "f7556a8a-d78e-43a0-b56d-a71a3917b120",
+      "scheduledDate": "2026-02-26T00:00:00.000Z",
+      "status": "COMPLETED",
+      "createdAt": "2026-02-24T08:39:11.905Z"
+    },
+    {
+      "id": "906633ec-c316-47af-bf03-d522dc5640db",
+      "scheduledDate": "2026-02-24T00:00:00.000Z",
+      "status": "COMPLETED",
+      "createdAt": "2026-02-24T08:36:14.136Z"
+    }
+  ]
+}

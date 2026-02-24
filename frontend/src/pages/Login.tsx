@@ -46,8 +46,12 @@ const Login = () => {
         storage.setToken(result.data.token);
         storage.setUser(result.data.user);
 
-        // Redirect to dashboard
-        navigate("/", { replace: true });
+        // Redirect to dashboard based on role
+        if (result.data.user?.role === 'TELECALLER') {
+          navigate("/telecaller/dashboard", { replace: true });
+        } else {
+          navigate("/", { replace: true });
+        }
       } else {
         setError(result.message || "Login failed - no data");
       }

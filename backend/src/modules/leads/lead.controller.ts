@@ -13,18 +13,18 @@ export const getLeads = async (req: AuthRequest, res: Response): Promise<Respons
 
     const where: any = {};
 
-    // Branch filtering based on user role
+    // Branch filtering - CEOs can filter by branchId from query, others are forced to their own branch
     if (req.user?.role !== UserRole.CEO) {
       where.branchId = req.user?.branchId;
-    } else if (branchId) {
+    } else if (branchId && branchId !== 'all') {
       where.branchId = branchId as string;
     }
 
-    if (status) {
+    if (status && status !== 'all' && status !== 'ALL') {
       where.status = status as LeadStatus;
     }
 
-    if (assignedToId) {
+    if (assignedToId && assignedToId !== 'all') {
       where.assignedToId = assignedToId as string;
     }
 
@@ -36,6 +36,11 @@ export const getLeads = async (req: AuthRequest, res: Response): Promise<Respons
         { phone: { contains: search as string, mode: 'insensitive' } },
       ];
     }
+
+    console.log(`[getLeads] Request by: ${req.user?.role} (${req.user?.id})`);
+    console.log(`[getLeads] Query Params:`, JSON.stringify(req.query, null, 2));
+    console.log(`[getLeads] Final Filters: branchId=${where.branchId}, status=${where.status}, assignedToId=${where.assignedToId}`);
+    console.log(`[getLeads] Where Clause:`, JSON.stringify(where, null, 2));
 
     const [leads, total] = await Promise.all([
       prisma.lead.findMany({
@@ -58,10 +63,13 @@ export const getLeads = async (req: AuthRequest, res: Response): Promise<Respons
       prisma.lead.count({ where }),
     ]);
 
+    console.log(`[getLeads] Found ${leads.length} leads out of ${total} total.`);
+
     const meta = getPaginationMeta(total, Number(page), Number(limit));
 
     return successResponse(res, { leads, meta });
   } catch (error) {
+    console.error('[getLeads] Error:', error);
     return errorResponse(res, 'Failed to fetch leads', 500, error);
   }
 };
@@ -191,6 +199,19 @@ export const createLead = async (req: AuthRequest, res: Response): Promise<Respo
       console.error('Failed to send WhatsApp notification:', err);
     });
 
+    // Create a follow-up task if provided
+    if (followUpDate && finalAssignedToId) {
+      await prisma.followUp.create({
+        data: {
+          leadId: lead.id,
+          telecallerId: finalAssignedToId,
+          scheduledDate: new Date(followUpDate),
+          notes: notes || 'Scheduled during lead creation',
+          type: 'CALL',
+        }
+      });
+    }
+
     return successResponse(res, lead, 'Lead created successfully', 201);
   } catch (error) {
     return errorResponse(res, 'Failed to create lead', 500, error);
@@ -258,6 +279,32 @@ export const updateLead = async (req: AuthRequest, res: Response): Promise<Respo
           newStatus: status,
           changedById: req.user!.id!,
           notes: notes || 'Status updated via lead management',
+        }
+      });
+    }
+
+    // Create a follow-up task if provided
+    if (followUpDate && (branchId || lead.assignedToId)) {
+      const telecallerId = lead.assignedToId || req.user!.id!;
+
+      // Complete old PENDING/OVERDUE tasks
+      await prisma.followUp.updateMany({
+        where: {
+          leadId: lead.id,
+          telecallerId,
+          status: { in: ['PENDING', 'OVERDUE'] }
+        },
+        data: { status: 'COMPLETED' }
+      });
+
+      // Create the new one
+      await prisma.followUp.create({
+        data: {
+          leadId: lead.id,
+          telecallerId,
+          scheduledDate: new Date(followUpDate),
+          notes: notes || 'Scheduled during lead update',
+          type: 'CALL',
         }
       });
     }
@@ -468,6 +515,17 @@ export const logCall = async (req: AuthRequest, res: Response): Promise<Response
         }
       });
 
+      // 2. Mark older PENDING and OVERDUE follow-ups as COMPLETED since a new interaction happened
+      await tx.followUp.updateMany({
+        where: {
+          leadId,
+          telecallerId: req.user!.id!,
+          status: { in: ['PENDING', 'OVERDUE'] }
+        },
+        data: { status: 'COMPLETED' }
+      });
+
+      // 3. Create the next follow-up if scheduled
       if (nextFollowUpDate) {
         await tx.followUp.create({
           data: {
@@ -520,21 +578,45 @@ export const getLeadStatusHistory = async (req: AuthRequest, res: Response): Pro
 export const getTelecallerDashboard = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
     const userId = req.user!.id!;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const userRole = req.user!.role;
+    const branchId = req.user!.branchId;
+
+    // Determine the lead filter based on role
+    // Admins and CEOs see all leads. Telecallers and others see leads from their branch.
+    const isGlobalView = userRole === UserRole.ADMIN || userRole === UserRole.CEO;
+    const leadFilter = isGlobalView ? {} : (branchId ? { branchId } : { assignedToId: userId });
+
+    const followUpFilter = isGlobalView
+      ? {}
+      : (userRole === UserRole.TELECALLER ? { telecallerId: userId } : {});
+
+    const now = new Date();
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+
+    const todayEnd = new Date(now);
+    todayEnd.setHours(23, 59, 59, 999);
 
     const [stats, followUpsToday, followUpsOverdue] = await Promise.all([
       prisma.lead.groupBy({
         by: ['status'],
-        where: { assignedToId: userId },
+        where: leadFilter,
         _count: true
       }),
       prisma.followUp.findMany({
-        where: { telecallerId: userId, scheduledDate: { gte: today, lt: new Date(today.getTime() + 86400000) }, status: 'PENDING' },
+        where: {
+          ...followUpFilter,
+          scheduledDate: { gte: todayStart, lte: todayEnd },
+          status: 'PENDING'
+        },
         include: { lead: true }
       }),
       prisma.followUp.findMany({
-        where: { telecallerId: userId, scheduledDate: { lt: today }, status: 'PENDING' },
+        where: {
+          ...followUpFilter,
+          scheduledDate: { lt: todayStart },
+          status: 'PENDING'
+        },
         include: { lead: true }
       })
     ]);
@@ -568,12 +650,22 @@ export const getCEOTelecallerAnalytics = async (req: AuthRequest, res: Response)
         _count: { select: { leads: true } },
         leads: {
           where: { status: LeadStatus.CONVERTED },
-          _count: true
+          select: { id: true }
         }
       }
     });
 
-    return successResponse(res, branchStats);
+    // Transform the result to match the expected format (count the converted leads)
+    const formattedStats = branchStats.map(branch => ({
+      ...branch,
+      _count: {
+        ...branch._count,
+        convertedLeads: branch.leads.length
+      },
+      leads: undefined // Remove the array of ids from the final response
+    }));
+
+    return successResponse(res, formattedStats);
   } catch (error) {
     return errorResponse(res, 'Failed to fetch CEO analytics', 500, error);
   }

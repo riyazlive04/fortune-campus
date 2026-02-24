@@ -10,41 +10,21 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
         const isCEO = req.user?.role === UserRole.CEO;
         const branchId = isCEO ? undefined : req.user?.branchId;
 
-        console.log('Dashboard Stats Debug:', {
-            user: req.user,
-            role: req.user?.role,
-            isCEO,
-            branchId
-        });
+        console.log('Dashboard Stats Debug:', { role: req.user?.role, isCEO, branchId });
 
         const where: any = branchId ? { branchId } : {};
-        console.log('Dashboard Stats Where Clause:', where);
-
-        // Get current month and last month dates
         const now = new Date();
         const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
-        // KPI Stats with month-over-month comparison
-        const [
-            totalLeads,
-            lastMonthLeads,
-            totalAdmissions,
-            lastMonthAdmissions,
-            activeStudents,
-            lastMonthActiveStudents,
-            totalPlacements,
-            lastMonthPlacements
-        ] = await Promise.all([
+        // Define all promises upfront for parallel execution
+        const kpiPromises = [
             prisma.lead.count({ where }),
             prisma.lead.count({ where: { ...where, createdAt: { gte: startOfLastMonth, lte: endOfLastMonth } } }),
-
             prisma.admission.count({ where }),
             prisma.admission.count({ where: { ...where, createdAt: { gte: startOfLastMonth, lte: endOfLastMonth } } }),
-
             prisma.user.count({ where: { ...where, role: UserRole.STUDENT, isActive: true } }),
             prisma.user.count({ where: { ...where, role: UserRole.STUDENT, isActive: true, createdAt: { lte: endOfLastMonth } } }),
-
             prisma.placement.count({
                 where: {
                     ...(branchId ? { student: { branchId } } : {}),
@@ -58,9 +38,63 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
                     createdAt: { gte: startOfLastMonth, lte: endOfLastMonth }
                 }
             }),
+        ];
+
+        const placementTrendPromises = [];
+        for (let i = 5; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const start = new Date(d.getFullYear(), d.getMonth(), 1);
+            const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+            const month = d.toLocaleString('default', { month: 'short' });
+            placementTrendPromises.push(
+                prisma.placement.count({
+                    where: {
+                        ...(branchId ? { student: { branchId } } : {}),
+                        status: { notIn: [PlacementStatus.REJECTED, PlacementStatus.NOT_ELIGIBLE] },
+                        createdAt: { gte: start, lte: end }
+                    }
+                }).then(count => ({ month, placed: count }))
+            );
+        }
+
+        const corePromises = Promise.all([
+            Promise.all(kpiPromises),
+            Promise.all(placementTrendPromises),
+            prisma.admission.groupBy({
+                by: ['courseId'],
+                where,
+                _count: true,
+            }),
+            prisma.trainer.findMany({
+                where: { branchId: branchId || undefined, isActive: true },
+                include: {
+                    user: { select: { firstName: true, lastName: true } },
+                    _count: { select: { courses: true, attendances: true } }
+                },
+                take: 5
+            }),
+            isCEO ? prisma.branch.findMany({
+                where: { isActive: true },
+                include: {
+                    _count: { select: { leads: true, admissions: true, students: true, trainers: true } }
+                }
+            }) : Promise.resolve([]),
+            isCEO ? prisma.placement.findMany({
+                where: { status: { notIn: [PlacementStatus.REJECTED, PlacementStatus.NOT_ELIGIBLE] } },
+                select: { student: { select: { branchId: true } } }
+            }) : Promise.resolve([])
         ]);
 
-        // Helper functions for percentages
+        const [kpiResults, placementTrend, courseDistribution, trainers, branches, allPlacements] = await corePromises;
+
+        // Process KPI stats
+        const [
+            totalLeads, lastMonthLeads,
+            totalAdmissions, lastMonthAdmissions,
+            activeStudents, lastMonthActiveStudents,
+            totalPlacements, lastMonthPlacements
+        ] = kpiResults;
+
         const calculateChange = (current: number, last: number) => {
             if (last === 0) return current > 0 ? 100 : 0;
             return Math.round(((current - last) / last) * 100);
@@ -73,81 +107,36 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
             placements: { value: totalPlacements, change: calculateChange(totalPlacements, lastMonthPlacements) },
         };
 
-        // Placement Trend (Last 6 months) - Optimized with parallel queries
-        const placementTrendPromises = [];
-        for (let i = 5; i >= 0; i--) {
-            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-            const start = new Date(d.getFullYear(), d.getMonth(), 1);
-            const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-            const month = d.toLocaleString('default', { month: 'short' });
-
-            placementTrendPromises.push(
-                prisma.placement.count({
-                    where: {
-                        ...(branchId ? { student: { branchId } } : {}),
-                        status: { notIn: [PlacementStatus.REJECTED, PlacementStatus.NOT_ELIGIBLE] },
-                        createdAt: { gte: start, lte: end }
-                    }
-                }).then(count => ({ month, placed: count }))
-            );
-        }
-        const placementTrend = await Promise.all(placementTrendPromises);
-
-        // Course-wise Distribution (Admissions)
-        const courseDistribution = await prisma.admission.groupBy({
-            by: ['courseId'],
-            where,
-            _count: true,
+        // Batch fetch courses for distribution (avoiding N+1)
+        const courseIds = courseDistribution.map(item => item.courseId);
+        const courses = await prisma.course.findMany({
+            where: { id: { in: courseIds } },
+            select: { id: true, name: true }
         });
-
-        const courseData = await Promise.all(courseDistribution.map(async (item) => {
-            const course = await prisma.course.findUnique({ where: { id: item.courseId }, select: { name: true } });
-            return { name: course?.name || 'Unknown', value: item._count };
+        const courseNameMap = Object.fromEntries(courses.map(c => [c.id, c.name]));
+        const courseData = courseDistribution.map(item => ({
+            name: courseNameMap[item.courseId] || 'Unknown',
+            value: item._count
         }));
 
-        // Branch Performance (CEO only or current branch)
+        // Process Branch Performance (CEO only)
         let branchPerformance: any[] = [];
         if (isCEO) {
-            const branches = await prisma.branch.findMany({
-                where: { isActive: true },
-                include: {
-                    _count: {
-                        select: {
-                            leads: true,
-                            admissions: true,
-                            students: true,
-                            trainers: true,
-                        }
-                    }
-                }
+            // Count placements per branch from the batch query
+            const placementCounts: Record<string, number> = {};
+            allPlacements.forEach(p => {
+                const bId = p.student.branchId;
+                placementCounts[bId] = (placementCounts[bId] || 0) + 1;
             });
 
-            branchPerformance = await Promise.all(branches.map(async (b) => {
-                const placementsCount = await prisma.placement.count({
-                    where: {
-                        student: { branchId: b.id },
-                        status: { notIn: [PlacementStatus.REJECTED, PlacementStatus.NOT_ELIGIBLE] }
-                    }
-                });
-                return {
-                    branch: b.name,
-                    leads: b._count.leads,
-                    admissions: b._count.admissions,
-                    students: b._count.students,
-                    placements: placementsCount,
-                };
+            branchPerformance = branches.map(b => ({
+                branch: b.name,
+                leads: b._count.leads,
+                admissions: b._count.admissions,
+                students: b._count.students,
+                placements: placementCounts[b.id] || 0,
             }));
         }
-
-        // Trainer Performance (Top 5)
-        const trainers = await prisma.trainer.findMany({
-            where: { branchId: branchId || undefined, isActive: true },
-            include: {
-                user: { select: { firstName: true, lastName: true } },
-                _count: { select: { courses: true, attendances: true } }
-            },
-            take: 5
-        });
 
         const trainerPerformanceData = trainers.map((t: any) => ({
             name: `${t.user.firstName} ${t.user.lastName}`,

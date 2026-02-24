@@ -1,0 +1,54 @@
+[
+  {
+    "id": "f0feca6f-a037-43e2-9407-8175a234fc46",
+    "name": "Coimbatore",
+    "code": "CBE",
+    "address": null,
+    "city": null,
+    "state": null,
+    "phone": null,
+    "email": null,
+    "isActive": true,
+    "createdAt": "2026-02-17T06:34:30.517Z",
+    "updatedAt": "2026-02-17T06:34:30.517Z"
+  },
+  {
+    "id": "ae1ebf77-14a0-4a76-a123-11b44b4517d3",
+    "name": "Erode",
+    "code": "ERD",
+    "address": null,
+    "city": null,
+    "state": null,
+    "phone": null,
+    "email": null,
+    "isActive": true,
+    "createdAt": "2026-02-17T06:34:30.920Z",
+    "updatedAt": "2026-02-17T06:34:30.920Z"
+  },
+  {
+    "id": "738587cc-6f2c-4f03-a386-4c3a376f4cc0",
+    "name": "Tiruppur",
+    "code": "TPR",
+    "address": null,
+    "city": null,
+    "state": null,
+    "phone": null,
+    "email": null,
+    "isActive": true,
+    "createdAt": "2026-02-17T06:34:31.331Z",
+    "updatedAt": "2026-02-17T06:34:31.331Z"
+  },
+  {
+    "id": "1e736840-e93c-4259-8fd7-c24c28b14413",
+    "name": "Salem ",
+    "code": "SLM",
+    "address": null,
+    "city": null,
+    "state": null,
+    "phone": null,
+    "email": null,
+    "isActive": true,
+    "createdAt": "2026-02-17T06:50:12.316Z",
+    "updatedAt": "2026-02-17T06:50:12.316Z"
+  }
+]

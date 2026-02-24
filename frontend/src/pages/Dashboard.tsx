@@ -35,6 +35,12 @@ const Dashboard = () => {
     return <BranchHeadDashboard />;
   }
 
+  if (user?.role === 'TELECALLER') {
+    // Safety redirect to telecaller dashboard
+    window.location.href = '/telecaller/dashboard';
+    return null;
+  }
+
   const [data, setData] = useState<any>(null);
   const [performance, setPerformance] = useState<any[]>([]);
   const [trainerAttendance, setTrainerAttendance] = useState<any[]>([]);
