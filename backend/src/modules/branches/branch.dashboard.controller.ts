@@ -167,24 +167,60 @@ export const convertLead = async (req: AuthRequest, res: Response): Promise<Resp
 export const getAttendanceStats = async (req: AuthRequest, res: Response): Promise<Response> => {
     try {
         const branchId = req.user?.branchId;
-        const where = branchId ? { student: { branchId } } : {};
+        const where = branchId ? { branchId } : {};
 
-        const [latestAttendance, lowAttendanceStudents] = await Promise.all([
-            prisma.attendance.findMany({
-                where,
-                take: 10,
-                orderBy: { date: 'desc' },
-                include: { student: { include: { user: true } } }
-            }),
-            // Simplified: in real app, we would aggregate attendance percentages
-            prisma.student.findMany({
-                where: { ...where, isActive: true },
-                include: { user: true, _count: { select: { attendances: true } } },
-                take: 5
-            })
-        ]);
+        // 1. Get students and their attendance count
+        const students = await prisma.student.findMany({
+            where: { ...where, isActive: true },
+            include: {
+                user: true,
+                course: true,
+                _count: { select: { attendances: true } },
+                attendances: {
+                    select: { status: true }
+                }
+            }
+        });
 
-        return successResponse(res, { latestAttendance, lowAttendanceStudents });
+        let totalPresent = 0;
+        let totalRecords = 0;
+
+        const summary = students.map((s: any) => {
+            const studentName = s.user ? `${s.user.firstName} ${s.user.lastName}` : 'Unknown';
+            const courseName = s.course?.name || 'N/A';
+            const atts = s.attendances || [];
+
+            const presentCount = atts.filter((a: any) => a.status === 'PRESENT').length;
+            const totalClasses = atts.length;
+
+            totalPresent += presentCount;
+            totalRecords += totalClasses;
+
+            const percentage = totalClasses > 0 ? Math.round((presentCount / totalClasses) * 100) : 0;
+
+            return {
+                id: s.id,
+                student: studentName,
+                course: courseName,
+                percentage: `${percentage}%`,
+                _rawPercent: percentage // used for sorting below
+            };
+        });
+
+        // 2. Average Attendance
+        const averageAttendance = totalRecords > 0 ? Math.round((totalPresent / totalRecords) * 100) : 0;
+
+        // 3. Low Attendance Students (used in overview tab)
+        const lowAttendanceStudents = students
+            .filter((s: any) => s._count?.attendances > 0) // Meaning they have some absentee records typically
+            .sort((a: any, b: any) => b._count.attendances - a._count.attendances)
+            .slice(0, 5); // Just return top 5 students with most records for now, or you can filter by absent status
+
+        return successResponse(res, {
+            averageAttendance,
+            lowAttendanceStudents,
+            summary: summary.sort((a, b) => a._rawPercent - b._rawPercent) // Lowest attendance first
+        });
     } catch (error) {
         return errorResponse(res, 'Failed to fetch attendance stats', 500, error);
     }
@@ -265,24 +301,23 @@ export const getProgressStats = async (req: AuthRequest, res: Response): Promise
 
         const where = branchId ? { branchId } : {};
 
-        const [courseDistribution, softwareProgress, totalStudents] = await Promise.all([
+        const [courseDistribution, softwareProgress, total] = await Promise.all([
             prisma.student.groupBy({
                 by: ['courseId'],
                 where: { ...where, isActive: true },
                 _count: true
             }),
             prisma.softwareProgress.findMany({
-                where: { student: { branchId, isActive: true } },
+                where: { student: { branchId: branchId || undefined, isActive: true } },
                 skip,
                 take: limit,
                 orderBy: { progress: 'desc' }, // Descending order for top progress
                 include: {
-                    student: { include: { user: true } },
-                    course: true
+                    student: { include: { user: true, course: true } }
                 }
             }),
             prisma.softwareProgress.count({
-                where: { student: { branchId, isActive: true } }
+                where: { student: { branchId: branchId || undefined, isActive: true } }
             })
         ]);
 
@@ -574,7 +609,7 @@ export const getPlacementReadiness = async (req: AuthRequest, res: Response): Pr
                 user: { select: { firstName: true, lastName: true } },
                 course: { select: { name: true } },
                 placementEligible: true,
-                softwareProgress: { select: { status: true } }, // Simplified check
+                softwareProgress: { select: { id: true } }, // Simplified check
                 portfolioSubmissions: { where: { status: 'APPROVED' }, select: { id: true } },
                 _count: { select: { attendances: { where: { status: 'ABSENT' } } } } // Rough metric
             }

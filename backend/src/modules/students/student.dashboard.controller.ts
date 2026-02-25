@@ -200,30 +200,48 @@ export const getStudentOverview = async (req: AuthRequest, res: Response): Promi
         const placementEligible = certificateEligible && student.placementEligible;
 
         // Fetch ALL batches/courses the student is enrolled in
+        // Using raw SQL to bypass any potential Prisma client generation issues (EPERM)
         let allEnrollments: Array<{ batchId: string; batchName: string; batchCode: string; courseName: string; courseCode: string; timing: string; trainer: string; }> = [];
         try {
-            const allBatches = await prisma.batch.findMany({
-                where: {
-                    students: { some: { id: student.id } }
-                },
-                include: {
-                    course: { select: { name: true, code: true, duration: true } },
-                    trainer: {
-                        include: {
-                            user: { select: { firstName: true, lastName: true } }
+            // Step 1: Get all unique batchIds from StudentBatch table + Attendance + Student.batchId
+            const enrolledBatchesRaw: any[] = await prisma.$queryRaw`
+                SELECT "batchId" FROM "student_batches" WHERE "studentId" = ${student.id} AND "isActive" = true
+            `;
+
+            const attendanceBatchRecords: any[] = await prisma.$queryRaw`
+                SELECT DISTINCT "batchId" FROM "attendances" WHERE "studentId" = ${student.id} AND "batchId" IS NOT NULL
+            `;
+
+            const batchIdSet = new Set<string>();
+            enrolledBatchesRaw.forEach(r => batchIdSet.add(r.batchId));
+            attendanceBatchRecords.forEach(r => batchIdSet.add(r.batchId));
+            if (student.batchId) batchIdSet.add(student.batchId);
+
+            const allBatchIds = Array.from(batchIdSet);
+
+            // Step 2: Fetch batch details for all discovered batchIds
+            if (allBatchIds.length > 0) {
+                const allBatches = await prisma.batch.findMany({
+                    where: { id: { in: allBatchIds } },
+                    include: {
+                        course: { select: { name: true, code: true, duration: true } },
+                        trainer: {
+                            include: {
+                                user: { select: { firstName: true, lastName: true } }
+                            }
                         }
                     }
-                }
-            });
-            allEnrollments = allBatches.map(b => ({
-                batchId: b.id,
-                batchName: b.name,
-                batchCode: b.code,
-                courseName: b.course.name,
-                courseCode: b.course.code,
-                timing: `${b.startTime || 'TBD'} - ${b.endTime || 'TBD'}`,
-                trainer: b.trainer ? `${b.trainer.user.firstName} ${b.trainer.user.lastName}` : 'Not Assigned',
-            }));
+                });
+                allEnrollments = allBatches.map(b => ({
+                    batchId: b.id,
+                    batchName: b.name,
+                    batchCode: b.code,
+                    courseName: b.course.name,
+                    courseCode: b.course.code,
+                    timing: `${b.startTime || 'TBD'} - ${b.endTime || 'TBD'}`,
+                    trainer: b.trainer ? `${b.trainer.user.firstName} ${b.trainer.user.lastName}` : 'Not Assigned',
+                }));
+            }
         } catch (err) {
             console.error('Error fetching all enrollments:', (err as any).message);
         }

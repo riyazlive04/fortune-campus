@@ -89,6 +89,15 @@ interface StudentOverview {
         paid: number;
         balance: number;
     };
+    allEnrollments?: Array<{
+        batchId: string;
+        batchName: string;
+        batchCode: string;
+        courseName: string;
+        courseCode: string;
+        timing: string;
+        trainer: string;
+    }>;
 }
 
 const StudentDashboard = () => {
@@ -299,7 +308,11 @@ const StudentDashboard = () => {
         <div className="animate-fade-in">
             <PageHeader
                 title={`Welcome, ${overview.student.name.split(' ')[0]}!`}
-                description={`${overview.course.name} • ${overview.branch.name}`}
+                description={
+                    overview.allEnrollments && overview.allEnrollments.length > 1
+                        ? overview.allEnrollments.map(e => e.courseName).join(' • ')
+                        : `${overview.course.name} • ${overview.branch.name}`
+                }
             />
 
             <Tabs defaultValue="overview" className="space-y-4" onValueChange={handleTabChange}>

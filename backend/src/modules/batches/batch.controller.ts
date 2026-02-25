@@ -67,6 +67,12 @@ export const getBatches = async (req: AuthRequest, res: Response): Promise<Respo
 export const getBatchById = async (req: AuthRequest, res: Response): Promise<Response> => {
     try {
         const { id } = req.params;
+        // Fetch students from the join table to support many-to-many
+        const studentEnrollments: any[] = await prisma.$queryRaw`
+            SELECT "studentId" FROM "student_batches" WHERE "batchId" = ${id} AND "isActive" = true
+        `;
+        const enrolledStudentIds = studentEnrollments.map(e => e.studentId);
+
         const batch = await prisma.batch.findUnique({
             where: { id },
             include: {
@@ -74,16 +80,44 @@ export const getBatchById = async (req: AuthRequest, res: Response): Promise<Res
                 trainer: {
                     include: { user: { select: { firstName: true, lastName: true } } }
                 },
+                branch: true,
+                // Still include standard students relation for safety/compatibility
                 students: {
-                    where: { isActive: true },
+                    where: {
+                        id: { notIn: enrolledStudentIds.length > 0 ? enrolledStudentIds : [''] },
+                        isActive: true
+                    },
                     include: {
                         user: { select: { firstName: true, lastName: true, email: true } },
                         course: { select: { name: true } }
                     }
-                },
-                branch: true
+                }
             }
         });
+
+        if (!batch) {
+            return errorResponse(res, 'Batch not found', 404);
+        }
+
+        // Fetch details for students in join table
+        let allStudents = [...batch.students];
+        if (enrolledStudentIds.length > 0) {
+            const extraStudents = await prisma.student.findMany({
+                where: { id: { in: enrolledStudentIds }, isActive: true },
+                include: {
+                    user: { select: { firstName: true, lastName: true, email: true } },
+                    course: { select: { name: true } }
+                }
+            });
+            // Merge and deduplicate
+            const existingIds = new Set(allStudents.map(s => s.id));
+            extraStudents.forEach(s => {
+                if (!existingIds.has(s.id)) allStudents.push(s);
+            });
+        }
+
+        // Override students in response
+        (batch as any).students = allStudents;
 
         if (!batch) {
             return errorResponse(res, 'Batch not found', 404);
@@ -210,6 +244,7 @@ export const assignStudentsToBatch = async (req: AuthRequest, res: Response): Pr
         // Verify students belong to same branch and course (optional but good practice)
         // For now, just update them.
 
+        // Legacy: Update primary batchId for backwards compatibility
         await prisma.student.updateMany({
             where: {
                 id: { in: studentIds },
@@ -219,6 +254,21 @@ export const assignStudentsToBatch = async (req: AuthRequest, res: Response): Pr
                 batchId: id
             }
         });
+
+        // Many-to-Many: Insert into student_batches to persist multiple enrollments
+        // Using raw SQL to avoid Prisma client EPERM issues
+        try {
+            for (const studentId of studentIds) {
+                const enrollmentId = `${studentId}_${id}`;
+                await prisma.$executeRawUnsafe(`
+                    INSERT INTO "student_batches" (id, "studentId", "batchId") 
+                    VALUES ($1, $2, $3) 
+                    ON CONFLICT DO NOTHING
+                `, enrollmentId, studentId, id);
+            }
+        } catch (err) {
+            console.error('Error persisting many-to-many enrollment:', (err as any).message);
+        }
 
         return successResponse(res, null, 'Students assigned to batch successfully');
     } catch (error) {

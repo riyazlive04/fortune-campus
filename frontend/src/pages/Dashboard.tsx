@@ -22,8 +22,22 @@ const COLORS = ["hsl(217, 71%, 53%)", "hsl(142, 71%, 45%)", "hsl(38, 92%, 50%)",
 
 const Dashboard = () => {
   const user = storage.getUser();
-  const [viewingTrainerId, setViewingTrainerId] = useState<string | null>(null);
 
+  // 1. ALL HOOKS MUST BE DECLARED FIRST
+  const [viewingTrainerId, setViewingTrainerId] = useState<string | null>(null);
+  const [data, setData] = useState<any>(null);
+  const [performance, setPerformance] = useState<any[]>([]);
+  const [trainerAttendance, setTrainerAttendance] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  const [modalType, setModalType] = useState<'leads' | 'students' | 'placements' | 'admissions' | null>(null);
+  const [modalData, setModalData] = useState<any[]>([]);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [isTopPerformerModalOpen, setIsTopPerformerModalOpen] = useState(false);
+  const [selectedHistoryTrainer, setSelectedHistoryTrainer] = useState<{ id: string, name: string } | null>(null);
+
+  // 2. EARLY RETURNS
   if (user?.role === 'TRAINER') {
     return <TrainerDashboard />;
   }
@@ -56,19 +70,6 @@ const Dashboard = () => {
     window.location.href = '/telecaller/dashboard';
     return null;
   }
-
-  const [data, setData] = useState<any>(null);
-  const [performance, setPerformance] = useState<any[]>([]);
-  const [trainerAttendance, setTrainerAttendance] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
-
-  // Detail modal state
-  const [modalType, setModalType] = useState<'leads' | 'students' | 'placements' | 'admissions' | null>(null);
-  const [modalData, setModalData] = useState<any[]>([]);
-  const [modalLoading, setModalLoading] = useState(false);
-  const [isTopPerformerModalOpen, setIsTopPerformerModalOpen] = useState(false);
-  const [selectedHistoryTrainer, setSelectedHistoryTrainer] = useState<{ id: string, name: string } | null>(null);
 
   const openModal = async (type: 'leads' | 'students' | 'placements' | 'admissions') => {
     setModalType(type);
@@ -217,7 +218,7 @@ const Dashboard = () => {
           change="Click to view details"
           changeType="neutral"
           icon={Users}
-          accentColor="bg-success"
+          accentColor="bg-emerald-500"
           onClick={() => openModal('admissions')}
         />
         <KPICard
@@ -226,7 +227,7 @@ const Dashboard = () => {
           change="Click to view details"
           changeType="neutral"
           icon={GraduationCap}
-          accentColor="bg-warning"
+          accentColor="bg-amber-500"
           onClick={() => openModal('students')}
         />
         <KPICard

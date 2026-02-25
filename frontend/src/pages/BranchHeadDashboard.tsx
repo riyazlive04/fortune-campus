@@ -201,13 +201,24 @@ const BranchHeadDashboard = () => {
                 />
 
                 {/* Attendance Status Widget */}
-                <Card className="shadow-sm cursor-pointer hover:border-primary/50 transition-colors" onClick={() => openModal('attendance')}>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Daily Attendance</CardTitle>
-                        <Clock className="h-4 w-4 text-muted-foreground" />
+                <Card
+                    className="relative overflow-hidden shadow-sm transition-all duration-300 hover:shadow-lg group hover:border-primary/40 hover:-translate-y-1 cursor-pointer flex flex-col justify-between"
+                    onClick={() => openModal('attendance')}
+                >
+                    {/* Top Border Accent */}
+                    <div className="absolute top-0 left-0 w-full h-[3px] opacity-80 bg-orange-500" />
+
+                    {/* Corner Glowing Blob */}
+                    <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full blur-[30px] opacity-20 transition-opacity duration-300 group-hover:opacity-40 bg-orange-500" />
+
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 relative z-10 h-auto">
+                        <CardTitle className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80 pt-1">Daily Attendance</CardTitle>
+                        <div className="rounded-full p-2.5 transition-colors bg-orange-500 bg-opacity-10 group-hover:bg-opacity-20 text-orange-600">
+                            <Clock className="h-4.5 w-4.5" />
+                        </div>
                     </CardHeader>
-                    <CardContent>
-                        <div className="flex flex-col gap-3 pt-2">
+                    <CardContent className="relative z-10">
+                        <div className="flex flex-col gap-3 pt-0">
                             {/* Students */}
                             <div className="flex flex-col gap-1">
                                 <div className="flex items-center justify-between">

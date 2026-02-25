@@ -301,6 +301,7 @@ model Student {
   placements      Placement[]
   growthReports   StudentGrowthReport[]
   feedbacks       StudentFeedback[]
+  batchEnrollments StudentBatch[] // Many-to-many enrollment tracking
   
   @@index([branchId])
   @@index([courseId])
@@ -480,11 +481,28 @@ model Batch {
   attendances     Attendance[]
   trainerAttendances TrainerAttendance[]
   tests           Test[]
+  enrollments     StudentBatch[] // Many-to-many enrollment tracking
   
   @@index([branchId])
   @@index([courseId])
   @@index([trainerId])
   @@map("batches")
+}
+
+model StudentBatch {
+  id          String   @id @default(uuid())
+  studentId   String
+  batchId     String
+  enrolledAt  DateTime @default(now())
+  isActive    Boolean  @default(true)
+
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  batch       Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, batchId])
+  @@index([studentId])
+  @@index([batchId])
+  @@map("student_batches")
 }
 
 model PortfolioTask {
