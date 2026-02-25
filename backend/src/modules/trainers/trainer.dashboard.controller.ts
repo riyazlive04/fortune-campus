@@ -5,11 +5,21 @@ import { AuthRequest } from '../../middlewares/auth.middleware';
 
 export const getTrainerDashboardStats = async (req: AuthRequest, res: Response): Promise<Response> => {
     try {
-        const userId = req.user?.id;
-        const trainer = await prisma.trainer.findUnique({
-            where: { userId },
-            include: { branch: true }
-        });
+        const { trainerId } = req.query;
+        let trainer;
+
+        if (req.user?.role === 'CEO' && trainerId) {
+            trainer = await prisma.trainer.findUnique({
+                where: { id: trainerId as string },
+                include: { branch: true, user: true }
+            });
+        } else {
+            const userId = req.user?.id;
+            trainer = await prisma.trainer.findUnique({
+                where: { userId },
+                include: { branch: true, user: true }
+            });
+        }
 
         if (!trainer) {
             return errorResponse(res, 'Trainer profile not found', 404);
@@ -125,6 +135,7 @@ export const getTrainerDashboardStats = async (req: AuthRequest, res: Response):
         });
 
         return successResponse(res, {
+            trainerName: `${trainer.user.firstName} ${trainer.user.lastName}`,
             activeStudents: activeStudentsCount,
             todayClasses: todayClasses,
             presentToday: presentCount,
@@ -215,10 +226,19 @@ export const checkBatchEligibility = async (req: AuthRequest, res: Response): Pr
 
 export const getBranchStudents = async (req: AuthRequest, res: Response): Promise<Response> => {
     try {
-        const userId = req.user?.id;
-        const trainer = await prisma.trainer.findUnique({
-            where: { userId }
-        });
+        const { trainerId } = req.query;
+        let trainer;
+
+        if (req.user?.role === 'CEO' && trainerId) {
+            trainer = await prisma.trainer.findUnique({
+                where: { id: trainerId as string }
+            });
+        } else {
+            const userId = req.user?.id;
+            trainer = await prisma.trainer.findUnique({
+                where: { userId }
+            });
+        }
 
         if (!trainer) {
             return errorResponse(res, 'Trainer profile not found', 404);

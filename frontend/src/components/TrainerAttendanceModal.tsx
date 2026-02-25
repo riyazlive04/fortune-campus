@@ -201,6 +201,8 @@ const TrainerAttendanceModal = ({ isOpen, onClose, onSuccess, trainer }: Trainer
                                     <SelectItem value="ABSENT">Absent</SelectItem>
                                     <SelectItem value="LATE">Late</SelectItem>
                                     <SelectItem value="HALFDAY">Half Day</SelectItem>
+                                    <SelectItem value="HOLIDAY">Holiday</SelectItem>
+                                    <SelectItem value="LEAVE">Leave</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>

@@ -48,14 +48,14 @@ export const markTrainerAttendance = async (req: AuthRequest, res: Response): Pr
                 outTime: outTime ? new Date(outTime) : undefined,
             },
             create: {
-                trainerId,
-                batchId: batchId || null,
-                branchId: branchId as string,
                 date: attendanceDate,
                 status,
                 remarks,
                 inTime: inTime ? new Date(inTime) : undefined,
                 outTime: outTime ? new Date(outTime) : undefined,
+                trainer: { connect: { id: trainerId } },
+                branch: { connect: { id: branchId as string } },
+                batch: batchId ? { connect: { id: batchId } } : undefined
             }
         });
 
@@ -63,6 +63,70 @@ export const markTrainerAttendance = async (req: AuthRequest, res: Response): Pr
     } catch (error) {
         console.error("DEBUG: markTrainerAttendance error:", error);
         return errorResponse(res, 'Failed to mark trainer attendance', 500, error);
+    }
+};
+
+export const markBulkAttendance = async (req: AuthRequest, res: Response): Promise<Response> => {
+    try {
+        const { date, status, remarks } = req.body;
+        const branchId = req.user?.branchId;
+
+        if (!branchId) {
+            return errorResponse(res, 'Branch ID not found. Only branch heads can bulk mark attendance.', 400);
+        }
+
+        if (!date || !status) {
+            return errorResponse(res, 'Date and status are required for bulk marking', 400);
+        }
+
+        const attendanceDate = new Date(date);
+        attendanceDate.setHours(0, 0, 0, 0);
+
+        // Find all active trainers in the branch
+        const activeTrainers = await prisma.trainer.findMany({
+            where: {
+                branchId,
+                isActive: true
+            },
+            select: { id: true }
+        });
+
+        if (activeTrainers.length === 0) {
+            return errorResponse(res, 'No active trainers found in this branch', 404);
+        }
+
+        // Prepare operations for the transaction
+        const deleteOp = prisma.trainerAttendance.deleteMany({
+            where: {
+                trainerId: { in: activeTrainers.map(t => t.id) },
+                date: attendanceDate
+            }
+        });
+
+        const createData = activeTrainers.map(trainer => ({
+            trainerId: trainer.id,
+            branchId,
+            date: attendanceDate,
+            status,
+            remarks,
+            batchId: null
+        }));
+
+        const createOp = prisma.trainerAttendance.createMany({
+            data: createData
+        });
+
+        // Execute all upserts in a transaction
+        await prisma.$transaction([deleteOp, createOp]);
+
+        return successResponse(
+            res,
+            { count: activeTrainers.length },
+            `Successfully marked ${status} for ${activeTrainers.length} trainers`
+        );
+    } catch (error) {
+        console.error("DEBUG: markBulkAttendance error:", error);
+        return errorResponse(res, 'Failed to process bulk attendance', 500, error);
     }
 };
 

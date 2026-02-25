@@ -35,7 +35,7 @@ const ProgressTab = () => <div className="p-4 bg-card border rounded-xl">Softwar
 const TestsTab = () => <div className="p-4 bg-card border rounded-xl">Test & Evaluation Management</div>;
 
 
-const TrainerDashboard = () => {
+const TrainerDashboard = ({ trainerId }: { trainerId?: string }) => {
     const [stats, setStats] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState("overview");
@@ -52,10 +52,10 @@ const TrainerDashboard = () => {
         setModalLoading(true);
         try {
             if (type === 'activeStudents') {
-                const res = await trainerApi.getBranchStudents();
+                const res = await trainerApi.getBranchStudents(trainerId);
                 setModalData(res.data?.students || []);
             } else if (type === 'attendance') {
-                const res = await trainerApi.getBranchStudents();
+                const res = await trainerApi.getBranchStudents(trainerId);
                 setModalData(res.data?.students || []);
             } else if (type === 'pendingPortfolios') {
                 const res = await portfolioTasksApi.getStats();
@@ -78,7 +78,7 @@ const TrainerDashboard = () => {
     const fetchDashboardData = async () => {
         try {
             setLoading(true);
-            const statsRes = await trainerApi.getDashboardStats().catch(e => ({ success: false, error: e }));
+            const statsRes = await trainerApi.getDashboardStats(trainerId).catch(e => ({ success: false, error: e }));
 
             if (statsRes.success) {
                 setStats(statsRes.data);
@@ -105,7 +105,7 @@ const TrainerDashboard = () => {
     return (
         <div className="animate-fade-in">
             <PageHeader
-                title={`Trainer Dashboard: ${user?.firstName || ''} ${user?.lastName || ''}`}
+                title={trainerId && stats?.trainerName ? `Trainer Dashboard: ${stats.trainerName}` : `Trainer Dashboard: ${user?.firstName || ''} ${user?.lastName || ''}`}
                 description={`Managing ${stats?.activeStudents || 0} active students across ${stats?.todayClasses || 0} classes today.`}
             />
 

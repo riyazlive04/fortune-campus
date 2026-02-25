@@ -11,7 +11,7 @@ const navSections = [
   {
     label: "Main",
     items: [
-      { title: "Dashboard", path: "/", icon: LayoutDashboard, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER'] },
+      { title: "Dashboard", path: "/", icon: LayoutDashboard, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER', 'TRAINER', 'STUDENT'] },
       { title: "Telecaller Desk", path: "/telecaller/dashboard", icon: LayoutDashboard, roles: ['TELECALLER', 'ADMIN'] },
       { title: "Lead Pipeline", path: "/telecaller/pipeline", icon: FolderKanban, roles: ['TELECALLER', 'ADMIN', 'CEO', 'CHANNEL_PARTNER'] },
       { title: "Leads & Enquiries", path: "/leads", icon: UserPlus, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER', 'TELECALLER'] },
@@ -109,11 +109,14 @@ const AppSidebar = ({ collapsed, onToggle }: AppSidebarProps) => {
                   key={item.path}
                   to={item.path}
                   className={({ isActive }) =>
-                    `mx-3 mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-semibold transition-all duration-200 ${isActive
+                    `mx-3 mb-1 flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-semibold transition-all duration-200 relative overflow-hidden ${isActive
                       ? "bg-sidebar-accent text-sidebar-accent-foreground"
                       : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
                     } ${collapsed ? "justify-center px-2" : ""}`}
                 >
+                  {location.pathname === item.path && (
+                    <div className="absolute left-0 top-0 h-full w-1 bg-primary animate-in slide-in-from-left duration-200" />
+                  )}
                   <item.icon className={`h-4.5 w-4.5 shrink-0 ${isActive ? "text-primary" : "text-sidebar-foreground/40"}`} />
                   {!collapsed && <span>{item.title}</span>}
                 </NavLink>

@@ -22,9 +22,25 @@ const COLORS = ["hsl(217, 71%, 53%)", "hsl(142, 71%, 45%)", "hsl(38, 92%, 50%)",
 
 const Dashboard = () => {
   const user = storage.getUser();
+  const [viewingTrainerId, setViewingTrainerId] = useState<string | null>(null);
 
   if (user?.role === 'TRAINER') {
     return <TrainerDashboard />;
+  }
+
+  if (viewingTrainerId) {
+    return (
+      <div className="space-y-6">
+        <button
+          onClick={() => setViewingTrainerId(null)}
+          className="flex items-center gap-2 text-primary hover:underline font-bold"
+        >
+          <Zap className="h-4 w-4 rotate-180" />
+          Back to Campus Overview
+        </button>
+        <TrainerDashboard trainerId={viewingTrainerId} />
+      </div>
+    );
   }
 
   if (user?.role === 'STUDENT') {
@@ -292,7 +308,11 @@ const Dashboard = () => {
                   {performance.length === 0 ? (
                     <tr><td colSpan={3} className="text-center py-20 text-muted-foreground font-semibold">Gathering ranking data...</td></tr>
                   ) : performance.slice(0, 5).map((t, idx) => (
-                    <tr key={t.trainerId} className="border-b border-border last:border-0 hover:bg-muted/50 transition-colors">
+                    <tr
+                      key={t.trainerId}
+                      className="border-b border-border last:border-0 hover:bg-muted/50 transition-colors cursor-pointer"
+                      onClick={() => setViewingTrainerId(t.trainerId)}
+                    >
                       <td className="py-4 pl-6 pr-4">
                         <div className="flex items-center gap-4">
                           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-xs font-black text-primary border border-primary/20">

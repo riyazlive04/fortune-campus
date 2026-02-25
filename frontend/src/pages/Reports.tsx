@@ -23,7 +23,7 @@ const Reports = () => {
         // 1. Fetch Branch Performance
         try {
           const branchesRes = await branchesApi.getBranches();
-          const branches = branchesRes.data || [];
+          const branches = branchesRes.data?.branches || [];
 
           if (branches.length > 0) {
             const branchReportsPromises = branches.map((b: any) =>

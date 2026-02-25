@@ -79,10 +79,24 @@ const TelecallerAnalytics = () => {
 
     // Transform data for charts
     const chartData: any[] = isCEO
-        ? (Array.isArray(data) ? data.map(b => ({ name: b.name, leads: b._count.leads, converted: b.leads.length, value: b.leads.length })) : [])
+        ? (Array.isArray(data) ? data.map(b => ({
+            name: b.name,
+            leads: b._count?.leads || 0,
+            converted: b._count?.convertedLeads || 0,
+            value: b._count?.convertedLeads || 0
+        })) : [])
         : isTelecaller
-            ? (data && (data as any).stats ? (data as any).stats.map((s: any) => ({ name: s.status, leads: s._count, value: s._count })) : [])
-            : (Array.isArray(data) ? data.map(tc => ({ name: `${tc.firstName} ${tc.lastName}`, leads: tc._count.leadsAssigned, conversions: tc._count.conversions, value: tc._count.conversions })) : []);
+            ? (data && (data as any).stats ? (data as any).stats.map((s: any) => ({
+                name: s.status,
+                leads: s._count || 0,
+                value: s._count || 0
+            })) : [])
+            : (Array.isArray(data) ? data.map(tc => ({
+                name: `${tc.firstName || ''} ${tc.lastName || ''}`.trim() || 'Unknown',
+                leads: tc._count?.leadsAssigned || 0,
+                conversions: tc._count?.conversions || 0,
+                value: tc._count?.conversions || 0
+            })) : []);
 
     return (
         <div className="space-y-6 animate-fade-in">

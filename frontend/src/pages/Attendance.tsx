@@ -6,7 +6,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
-import { attendanceApi, branchesApi, batchesApi, storage } from "@/lib/api";
+import { Input } from "@/components/ui/input";
+import { attendanceApi, branchesApi, batchesApi, studentsApi, storage } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -16,10 +17,11 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import {
-  Loader2, History, Calendar, User, CalendarDays,
-  CheckCircle2, XCircle, ClipboardList, Users, Send
+  Loader2, History as HistoryIcon, Calendar, User, CalendarDays,
+  CheckCircle2, XCircle, ClipboardList, Users, Send, Search
 } from "lucide-react";
 import { format } from "date-fns";
+import StudentHistoryModal from "@/components/StudentHistoryModal";
 
 const Attendance = () => {
   // ── Core state ──────────────────────────────────────────────
@@ -45,10 +47,13 @@ const Attendance = () => {
   // ── Summary / history state ──────────────────────────────────
   const [attendanceData, setAttendanceData] = useState<any[]>([]);
   const [loadingSummary, setLoadingSummary] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState<any>(null);
-  const [history, setHistory] = useState<any[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedHistoryStudent, setSelectedHistoryStudent] = useState<any | null>(null);
+
+  // ── Global Student Dropdown State ───────────────────────────
+  const [isStudentDropdownOpen, setIsStudentDropdownOpen] = useState(false);
+  const [allStudents, setAllStudents] = useState<any[]>([]);
+  const [loadingAllStudents, setLoadingAllStudents] = useState(false);
+  const [studentDropdownSearch, setStudentDropdownSearch] = useState("");
 
   // ── Fetch branches ───────────────────────────────────────────
   useEffect(() => {
@@ -103,6 +108,17 @@ const Attendance = () => {
 
   useEffect(() => { fetchSummary(); }, [fetchSummary]);
 
+  // ── Fetch all students for dropdown ──────────────────────────
+  useEffect(() => {
+    setLoadingAllStudents(true);
+    const params: any = { limit: 500 };
+    if (!isCEO && currentUser?.branchId) params.branchId = currentUser?.branchId;
+    studentsApi.getStudents(params)
+      .then(r => setAllStudents(r.data?.students || r.data || []))
+      .catch(() => setAllStudents([]))
+      .finally(() => setLoadingAllStudents(false));
+  }, [isCEO, currentUser?.branchId]);
+
   // ── Toggle attendance for one student ────────────────────────
   const toggle = (studentId: string) => {
     setAttendanceMap(prev => ({
@@ -153,23 +169,6 @@ const Attendance = () => {
     }
   };
 
-  const fetchStudentHistory = async (student: any) => {
-    console.log("Fetching history for student:", student);
-    setSelectedStudent(student);
-    setIsModalOpen(true);
-    setHistory([]);
-    setLoadingHistory(true);
-    try {
-      // The backend returns the student's ID as `id` in getAttendanceStats summary
-      const r = await attendanceApi.getAttendance({ studentId: student.id });
-      console.log("History response:", r);
-      setHistory(r.data?.attendance || []);
-    } catch (err: any) {
-      console.error("Failed to fetch history:", err);
-    }
-    finally { setLoadingHistory(false); }
-  };
-
   // ── Filtered batches for schedule table ──────────────────────
   const displayedBatches = selectedBranch && selectedBranch !== "all"
     ? batches.filter(b => b.branchId === selectedBranch)
@@ -199,6 +198,77 @@ const Attendance = () => {
               onSelect={(date) => { if (date) { setSelectedDate(date); setIsCalendarOpen(false); } }}
               initialFocus
             />
+          </PopoverContent>
+        </Popover>
+
+        {/* Global Student History Dropdown */}
+        <Popover open={isStudentDropdownOpen} onOpenChange={setIsStudentDropdownOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="secondary" className="gap-2 font-bold shadow-sm border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700">
+              <HistoryIcon className="h-4 w-4" />
+              Student History
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-80 p-0" align="start">
+            <div className="p-3 border-b border-border">
+              <h4 className="font-bold text-sm text-foreground flex items-center gap-2 mb-2">
+                <Users className="h-4 w-4 text-muted-foreground" /> Select a Student
+              </h4>
+              {/* Quick filter inside dropdown */}
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Filter students…"
+                  value={studentDropdownSearch}
+                  onChange={(e) => setStudentDropdownSearch(e.target.value)}
+                  className="h-8 pl-8 text-xs"
+                />
+              </div>
+            </div>
+            <div className="max-h-64 overflow-y-auto py-1">
+              {loadingAllStudents ? (
+                <div className="flex items-center justify-center py-6 text-muted-foreground gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-xs">Loading students…</span>
+                </div>
+              ) : (() => {
+                const filtered = allStudents.filter(s => {
+                  const name = `${s.user?.firstName || ''} ${s.user?.lastName || ''}`.toLowerCase();
+                  const enroll = (s.enrollmentNumber || '').toLowerCase();
+                  const q = studentDropdownSearch.toLowerCase();
+                  return name.includes(q) || enroll.includes(q);
+                });
+                return filtered.length === 0 ? (
+                  <div className="py-6 text-center text-xs text-muted-foreground">
+                    {allStudents.length === 0 ? 'No students found' : 'No match for your filter'}
+                  </div>
+                ) : (
+                  filtered.map(s => {
+                    const name = `${s.user?.firstName || ''} ${s.user?.lastName || ''}`.trim() || 'Unknown';
+                    const enroll = s.enrollmentNumber || s.user?.email || '';
+                    return (
+                      <button
+                        key={s.id}
+                        onClick={() => {
+                          setSelectedHistoryStudent(s);
+                          setIsStudentDropdownOpen(false);
+                          setStudentDropdownSearch('');
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-muted/60 transition-colors"
+                      >
+                        <div className="h-7 w-7 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-black shrink-0">
+                          {name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-foreground truncate">{name}</p>
+                          {enroll && <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-bold truncate">{enroll}</p>}
+                        </div>
+                      </button>
+                    );
+                  })
+                );
+              })()}
+            </div>
           </PopoverContent>
         </Popover>
 
@@ -305,19 +375,28 @@ const Attendance = () => {
                           <p className="text-[11px] text-muted-foreground">{enroll}</p>
                         </div>
                       </div>
-                      {/* Toggle button */}
-                      <button
-                        onClick={() => toggle(student.id)}
-                        className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold transition-all border ${isPresent
-                          ? "bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600"
-                          : "bg-red-500 text-white border-red-500 hover:bg-red-600"
-                          }`}
-                      >
-                        {isPresent
-                          ? <><CheckCircle2 className="h-3.5 w-3.5" /> Present</>
-                          : <><XCircle className="h-3.5 w-3.5" /> Absent</>
-                        }
-                      </button>
+                      {/* Actions column */}
+                      <div className="flex items-center gap-3">
+                        {/* Toggle button */}
+                        <button
+                          onClick={() => toggle(student.id)}
+                          className={`flex items-center w-[90px] justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${isPresent
+                            ? "bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600 shadow-sm"
+                            : "bg-red-500 text-white border-red-500 hover:bg-red-600 shadow-sm"
+                            }`}
+                        >
+                          {isPresent ? <><CheckCircle2 className="h-3.5 w-3.5" /> Present</> : <><XCircle className="h-3.5 w-3.5" /> Absent</>}
+                        </button>
+
+                        {/* History Button */}
+                        <button
+                          onClick={() => setSelectedHistoryStudent(student)}
+                          className="flex items-center justify-center p-1.5 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200 transition-colors shadow-sm"
+                          title="View Attendance History"
+                        >
+                          <HistoryIcon className="h-4 w-4" />
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -390,7 +469,7 @@ const Attendance = () => {
                   <tr key={i} className="hover:bg-muted/30 transition-colors">
                     <td className="font-medium whitespace-nowrap">
                       <button
-                        onClick={() => fetchStudentHistory(a)}
+                        onClick={() => setSelectedHistoryStudent({ id: a.id, name: a.student })}
                         className="flex items-center gap-2 text-primary hover:text-primary/80 transition-all font-bold group text-left"
                       >
                         <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
@@ -417,78 +496,12 @@ const Attendance = () => {
         </div>
       </div>
 
-      {/* ── History Modal ── */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-2xl bg-card border-border shadow-2xl">
-          <DialogHeader className="pb-4 border-b">
-            <DialogTitle className="flex items-center gap-3 text-xl font-black text-foreground">
-              <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                <History className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="leading-none">{selectedStudent?.student}</p>
-                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mt-1.5 flex items-center gap-1.5 opacity-60">
-                  <Calendar className="h-3 w-3" /> Attendance History
-                </p>
-              </div>
-            </DialogTitle>
-            <DialogDescription className="hidden">Detailed logs for student attendance</DialogDescription>
-          </DialogHeader>
-
-          <div className="mt-6">
-            {loadingHistory ? (
-              <div className="flex flex-col items-center justify-center py-20 gap-4">
-                <Loader2 className="h-10 w-10 animate-spin text-primary opacity-50" />
-                <p className="text-xs font-black uppercase text-muted-foreground tracking-widest animate-pulse">Retrieving Logs…</p>
-              </div>
-            ) : history.length === 0 ? (
-              <div className="text-center py-20 flex flex-col items-center gap-4">
-                <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
-                  <Calendar className="h-8 w-8 text-muted-foreground/30" />
-                </div>
-                <p className="text-sm font-bold text-muted-foreground">No history records found for this student.</p>
-              </div>
-            ) : (
-              <div className="max-h-[50vh] overflow-y-auto rounded-xl border border-border bg-muted/20 scrollbar-hide">
-                <table className="w-full text-[13px]">
-                  <thead className="bg-muted/80 backdrop-blur-sm sticky top-0 z-10">
-                    <tr className="border-b border-border">
-                      <th className="px-6 py-4 text-left font-black uppercase tracking-widest text-[10px] text-muted-foreground">Date</th>
-                      <th className="px-6 py-4 text-left font-black uppercase tracking-widest text-[10px] text-muted-foreground">Status</th>
-                      <th className="px-6 py-4 text-left font-black uppercase tracking-widest text-[10px] text-muted-foreground">Trainer</th>
-                      <th className="px-6 py-4 text-left font-black uppercase tracking-widest text-[10px] text-muted-foreground">Remarks</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/50 bg-card">
-                    {history.map((h) => (
-                      <tr key={h.id} className="hover:bg-muted/30 transition-colors">
-                        <td className="px-6 py-4 font-bold text-foreground">
-                          {new Date(h.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                        </td>
-                        <td className="px-6 py-4">
-                          <StatusBadge status={h.status} variant={h.status === 'PRESENT' ? 'success' : 'danger'} />
-                        </td>
-                        <td className="px-6 py-4 font-semibold text-muted-foreground">
-                          {h.trainer?.user ? `${h.trainer.user.firstName} ${h.trainer.user.lastName}` : 'System'}
-                        </td>
-                        <td className="px-6 py-4 text-[11px] text-muted-foreground/70 leading-relaxed italic">
-                          {h.remarks || '-'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            <div className="mt-8 flex justify-end">
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="px-6 py-2.5 bg-muted hover:bg-muted/80 text-foreground text-xs font-black uppercase tracking-widest rounded-lg transition-all"
-              >Close Records</button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Render the generic StudentHistoryModal passing the whole student object */}
+      <StudentHistoryModal
+        isOpen={!!selectedHistoryStudent}
+        onClose={() => setSelectedHistoryStudent(null)}
+        student={selectedHistoryStudent}
+      />
     </div>
   );
 };

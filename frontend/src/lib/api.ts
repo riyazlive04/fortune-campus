@@ -787,6 +787,24 @@ export const trainerAttendanceApi = {
     if (!response.ok) throw new Error(result.message || 'Failed to mark attendance');
     return result;
   },
+  markBulkAttendance: async (data: {
+    date: string;
+    status: string;
+    remarks?: string;
+  }) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/trainer-attendance/mark-bulk`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(data)
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to bulk-mark attendance');
+    return result;
+  },
   getHistory: async (params: { trainerId?: string; startDate?: string; endDate?: string }) => {
     const token = storage.getToken();
     const query = new URLSearchParams(params as any).toString();
@@ -1870,9 +1888,12 @@ export const notificationsApi = {
 
 // Trainer Dashboard API Service
 export const trainerApi = {
-  getDashboardStats: async () => {
+  getDashboardStats: async (trainerId?: string) => {
     const token = storage.getToken();
-    const response = await fetch(`${API_BASE_URL}/trainers/dashboard/stats`, {
+    const url = trainerId
+      ? `${API_BASE_URL}/trainers/dashboard/stats?trainerId=${trainerId}`
+      : `${API_BASE_URL}/trainers/dashboard/stats`;
+    const response = await fetch(url, {
       headers: { 'Authorization': `Bearer ${token}` },
     });
     const result = await response.json();
@@ -1890,9 +1911,12 @@ export const trainerApi = {
     return result;
   },
 
-  getBranchStudents: async () => {
+  getBranchStudents: async (trainerId?: string) => {
     const token = storage.getToken();
-    const response = await fetch(`${API_BASE_URL}/trainers/branch-students`, {
+    const url = trainerId
+      ? `${API_BASE_URL}/trainers/branch-students?trainerId=${trainerId}`
+      : `${API_BASE_URL}/trainers/branch-students`;
+    const response = await fetch(url, {
       headers: { 'Authorization': `Bearer ${token}` },
     });
     const result = await response.json();

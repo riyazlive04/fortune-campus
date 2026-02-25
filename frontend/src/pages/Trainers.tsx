@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import TrainerModal from "@/components/TrainerModal";
 import TrainerAttendanceModal from "@/components/TrainerAttendanceModal";
 import TrainerHistoryModal from "@/components/TrainerHistoryModal";
+import BranchHolidayModal from "@/components/BranchHolidayModal";
 import PageHeader from "@/components/PageHeader";
 import { CheckSquare, History as HistoryIcon } from "lucide-react";
 
@@ -22,6 +23,7 @@ const Trainers = () => {
     const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
     const [attendanceTrainer, setAttendanceTrainer] = useState<{ id: string, name: string } | null>(null);
     const [historyTrainer, setHistoryTrainer] = useState<{ id: string, name: string } | null>(null);
+    const [isBranchHolidayModalOpen, setIsBranchHolidayModalOpen] = useState(false);
 
     const { toast } = useToast();
 
@@ -143,6 +145,16 @@ const Trainers = () => {
                                 className="pl-9"
                             />
                         </div>
+                        {isChannelPartner && (
+                            <Button
+                                variant="outline"
+                                className="text-amber-600 border-amber-200 hover:bg-amber-50 shrink-0"
+                                onClick={() => setIsBranchHolidayModalOpen(true)}
+                            >
+                                <CheckSquare className="h-4 w-4 mr-2" />
+                                Mark Branch Holiday
+                            </Button>
+                        )}
                     </div>
 
                     <div className="rounded-md border">
@@ -258,6 +270,15 @@ const Trainers = () => {
                 onClose={() => setHistoryTrainer(null)}
                 trainerId={historyTrainer?.id || null}
                 trainerName={historyTrainer?.name || null}
+            />
+
+            <BranchHolidayModal
+                isOpen={isBranchHolidayModalOpen}
+                onClose={() => setIsBranchHolidayModalOpen(false)}
+                onSuccess={() => {
+                    setIsBranchHolidayModalOpen(false);
+                    fetchTrainers(); // refresh the list or triggers a re-fetch if needed
+                }}
             />
         </div>
     );

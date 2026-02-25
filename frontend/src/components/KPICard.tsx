@@ -14,7 +14,7 @@ const KPICard = ({ title, value, change, changeType = "neutral", icon: Icon, onC
     return (
         <div
             onClick={onClick}
-            className={`relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm transition-all hover:shadow-md animate-fade-in group h-full flex flex-col justify-between ${onClick ? 'cursor-pointer hover:border-primary/50' : ''}`}
+            className={`relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm transition-all hover:shadow-md hover:shadow-primary/5 animate-fade-in group h-full flex flex-col justify-between ${onClick ? 'cursor-pointer hover:border-primary/50 hover:shadow-primary/10' : ''}`}
         >
             <div className="flex flex-col gap-1 w-full">
                 <div className="flex items-center justify-between">

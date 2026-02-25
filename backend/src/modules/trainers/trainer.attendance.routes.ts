@@ -9,6 +9,7 @@ const router = Router();
 router.use(authenticateToken);
 
 router.post('/mark', requireBranchHead, trainerAttendanceController.markTrainerAttendance);
+router.post('/mark-bulk', requireBranchHead, trainerAttendanceController.markBulkAttendance);
 router.get('/history', requireBranchHead, trainerAttendanceController.getTrainerAttendance);
 
 export default router;

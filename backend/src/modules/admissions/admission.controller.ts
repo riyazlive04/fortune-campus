@@ -21,6 +21,8 @@ export const getAdmissions = async (req: AuthRequest, res: Response): Promise<Re
 
         if (status) {
             where.status = status;
+        } else {
+            where.status = { not: AdmissionStatus.CONVERTED };
         }
 
         if (courseId) {
