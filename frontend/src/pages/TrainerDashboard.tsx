@@ -118,7 +118,7 @@ const TrainerDashboard = ({ trainerId }: { trainerId?: string }) => {
                         change="Click to view details"
                         changeType="neutral"
                         icon={Users}
-                        accentColor="bg-primary"
+                        accentColor="bg-blue-500"
                     />
                 </div>
                 <div onClick={() => openModal("attendance")} className="cursor-pointer hover:shadow-md transition-shadow rounded-xl">
@@ -128,7 +128,7 @@ const TrainerDashboard = ({ trainerId }: { trainerId?: string }) => {
                         change="Click to view details"
                         changeType="neutral"
                         icon={ClipboardCheck}
-                        accentColor="bg-success"
+                        accentColor="bg-emerald-500"
                     />
                 </div>
                 <div onClick={() => openModal("pendingPortfolios")} className="cursor-pointer hover:shadow-md transition-shadow rounded-xl">
@@ -138,7 +138,7 @@ const TrainerDashboard = ({ trainerId }: { trainerId?: string }) => {
                         change="Click to view details"
                         changeType="neutral"
                         icon={LayoutDashboard}
-                        accentColor="bg-warning"
+                        accentColor="bg-amber-500"
                     />
                 </div>
                 <div onClick={() => openModal("placementEligible")} className="cursor-pointer hover:shadow-md transition-shadow rounded-xl">
@@ -425,17 +425,52 @@ const TrainerIncentivesList = () => {
     return (
         <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 bg-primary/10 rounded-xl border border-primary/20">
-                    <p className="text-sm text-gray-500">Total Earned</p>
-                    <p className="text-2xl font-bold text-primary">{formatCurrency(stats.total)}</p>
+                {/* Total Earned */}
+                <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm transition-all duration-300 hover:shadow-lg group h-full flex flex-col justify-between">
+                    <div className="absolute top-0 left-0 w-full h-[3px] opacity-80 bg-violet-500" />
+                    <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full blur-[30px] opacity-20 group-hover:opacity-40 transition-opacity bg-violet-500" />
+                    <div className="flex items-center justify-between relative z-10">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">Total Earned</p>
+                        <div className="rounded-full p-2.5 bg-violet-500 bg-opacity-10 group-hover:bg-opacity-20 transition-colors">
+                            <DollarSign className="h-4 w-4 text-violet-600" />
+                        </div>
+                    </div>
+                    <div className="mt-2 relative z-10">
+                        <h3 className="text-2xl font-black tracking-tight text-foreground">{formatCurrency(stats.total)}</h3>
+                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold bg-muted/50 text-muted-foreground border border-border/50 mt-1">Lifetime incentives</span>
+                    </div>
                 </div>
-                <div className="p-4 bg-green-500/10 rounded-xl border border-green-500/20">
-                    <p className="text-sm text-gray-500">Paid Out</p>
-                    <p className="text-2xl font-bold text-green-600">{formatCurrency(stats.paid)}</p>
+
+                {/* Paid Out */}
+                <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm transition-all duration-300 hover:shadow-lg group h-full flex flex-col justify-between">
+                    <div className="absolute top-0 left-0 w-full h-[3px] opacity-80 bg-emerald-500" />
+                    <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full blur-[30px] opacity-20 group-hover:opacity-40 transition-opacity bg-emerald-500" />
+                    <div className="flex items-center justify-between relative z-10">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">Paid Out</p>
+                        <div className="rounded-full p-2.5 bg-emerald-500 bg-opacity-10 group-hover:bg-opacity-20 transition-colors">
+                            <CheckCircle className="h-4 w-4 text-emerald-600" />
+                        </div>
+                    </div>
+                    <div className="mt-2 relative z-10">
+                        <h3 className="text-2xl font-black tracking-tight text-foreground">{formatCurrency(stats.paid)}</h3>
+                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100/50 mt-1">Already disbursed</span>
+                    </div>
                 </div>
-                <div className="p-4 bg-yellow-500/10 rounded-xl border border-yellow-500/20">
-                    <p className="text-sm text-gray-500">Pending</p>
-                    <p className="text-2xl font-bold text-yellow-600">{formatCurrency(stats.pending)}</p>
+
+                {/* Pending */}
+                <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm transition-all duration-300 hover:shadow-lg group h-full flex flex-col justify-between">
+                    <div className="absolute top-0 left-0 w-full h-[3px] opacity-80 bg-amber-500" />
+                    <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full blur-[30px] opacity-20 group-hover:opacity-40 transition-opacity bg-amber-500" />
+                    <div className="flex items-center justify-between relative z-10">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">Pending</p>
+                        <div className="rounded-full p-2.5 bg-amber-500 bg-opacity-10 group-hover:bg-opacity-20 transition-colors">
+                            <AlertCircle className="h-4 w-4 text-amber-600" />
+                        </div>
+                    </div>
+                    <div className="mt-2 relative z-10">
+                        <h3 className="text-2xl font-black tracking-tight text-foreground">{formatCurrency(stats.pending)}</h3>
+                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold bg-amber-50 text-amber-600 border border-amber-100/50 mt-1">Awaiting payment</span>
+                    </div>
                 </div>
             </div>
 

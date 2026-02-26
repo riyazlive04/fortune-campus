@@ -1,13 +1,16 @@
 import { useState, useEffect } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import AppSidebar from "./AppSidebar";
 import TopBar from "./TopBar";
 import Footer from "./Footer";
 import { storage } from "@/lib/api";
+import { AnimatePresence } from "framer-motion";
+import PageTransition from "./PageTransition";
 
 const Layout = () => {
   const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     // Check if user is authenticated
@@ -25,8 +28,12 @@ const Layout = () => {
       <AppSidebar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} />
       <TopBar sidebarCollapsed={collapsed} />
       <main className={`pt-16 flex-1 transition-all duration-300 ${collapsed ? "ml-16" : "ml-60"}`}>
-        <div className="p-6">
-          <Outlet />
+        <div className="p-6 h-full relative">
+          <AnimatePresence mode="wait">
+            <PageTransition key={location.pathname}>
+              <Outlet />
+            </PageTransition>
+          </AnimatePresence>
         </div>
       </main>
       <div className={`transition-all duration-300 ${collapsed ? "ml-16" : "ml-60"}`}>

@@ -42,6 +42,8 @@ model User {
   incentives    Incentive[]
   notifications Notification[]
   uploadedReports BranchReport[]
+  performanceGapsTarget PerformanceGap[] @relation("GapTarget")
+  performanceGapsCreated PerformanceGap[] @relation("GapCreator")
   
   @@index([email])
   @@index([branchId])
@@ -76,8 +78,33 @@ model Branch {
   socialMedia SocialMediaEngagement[]
   eventPlans  EventPlan[]
   branchReports BranchReport[]
+  performanceGaps PerformanceGap[]
   
   @@map("branches")
+}
+
+model PerformanceGap {
+  id              String   @id @default(uuid())
+  targetUserId    String
+  category        String   // "STUDENT", "TRAINER", "TELECALLER"
+  weakness        String
+  improvementPlan String?
+  status          String   @default("IDENTIFIED") // IDENTIFIED, IMPROVING, RESOLVED
+  
+  createdById     String
+  branchId        String
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  targetUser      User     @relation("GapTarget", fields: [targetUserId], references: [id])
+  createdBy       User     @relation("GapCreator", fields: [createdById], references: [id])
+  branch          Branch   @relation(fields: [branchId], references: [id])
+
+  @@index([targetUserId])
+  @@index([branchId])
+  @@index([category])
+  @@map("performance_gaps")
 }
 
 model Lead {
@@ -302,6 +329,7 @@ model Student {
   growthReports   StudentGrowthReport[]
   feedbacks       StudentFeedback[]
   batchEnrollments StudentBatch[] // Many-to-many enrollment tracking
+  trainerRatings  TrainerRating[]
   
   @@index([branchId])
   @@index([courseId])
@@ -338,9 +366,30 @@ model Trainer {
   growthReports     StudentGrowthReport[]
   fileReports       ClassAndPortfolioReport[]
   awards            TrainerAward[]
+  ratings           TrainerRating[]
   
   @@index([branchId])
   @@map("trainers")
+}
+
+model TrainerRating {
+  id          String   @id @default(uuid())
+  trainerId   String
+  studentId   String
+  rating      Float    // 1.0 – 5.0
+  comment     String?
+  month       Int      // 1-12
+  year        Int
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  trainer     Trainer  @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([trainerId, studentId, month, year])
+  @@index([trainerId])
+  @@index([studentId])
+  @@map("trainer_ratings")
 }
 
 model Course {

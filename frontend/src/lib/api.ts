@@ -129,6 +129,8 @@ export const leadsApi = {
     status?: string;
     branchId?: string;
     search?: string;
+    source?: string;
+    interestedCourse?: string;
   } = {}) => {
     const token = storage.getToken();
     const query = new URLSearchParams(params as any).toString();
@@ -283,9 +285,12 @@ export const leadsApi = {
     return result;
   },
 
-  getTelecallerStats: async () => {
+  getTelecallerStats: async (date?: string) => {
     const token = storage.getToken();
-    const response = await fetch(`${API_BASE_URL}/leads/stats/telecaller`, {
+    const url = date
+      ? `${API_BASE_URL}/leads/stats/telecaller?date=${date}`
+      : `${API_BASE_URL}/leads/stats/telecaller`;
+    const response = await fetch(url, {
       headers: { 'Authorization': `Bearer ${token}` },
     });
     const result = await response.json();
@@ -537,6 +542,17 @@ export const branchesApi = {
 
     if (!response.ok) {
       throw new Error(result.message || 'Failed to fetch branches');
+    }
+
+    return result;
+  },
+
+  getPublicBranches: async () => {
+    const response = await fetch(`${API_BASE_URL}/branches/public/list`);
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to fetch public branches');
     }
 
     return result;
@@ -1848,7 +1864,24 @@ export const reportsApi = {
     if (!response.ok) throw new Error(result.message || 'Failed to submit event plan');
     return result;
   },
+
+  getCEOOverallReport: async (month?: string, year?: string, startDate?: string, endDate?: string) => {
+    const token = storage.getToken();
+    const query = new URLSearchParams();
+    if (month) query.append('month', month);
+    if (year) query.append('year', year);
+    if (startDate) query.append('startDate', startDate);
+    if (endDate) query.append('endDate', endDate);
+
+    const response = await fetch(`${API_BASE_URL}/reports/ceo-overall?${query.toString()}`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch CEO report');
+    return result;
+  },
 };
+
 
 // Notifications API Service
 export const notificationsApi = {
@@ -2218,6 +2251,89 @@ export const batchesApi = {
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Failed to remove student');
+    return result;
+  }
+};
+
+// Users API Service
+export const usersApi = {
+  getUsers: async (params?: any) => {
+    const token = storage.getToken();
+    const queryString = params ? new URLSearchParams(params).toString() : '';
+    const response = await fetch(`${API_BASE_URL}/users?${queryString}`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch users');
+    return result;
+  },
+};
+// --------------------------------------------------------------------------
+// Ratings API Service
+// --------------------------------------------------------------------------
+export const ratingsApi = {
+  submitTrainerRating: async (data: { trainerId: string; rating: number; comment?: string }) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/ratings/trainer`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(data),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to submit rating');
+    return result;
+  },
+
+  getMyRatingForTrainer: async (trainerId: string) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/ratings/trainer/${trainerId}/my-rating`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch rating');
+    return result;
+  },
+
+  getTrainerAverageRating: async (trainerId: string) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/ratings/trainer/${trainerId}/average`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch average rating');
+    return result;
+  },
+
+  getAllTrainersAverageRatings: async () => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/ratings/trainers/averages`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch average ratings');
+    return result;
+  },
+
+  getPerformanceMetrics: async (trainerId: string) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/ratings/trainer/${trainerId}/performance-metrics`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch metrics');
+    return result;
+  },
+
+  getAllPerformanceMetrics: async () => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/ratings/trainers/performance-metrics`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch bulk metrics');
     return result;
   }
 };

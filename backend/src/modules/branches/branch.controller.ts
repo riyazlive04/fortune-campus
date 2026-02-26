@@ -3,10 +3,23 @@ import { prisma } from '../../config/database';
 import { successResponse, errorResponse, paginationHelper, getPaginationMeta } from '../../utils/response';
 import { AuthRequest } from '../../middlewares/auth.middleware';
 
+export const getPublicBranches = async (req: AuthRequest, res: Response): Promise<Response> => {
+  try {
+    const branches = await prisma.branch.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    });
+    return successResponse(res, branches);
+  } catch (error) {
+    return errorResponse(res, 'Failed to fetch public branches', 500, error);
+  }
+};
+
 export const getBranches = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
     const { page = 1, limit = 10, isActive, search } = req.query;
-    
+
     const { skip, take } = paginationHelper(Number(page), Number(limit));
 
     const where: any = {};

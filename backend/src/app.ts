@@ -29,6 +29,7 @@ import batchRouter from "./modules/batches/batch.routes";
 import studentDashboardRouter from "./modules/students/student.dashboard.routes";
 import branchDashboardRouter from "./modules/branches/branch.dashboard.routes";
 import trainerAttendanceRouter from "./modules/trainers/trainer.attendance.routes";
+import ratingsRouter from "./modules/ratings/rating.routes";
 
 const app: Application = express();
 
@@ -128,6 +129,7 @@ app.use("/api/students", studentDashboardRouter);
 app.use("/api/students", studentRouter);
 app.use("/api/branch-dashboard", branchDashboardRouter);
 app.use("/api/trainer-attendance", trainerAttendanceRouter);
+app.use("/api/ratings", ratingsRouter);
 
 // --------------------
 // Error Handling

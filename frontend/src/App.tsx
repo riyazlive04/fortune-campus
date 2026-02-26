@@ -22,14 +22,14 @@ import Attendance from "./pages/Attendance";
 import Portfolio from "./pages/Portfolio";
 import Placements from "./pages/Placements";
 import Incentives from "./pages/Incentives";
-import Reports from "./pages/Reports";
 import StudentGrowth from "./pages/StudentGrowth";
-import BranchInsights from "./pages/BranchInsights";
 import Notifications from "./pages/Notifications";
 import TelecallerDashboard from "./pages/telecaller/TelecallerDashboard";
 import LeadPipeline from "./pages/telecaller/LeadPipeline";
 import TelecallerAnalytics from "./pages/telecaller/TelecallerAnalytics";
+import CeoPerformance from "./pages/CeoPerformance";
 import NotFound from "./pages/NotFound";
+import PageTransition from "./components/PageTransition";
 
 const queryClient = new QueryClient();
 
@@ -41,9 +41,9 @@ const App = () => (
       <BrowserRouter>
         <SetupGuard>
           <Routes>
-            <Route path="/setup" element={<Setup />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/enquiry" element={<PublicEnquiry />} />
+            <Route path="/setup" element={<PageTransition><Setup /></PageTransition>} />
+            <Route path="/login" element={<PageTransition><Login /></PageTransition>} />
+            <Route path="/enquiry" element={<PageTransition><PublicEnquiry /></PageTransition>} />
             <Route element={<Layout />}>
               <Route path="/" element={<Dashboard />} />
               <Route path="/users" element={<Users />} />
@@ -59,13 +59,12 @@ const App = () => (
               <Route path="/portfolio" element={<Portfolio />} />
               <Route path="/placements" element={<Placements />} />
               <Route path="/incentives" element={<Incentives />} />
-              <Route path="/reports" element={<Reports />} />
               <Route path="/growth" element={<StudentGrowth />} />
-              <Route path="/branch-insights" element={<BranchInsights />} />
               <Route path="/notifications" element={<Notifications />} />
               <Route path="/telecaller/dashboard" element={<TelecallerDashboard />} />
               <Route path="/telecaller/pipeline" element={<LeadPipeline />} />
               <Route path="/telecaller/analytics" element={<TelecallerAnalytics />} />
+              <Route path="/ceo-analytics" element={<CeoPerformance />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

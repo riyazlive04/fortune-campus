@@ -1,13 +1,15 @@
 import { useState, useEffect } from "react";
-import { Plus, MoreHorizontal, Phone, Mail, Calendar, MessageSquare, RefreshCw } from "lucide-react";
+import { Plus, MoreHorizontal, Phone, Mail, Calendar, RefreshCw, Search, Filter } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { leadsApi, branchesApi, storage } from "@/lib/api";
+import { leadsApi, branchesApi, coursesApi, storage } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import LeadModal from "@/components/LeadModal";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
     DndContext,
     closestCorners,
@@ -36,6 +38,12 @@ const PIPELINE_STATUSES = [
     { id: "NEGOTIATING", label: "Negotiating", color: "bg-orange-500/10 text-orange-500 border-orange-500/20" },
     { id: "CONVERTED", label: "Converted", color: "bg-green-500/10 text-green-500 border-green-500/20" },
 ];
+
+const WhatsAppIcon = ({ className }: { className?: string }) => (
+    <svg viewBox="0 0 24 24" className={className || "h-4 w-4 fill-current text-[#25D366]"} xmlns="http://www.w3.org/2000/svg">
+        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z" />
+    </svg>
+);
 
 const SortableLeadCard = ({ lead, status, onEdit }: { lead: any; status: any; onEdit: (id: string) => void }) => {
     const {
@@ -123,16 +131,16 @@ const SortableLeadCard = ({ lead, status, onEdit }: { lead: any; status: any; on
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 rounded-full hover:bg-primary/10 hover:text-primary"
+                            className="h-7 w-7 rounded-full hover:bg-green-50"
                             onClick={handleWhatsApp}
                             title="WhatsApp Lead"
                         >
-                            <MessageSquare className="h-3 w-3" />
+                            <WhatsAppIcon className="h-3 w-3" />
                         </Button>
                         <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 rounded-full hover:bg-success/10 hover:text-success"
+                            className="h-7 w-7 rounded-full hover:bg-blue-50 text-[#007AFF]"
                             onClick={handleCall}
                             title="Call Lead"
                         >
@@ -172,7 +180,11 @@ const LeadPipeline = () => {
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
     const [branches, setBranches] = useState<any[]>([]);
+    const [courses, setCourses] = useState<any[]>([]);
     const [selectedBranchId, setSelectedBranchId] = useState<string>("all");
+    const [selectedSource, setSelectedSource] = useState<string>("all");
+    const [selectedCourse, setSelectedCourse] = useState<string>("all");
+    const [searchTerm, setSearchTerm] = useState<string>("");
     const [activeId, setActiveId] = useState<string | null>(null);
     const { toast } = useToast();
 
@@ -196,10 +208,22 @@ const LeadPipeline = () => {
             const res = await branchesApi.getBranches();
             if (res.success && res.data?.branches) {
                 setBranches(res.data.branches);
-                // No need to set selectedBranchId to first branch, keep "all" as default
             }
         } catch (error) {
             console.error("Failed to fetch branches", error);
+        }
+    };
+
+    const fetchCourses = async () => {
+        try {
+            const res = await coursesApi.getCourses();
+            if (res.success && res.data?.courses) {
+                setCourses(res.data.courses);
+            } else if (res.success && Array.isArray(res.data)) {
+                setCourses(res.data);
+            }
+        } catch (error) {
+            console.error("Failed to fetch courses", error);
         }
     };
 
@@ -213,6 +237,20 @@ const LeadPipeline = () => {
 
             if (targetBranchId && targetBranchId !== "all") {
                 params.branchId = targetBranchId;
+            }
+
+            if (selectedSource !== "all") {
+                params.source = selectedSource;
+            }
+
+            if (searchTerm) {
+                params.search = searchTerm;
+            }
+
+            // Interested course filter (if backend supports or handle locally)
+            // For now, we'll pass it to backend and see
+            if (selectedCourse !== "all") {
+                params.interestedCourse = selectedCourse;
             }
 
             // If telecaller, we might want to filter by assignedToId
@@ -242,13 +280,24 @@ const LeadPipeline = () => {
 
     useEffect(() => {
         fetchBranches();
+        fetchCourses();
     }, []);
 
     useEffect(() => {
         if (isCEO || (user?.branchId)) {
             fetchLeads();
         }
-    }, [selectedBranchId, user?.branchId]);
+    }, [selectedBranchId, selectedSource, selectedCourse, user?.branchId]);
+
+    // Debounced search effect
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (isCEO || (user?.branchId)) {
+                fetchLeads();
+            }
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
 
     const getLeadsByStatus = (status: string) => {
         return leads.filter(l => l.status === status);
@@ -310,53 +359,123 @@ const LeadPipeline = () => {
 
     return (
         <div className="flex flex-col h-[calc(100vh-4rem)] bg-slate-50/50">
-            <div className="p-6 pb-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="p-6 pb-0">
                 <PageHeader
                     title="Lead Pipeline"
                     description="Drag and drop management of your sales funnel"
                 />
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
-                    <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded-lg border border-muted-foreground/10">
-                            <Badge variant="outline" className="h-5 px-1 bg-primary/10 text-primary border-primary/20">
-                                {isCEO
-                                    ? (selectedBranchId === "all" ? "All Branches" : branches.find(b => b.id === selectedBranchId)?.name || "Selected Branch")
-                                    : (user?.branch?.name || "Local Branch")
-                                }
-                            </Badge>
-                            <span className="text-xs font-medium text-muted-foreground">Active Pipeline</span>
-                        </div>
 
+                <div className="bg-card border border-border/50 rounded-xl p-4 mt-6 mb-6 shadow-sm">
+                    <div className="flex flex-col md:flex-row gap-4 items-end">
                         {isCEO && (
-                            <Select value={selectedBranchId} onValueChange={setSelectedBranchId}>
-                                <SelectTrigger className="w-[180px] h-9 bg-card">
-                                    <SelectValue placeholder="Select Branch" />
+                            <div className="space-y-1.5 flex-1 min-w-[200px]">
+                                <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Branch</Label>
+                                <Select value={selectedBranchId} onValueChange={setSelectedBranchId}>
+                                    <SelectTrigger className="rounded-lg h-9 bg-muted/20">
+                                        <SelectValue placeholder="Select Branch" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All Branches</SelectItem>
+                                        {branches.map((b: any) => (
+                                            <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
+                        <div className="space-y-1.5 flex-1 min-w-[150px]">
+                            <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Source</Label>
+                            <Select value={selectedSource} onValueChange={setSelectedSource}>
+                                <SelectTrigger className="rounded-lg h-9 bg-muted/20">
+                                    <SelectValue placeholder="Select Source" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">All Branches</SelectItem>
-                                    {branches.map((branch) => (
-                                        <SelectItem key={branch.id} value={branch.id}>
-                                            {branch.name}
-                                        </SelectItem>
+                                    <SelectItem value="all">All Sources</SelectItem>
+                                    <SelectItem value="WEBSITE">Website</SelectItem>
+                                    <SelectItem value="PHONE">Phone</SelectItem>
+                                    <SelectItem value="WALK_IN">Walk-in</SelectItem>
+                                    <SelectItem value="REFERRAL">Referral</SelectItem>
+                                    <SelectItem value="SOCIAL_MEDIA">Social Media</SelectItem>
+                                    <SelectItem value="ADVERTISEMENT">Advertisement</SelectItem>
+                                    <SelectItem value="OTHER">Other</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="space-y-1.5 flex-1 min-w-[180px]">
+                            <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Course</Label>
+                            <Select value={selectedCourse} onValueChange={setSelectedCourse}>
+                                <SelectTrigger className="rounded-lg h-9 bg-muted/20">
+                                    <SelectValue placeholder="Select Course" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Courses</SelectItem>
+                                    {courses.map((course: any) => (
+                                        <SelectItem key={course.id} value={course.name}>{course.name}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
-                        )}
+                        </div>
+
+                        <div className="space-y-1.5 flex-1 min-w-[200px]">
+                            <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Search Leads</Label>
+                            <div className="relative">
+                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Name, Email, Phone..."
+                                    className="pl-9 h-9 rounded-lg bg-muted/20"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex gap-2">
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-9 w-9 rounded-lg"
+                                title="Apply Filters"
+                                onClick={() => fetchLeads(true)}
+                                disabled={loading}
+                            >
+                                <Filter className={`h-4 w-4 ${loading ? 'opacity-50' : ''}`} />
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-9 w-9 rounded-lg"
+                                title="Refresh Pipeline"
+                                onClick={() => fetchLeads(true)}
+                                disabled={loading}
+                            >
+                                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                            </Button>
+                            <Button
+                                className="h-9 rounded-lg gap-2"
+                                onClick={() => handleOpenModal()}
+                            >
+                                <Plus className="h-4 w-4" />
+                                <span className="hidden sm:inline">New Lead</span>
+                            </Button>
+                        </div>
                     </div>
+                </div>
+
+                <div className="flex items-center justify-between mb-4 px-2">
                     <div className="flex items-center gap-2">
-                        <span className="text-xs text-muted-foreground mr-2">
-                            Total: {leads.length} leads
-                        </span>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => fetchLeads(true)}
-                            disabled={loading}
-                            className="h-9 gap-2"
-                        >
-                            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                            Refresh
-                        </Button>
+                        {isCEO && selectedBranchId !== 'all' && (
+                            <Badge variant="secondary" className="px-3 py-1 bg-primary/5 text-primary border-primary/10">
+                                {branches.find(b => b.id === selectedBranchId)?.name}
+                            </Badge>
+                        )}
+                        <Badge variant="secondary" className="px-3 py-1 bg-muted/50 text-muted-foreground">
+                            Active Pipeline
+                        </Badge>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                        Total: <span className="font-bold text-foreground">{leads.length} leads</span>
                     </div>
                 </div>
             </div>

@@ -44,6 +44,7 @@ export const getStudentOverview = async (req: AuthRequest, res: Response): Promi
                         endTime: true,
                         trainer: {
                             select: {
+                                id: true,
                                 user: {
                                     select: {
                                         firstName: true,
@@ -226,7 +227,8 @@ export const getStudentOverview = async (req: AuthRequest, res: Response): Promi
                     include: {
                         course: { select: { name: true, code: true, duration: true } },
                         trainer: {
-                            include: {
+                            select: {
+                                id: true,
                                 user: { select: { firstName: true, lastName: true } }
                             }
                         }
@@ -240,6 +242,7 @@ export const getStudentOverview = async (req: AuthRequest, res: Response): Promi
                     courseCode: b.course.code,
                     timing: `${b.startTime || 'TBD'} - ${b.endTime || 'TBD'}`,
                     trainer: b.trainer ? `${b.trainer.user.firstName} ${b.trainer.user.lastName}` : 'Not Assigned',
+                    trainerId: b.trainer?.id,
                 }));
             }
         } catch (err) {
@@ -266,6 +269,7 @@ export const getStudentOverview = async (req: AuthRequest, res: Response): Promi
                 trainer: student.batch.trainer ?
                     `${student.batch.trainer.user.firstName} ${student.batch.trainer.user.lastName}` :
                     'Not Assigned',
+                trainerId: student.batch.trainer?.id || null,
                 upcomingTest: upcomingTest
             } : null,
             branch: {

@@ -9,8 +9,8 @@ export const getBranchReport = async (req: AuthRequest, res: Response): Promise<
   try {
     const { branchId } = req.query;
 
-    const effectiveBranchId = req.user?.role === UserRole.CEO && branchId 
-      ? branchId as string 
+    const effectiveBranchId = req.user?.role === UserRole.CEO && branchId
+      ? branchId as string
       : req.user?.branchId;
 
     if (!effectiveBranchId) {
@@ -36,7 +36,7 @@ export const getBranchReport = async (req: AuthRequest, res: Response): Promise<
       prisma.lead.count({ where: { branchId: effectiveBranchId } }),
       prisma.lead.count({ where: { branchId: effectiveBranchId, status: LeadStatus.CONVERTED } }),
       prisma.admission.count({ where: { branchId: effectiveBranchId } }),
-      prisma.admission.count({ where: { branchId: effectiveBranchId, status: AdmissionStatus.APPROVED } }),
+      prisma.admission.count({ where: { branchId: effectiveBranchId, status: AdmissionStatus.CONVERTED } }),
       prisma.placement.count({ where: { student: { branchId: effectiveBranchId } } }),
       prisma.placement.count({ where: { student: { branchId: effectiveBranchId }, status: PlacementStatus.PLACED } }),
     ]);
@@ -349,8 +349,8 @@ export const getRevenueReport = async (req: AuthRequest, res: Response): Promise
         totalFees: admissions._sum.feeAmount || 0,
         collected: admissions._sum.feePaid || 0,
         pending: admissions._sum.feeBalance || 0,
-        collectionRate: admissions._sum.feeAmount 
-          ? ((Number(admissions._sum.feePaid) / Number(admissions._sum.feeAmount)) * 100).toFixed(2) 
+        collectionRate: admissions._sum.feeAmount
+          ? ((Number(admissions._sum.feePaid) / Number(admissions._sum.feeAmount)) * 100).toFixed(2)
           : '0',
       },
       byCourse: courseRevenue,
@@ -359,5 +359,159 @@ export const getRevenueReport = async (req: AuthRequest, res: Response): Promise
     return successResponse(res, report);
   } catch (error) {
     return errorResponse(res, 'Failed to generate revenue report', 500, error);
+  }
+};
+export const getCEOOverallReport = async (req: AuthRequest, res: Response): Promise<Response> => {
+  try {
+    if (req.user?.role !== UserRole.CEO) {
+      return errorResponse(res, 'Unauthorized access: CEO role required', 403);
+    }
+
+    const { month, year, startDate, endDate } = req.query;
+    let dateFilter: any = {};
+
+    const parseLocalDate = (dateStr: string, endOfDay = false): Date => {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      if (endOfDay) {
+        return new Date(y, m - 1, d, 23, 59, 59, 999);
+      }
+      return new Date(y, m - 1, d, 0, 0, 0, 0);
+    };
+
+    if (startDate || endDate) {
+      // Custom or MTD/YTD date range from frontend
+      dateFilter = {
+        createdAt: {
+          ...(startDate ? { gte: parseLocalDate(startDate as string, false) } : {}),
+          ...(endDate ? { lte: parseLocalDate(endDate as string, true) } : {}),
+        }
+      };
+    } else if (year) {
+      const yr = parseInt(year as string);
+      let start: Date;
+      let end: Date;
+
+      if (month) {
+        const mo = parseInt(month as string);
+        start = new Date(yr, mo - 1, 1);
+        end = new Date(yr, mo, 0, 23, 59, 59);
+      } else {
+        start = new Date(yr, 0, 1);
+        end = new Date(yr, 11, 31, 23, 59, 59);
+      }
+
+      dateFilter = {
+        createdAt: {
+          gte: start,
+          lte: end
+        }
+      };
+    }
+
+    const [
+      branches,
+      leadSources,
+      leadStatuses,
+      admissionSummary,
+      branchRevenue,
+      performanceGaps
+    ] = await Promise.all([
+      prisma.branch.findMany({ select: { id: true, name: true } }),
+      prisma.lead.groupBy({
+        by: ['source'],
+        where: dateFilter,
+        _count: true,
+      }),
+      prisma.lead.groupBy({
+        by: ['status'],
+        where: dateFilter,
+        _count: true,
+      }),
+      prisma.admission.aggregate({
+        where: {
+          admissionDate: dateFilter.createdAt
+        },
+        _sum: {
+          feeAmount: true,
+          feePaid: true,
+          feeBalance: true,
+        },
+        _count: true,
+      }),
+      prisma.admission.groupBy({
+        by: ['branchId'],
+        where: {
+          admissionDate: dateFilter.createdAt
+        },
+        _sum: {
+          feeAmount: true,
+          feePaid: true,
+        },
+        _count: true,
+      }),
+      prisma.performanceGap.findMany({
+        where: dateFilter,
+        include: {
+          targetUser: { select: { firstName: true, lastName: true, role: true } },
+          createdBy: { select: { firstName: true, lastName: true } },
+          branch: { select: { name: true } }
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 50
+      })
+    ]);
+
+    // Map branch revenue to names
+    const branchComparison = await Promise.all(branches.map(async (branch) => {
+      const revenue = branchRevenue.find(r => r.branchId === branch.id);
+      const leadsCount = await prisma.lead.count({
+        where: {
+          branchId: branch.id,
+          ...dateFilter
+        }
+      });
+      const convertedCount = await prisma.lead.count({
+        where: {
+          branchId: branch.id,
+          status: LeadStatus.CONVERTED,
+          ...dateFilter
+        }
+      });
+
+      return {
+        branch: branch.name,
+        revenue: Number(revenue?._sum.feeAmount || 0),
+        collected: Number(revenue?._sum.feePaid || 0),
+        leads: leadsCount,
+        conversions: convertedCount,
+      };
+    }));
+
+    const report = {
+      overall: {
+        totalLeads: leadStatuses.reduce((acc, s) => acc + s._count, 0),
+        totalAdmissions: admissionSummary._count,
+        totalRevenue: Number(admissionSummary._sum.feeAmount || 0),
+        totalCollected: Number(admissionSummary._sum.feePaid || 0),
+      },
+      leadSources: leadSources.map(s => ({
+        source: s.source || 'Unknown',
+        count: s._count,
+      })),
+      conversionFunnel: leadStatuses.map(s => ({
+        status: s.status,
+        count: s._count,
+      })),
+      branchComparison,
+      performanceGaps: {
+        students: performanceGaps.filter(g => g.category === 'STUDENT'),
+        trainers: performanceGaps.filter(g => g.category === 'TRAINER'),
+        telecallers: performanceGaps.filter(g => g.category === 'TELECALLER'),
+      }
+    };
+
+    return successResponse(res, report);
+  } catch (error) {
+    return errorResponse(res, 'Failed to generate CEO overall report', 500, error);
   }
 };

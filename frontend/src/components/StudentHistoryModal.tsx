@@ -14,9 +14,10 @@ interface StudentHistoryModalProps {
     isOpen: boolean;
     onClose: () => void;
     student: any | null; // Pass the entire student object to get identifiers
+    courseFilter?: string; // Optional course name to filter by
 }
 
-const StudentHistoryModal = ({ isOpen, onClose, student }: StudentHistoryModalProps) => {
+const StudentHistoryModal = ({ isOpen, onClose, student, courseFilter }: StudentHistoryModalProps) => {
     const [history, setHistory] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -25,7 +26,7 @@ const StudentHistoryModal = ({ isOpen, onClose, student }: StudentHistoryModalPr
         if (isOpen && student?.id) {
             fetchHistory();
         }
-    }, [isOpen, student?.id, currentMonth]);
+    }, [isOpen, student?.id, currentMonth, courseFilter]);
 
     const fetchHistory = async () => {
         try {
@@ -41,7 +42,17 @@ const StudentHistoryModal = ({ isOpen, onClose, student }: StudentHistoryModalPr
 
             // The backend returns an array of attendances based on generic attendance.controller.ts
             // Typically nested inside `.data.attendance` or just `.data`
-            const data = res.data?.attendance || res.data || [];
+            let data = res.data?.attendance || res.data || [];
+
+            // Filter by requested course/batch if one was provided
+            if (courseFilter && courseFilter !== "all") {
+                data = data.filter((record: any) => {
+                    const recordCourse = record.course?.name || '';
+                    const recordBatchName = record.batch?.code || record.batch?.name || '';
+                    const filterKey = recordBatchName && recordBatchName !== 'Unassigned' ? `${recordCourse} - ${recordBatchName}` : recordCourse;
+                    return filterKey === courseFilter || recordCourse === courseFilter;
+                });
+            }
 
             // Sort by date descending
             data.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());

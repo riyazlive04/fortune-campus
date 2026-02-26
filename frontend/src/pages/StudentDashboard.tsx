@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { storage } from '@/lib/api';
+import { storage, ratingsApi } from '@/lib/api';
 import {
     GraduationCap,
     Calendar,
@@ -24,6 +24,8 @@ import {
     Clock,
     Upload,
     TrendingUp,
+    Star,
+    Send,
 } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import DashboardSkeleton from '@/components/DashboardSkeleton';
@@ -47,6 +49,7 @@ interface StudentOverview {
         code: string;
         timing: string;
         trainer: string;
+        trainerId?: string;
     } | null;
     branch: {
         name: string;
@@ -97,6 +100,7 @@ interface StudentOverview {
         courseCode: string;
         timing: string;
         trainer: string;
+        trainerId?: string;
     }>;
 }
 
@@ -112,6 +116,15 @@ const StudentDashboard = () => {
     const [error, setError] = useState<string | null>(null);
     const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
     const { toast } = useToast();
+
+    // Rating State
+    const [ratingLoading, setRatingLoading] = useState(false);
+    const [myRating, setMyRating] = useState<number>(0);
+    const [ratingComment, setRatingComment] = useState('');
+    const [hasRatedThisMonth, setHasRatedThisMonth] = useState(false);
+    const [hoverRating, setHoverRating] = useState(0);
+    const [showRatingSuccess, setShowRatingSuccess] = useState(false);
+    const [activeTab, setActiveTab] = useState('overview');
 
     // Modal state for Tests details
     const [showTestsModal, setShowTestsModal] = useState(false);
@@ -150,6 +163,10 @@ const StudentDashboard = () => {
 
             if (response.ok && data.success) {
                 setOverview(data.data);
+                // If there's a trainer, fetch existing rating
+                if (data.data.batch?.trainerId) {
+                    fetchMyRating(data.data.batch.trainerId);
+                }
             } else {
                 const errorMsg = data.message || 'Failed to fetch student profile';
                 setError(errorMsg);
@@ -168,6 +185,48 @@ const StudentDashboard = () => {
             });
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchMyRating = async (trainerId: string) => {
+        try {
+            const res = await ratingsApi.getMyRatingForTrainer(trainerId);
+            if (res.success && res.data?.existing) {
+                setMyRating(res.data.existing.rating);
+                setRatingComment(res.data.existing.comment || '');
+                setHasRatedThisMonth(true);
+            }
+        } catch (error) {
+            console.error('Failed to fetch rating:', error);
+        }
+    };
+
+    const handleSubmitRating = async (trainerId: string) => {
+        if (myRating < 1 || myRating > 5) {
+            toast({ variant: 'destructive', title: 'Error', description: 'Please select a rating from 1 to 5.' });
+            return;
+        }
+
+        setRatingLoading(true);
+        try {
+            const res = await ratingsApi.submitTrainerRating({
+                trainerId,
+                rating: myRating,
+                comment: ratingComment
+            });
+
+            if (res.success) {
+                setHasRatedThisMonth(true);
+                setShowRatingSuccess(true);
+                setTimeout(() => setShowRatingSuccess(false), 3000);
+                toast({ title: 'Success', description: 'Thank you! Your rating has been submitted.' });
+            } else {
+                throw new Error(res.message);
+            }
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Error', description: error.message || 'Failed to submit rating' });
+        } finally {
+            setRatingLoading(false);
         }
     };
 
@@ -502,6 +561,97 @@ const StudentDashboard = () => {
                                 </Card>
                             )}
                         </div>
+                    )}
+
+                    {/* Rate My Trainer Widget */}
+                    {overview.batch?.trainerId && (
+                        <Card className="border-blue-100 bg-blue-50/30 overflow-hidden shadow-sm">
+                            <CardHeader className="pb-3 border-b border-blue-100/50 bg-white/50">
+                                <CardTitle className="flex items-center gap-2 text-lg text-blue-900">
+                                    <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
+                                    Rate Your Trainer
+                                </CardTitle>
+                                <CardDescription>
+                                    Your feedback for <span className="font-semibold text-blue-800">{overview.batch.trainer}</span> helps us improve.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="pt-6">
+                                {showRatingSuccess ? (
+                                    <div className="flex flex-col items-center justify-center py-6 text-green-600 animate-fade-in">
+                                        <CheckCircle2 className="h-12 w-12 mb-3 text-green-500" />
+                                        <p className="font-semibold text-lg">Thank You!</p>
+                                        <p className="text-sm text-center mt-1 text-green-700/80">Your rating has been recorded for this month.</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-5 max-w-xl">
+                                        <div>
+                                            <div className="flex gap-2 mb-2">
+                                                {[1, 2, 3, 4, 5].map((star) => (
+                                                    <button
+                                                        key={`star-${star}`}
+                                                        type="button"
+                                                        className="focus:outline-none transition-transform hover:scale-110"
+                                                        onMouseEnter={() => !hasRatedThisMonth && setHoverRating(star)}
+                                                        onMouseLeave={() => !hasRatedThisMonth && setHoverRating(0)}
+                                                        onClick={() => !hasRatedThisMonth && setMyRating(star)}
+                                                        disabled={hasRatedThisMonth}
+                                                    >
+                                                        <Star
+                                                            className={`h-10 w-10 ${(hoverRating || myRating) >= star
+                                                                ? 'text-yellow-400 fill-yellow-400 drop-shadow-sm'
+                                                                : 'text-slate-300'
+                                                                } ${hasRatedThisMonth ? 'opacity-80 cursor-default' : 'cursor-pointer'}`}
+                                                        />
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <div className="flex justify-between items-center pr-2">
+                                                <p className="text-sm font-medium text-slate-600">
+                                                    {myRating === 0 ? 'Select a star rating' :
+                                                        myRating === 1 ? 'Poor' :
+                                                            myRating === 2 ? 'Fair' :
+                                                                myRating === 3 ? 'Good' :
+                                                                    myRating === 4 ? 'Very Good' : 'Excellent'}
+                                                </p>
+                                                {hasRatedThisMonth && (
+                                                    <Button variant="ghost" size="sm" onClick={() => setHasRatedThisMonth(false)} className="h-8 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-100/50">
+                                                        Change Rating
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {!hasRatedThisMonth && (
+                                            <div className="animate-fade-in space-y-4">
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="rating-comment" className="text-sm font-medium text-slate-700">Additional Feedback (Optional)</Label>
+                                                    <Textarea
+                                                        id="rating-comment"
+                                                        placeholder="What went well? What could be improved?"
+                                                        value={ratingComment}
+                                                        onChange={(e) => setRatingComment(e.target.value)}
+                                                        className="resize-none border-slate-200 focus:border-blue-400 bg-white"
+                                                        rows={3}
+                                                    />
+                                                </div>
+                                                <Button
+                                                    onClick={() => handleSubmitRating(overview.batch!.trainerId!)}
+                                                    disabled={myRating === 0 || ratingLoading}
+                                                    className="w-full sm:w-auto mt-2 bg-blue-600 hover:bg-blue-700"
+                                                >
+                                                    {ratingLoading ? 'Submitting...' : (
+                                                        <>
+                                                            <Send className="w-4 h-4 mr-2" />
+                                                            Submit Rating
+                                                        </>
+                                                    )}
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
                     )}
 
                     {/* Notifications */}

@@ -1,9 +1,11 @@
 import { Router } from 'express';
-import { getBranches, getBranchById, createBranch, updateBranch, deleteBranch } from './branch.controller';
+import { getBranches, getBranchById, createBranch, updateBranch, deleteBranch, getPublicBranches } from './branch.controller';
 import { authenticateToken } from '../../middlewares/auth.middleware';
 import { requireAdmin } from '../../middlewares/role.middleware';
 
 const router = Router();
+
+router.get('/public/list', getPublicBranches);
 
 router.use(authenticateToken);
 

@@ -14,7 +14,10 @@ import {
     CheckCircle2,
     XCircle,
     Clock,
-    AlertCircle
+    AlertCircle,
+    Wallet,
+    TrendingDown,
+    IndianRupee
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -109,39 +112,59 @@ const Fees = () => {
             />
 
             <div className="grid gap-4 md:grid-cols-3">
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">Total Receivables</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">
+                {/* Total Receivables */}
+                <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm transition-all duration-300 hover:shadow-lg group h-full flex flex-col justify-between">
+                    <div className="absolute top-0 left-0 w-full h-[3px] opacity-80 bg-blue-500" />
+                    <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full blur-[30px] opacity-20 group-hover:opacity-40 transition-opacity bg-blue-500" />
+                    <div className="flex items-center justify-between relative z-10">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">Total Receivables</p>
+                        <div className="rounded-full p-2.5 bg-blue-500 bg-opacity-10 group-hover:bg-opacity-20 transition-colors">
+                            <IndianRupee className="h-4 w-4 text-blue-600" />
+                        </div>
+                    </div>
+                    <div className="mt-2 relative z-10">
+                        <h3 className="text-2xl font-black tracking-tight text-foreground">
                             ₹{students.reduce((acc, s) => acc + (s.admission?.feeAmount || 0), 0).toLocaleString()}
+                        </h3>
+                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold bg-muted/50 text-muted-foreground border border-border/50 mt-1">Total revenue committed</span>
+                    </div>
+                </div>
+
+                {/* Total Collected */}
+                <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm transition-all duration-300 hover:shadow-lg group h-full flex flex-col justify-between">
+                    <div className="absolute top-0 left-0 w-full h-[3px] opacity-80 bg-emerald-500" />
+                    <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full blur-[30px] opacity-20 group-hover:opacity-40 transition-opacity bg-emerald-500" />
+                    <div className="flex items-center justify-between relative z-10">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">Total Collected</p>
+                        <div className="rounded-full p-2.5 bg-emerald-500 bg-opacity-10 group-hover:bg-opacity-20 transition-colors">
+                            <Wallet className="h-4 w-4 text-emerald-600" />
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">Total revenue committed</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">Total Collected</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-green-600">
+                    </div>
+                    <div className="mt-2 relative z-10">
+                        <h3 className="text-2xl font-black tracking-tight text-foreground">
                             ₹{students.reduce((acc, s) => acc + (s.admission?.feePaid || 0), 0).toLocaleString()}
+                        </h3>
+                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100/50 mt-1">Cash received</span>
+                    </div>
+                </div>
+
+                {/* Outstanding Balance */}
+                <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm transition-all duration-300 hover:shadow-lg group h-full flex flex-col justify-between">
+                    <div className="absolute top-0 left-0 w-full h-[3px] opacity-80 bg-rose-500" />
+                    <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full blur-[30px] opacity-20 group-hover:opacity-40 transition-opacity bg-rose-500" />
+                    <div className="flex items-center justify-between relative z-10">
+                        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">Outstanding Balance</p>
+                        <div className="rounded-full p-2.5 bg-rose-500 bg-opacity-10 group-hover:bg-opacity-20 transition-colors">
+                            <TrendingDown className="h-4 w-4 text-rose-600" />
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">Cash received</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">Outstanding Balance</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold text-red-600">
+                    </div>
+                    <div className="mt-2 relative z-10">
+                        <h3 className="text-2xl font-black tracking-tight text-foreground">
                             ₹{students.reduce((acc, s) => acc + (s.admission?.feeBalance || 0), 0).toLocaleString()}
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">Pending payments</p>
-                    </CardContent>
-                </Card>
+                        </h3>
+                        <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold bg-red-50 text-rose-600 border border-rose-100/50 mt-1">Pending payments</span>
+                    </div>
+                </div>
             </div>
 
             <Card>

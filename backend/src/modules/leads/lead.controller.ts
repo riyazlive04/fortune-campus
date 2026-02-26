@@ -5,9 +5,16 @@ import { successResponse, errorResponse, paginationHelper, getPaginationMeta } f
 import { AuthRequest } from '../../middlewares/auth.middleware';
 import { whatsappService } from '../../services/whatsapp.service';
 
+const parseDateString = (dateStr: string) => {
+  if (!dateStr) return null;
+  const [year, month, day] = dateStr.split('-').map(Number);
+  // Create at noon in server local time to ensure it falls within the expected day range regardless of minor timezone shifts
+  return new Date(year, month - 1, day, 12, 0, 0);
+};
+
 export const getLeads = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
-    const { page = 1, limit = 10, status, branchId, assignedToId, search } = req.query;
+    const { page = 1, limit = 10, status, branchId, assignedToId, search, source, interestedCourse } = req.query;
 
     const { skip, take } = paginationHelper(Number(page), Number(limit));
 
@@ -24,7 +31,11 @@ export const getLeads = async (req: AuthRequest, res: Response): Promise<Respons
       where.status = status as LeadStatus;
     }
 
-    if (assignedToId && assignedToId !== 'all') {
+    // Role-based visibility enforcement
+    if (req.user?.role === UserRole.TELECALLER) {
+      // Telecallers can only see their explicit leads
+      where.assignedToId = req.user.id;
+    } else if (assignedToId && assignedToId !== 'all') {
       where.assignedToId = assignedToId as string;
     }
 
@@ -35,6 +46,14 @@ export const getLeads = async (req: AuthRequest, res: Response): Promise<Respons
         { email: { contains: search as string, mode: 'insensitive' } },
         { phone: { contains: search as string, mode: 'insensitive' } },
       ];
+    }
+
+    if (source && source !== 'all') {
+      where.source = source as string;
+    }
+
+    if (interestedCourse && interestedCourse !== 'all') {
+      where.interestedCourse = interestedCourse as string;
     }
 
     console.log(`[getLeads] Request by: ${req.user?.role} (${req.user?.id})`);
@@ -55,7 +74,7 @@ export const getLeads = async (req: AuthRequest, res: Response): Promise<Respons
             select: { id: true, firstName: true, lastName: true, email: true },
           },
           assignedTo: {
-            select: { id: true, firstName: true, lastName: true, email: true },
+            select: { id: true, firstName: true, lastName: true, email: true, role: true },
           },
         },
         orderBy: { createdAt: 'desc' },
@@ -86,7 +105,7 @@ export const getLeadById = async (req: AuthRequest, res: Response): Promise<Resp
           select: { id: true, firstName: true, lastName: true, email: true },
         },
         assignedTo: {
-          select: { id: true, firstName: true, lastName: true, email: true },
+          select: { id: true, firstName: true, lastName: true, email: true, role: true },
         },
         admission: true,
         whatsappLogs: {
@@ -199,14 +218,14 @@ export const createLead = async (req: AuthRequest, res: Response): Promise<Respo
       console.error('Failed to send WhatsApp notification:', err);
     });
 
-    // Create a follow-up task if provided
-    if (followUpDate && finalAssignedToId) {
+    // Create a follow-up task
+    if (finalAssignedToId) {
       await prisma.followUp.create({
         data: {
           leadId: lead.id,
           telecallerId: finalAssignedToId,
-          scheduledDate: new Date(followUpDate),
-          notes: notes || 'Scheduled during lead creation',
+          scheduledDate: followUpDate ? parseDateString(followUpDate)! : new Date(),
+          notes: notes || (followUpDate ? 'Scheduled during lead creation' : 'Initial follow-up required'),
           type: 'CALL',
         }
       });
@@ -302,7 +321,7 @@ export const updateLead = async (req: AuthRequest, res: Response): Promise<Respo
         data: {
           leadId: lead.id,
           telecallerId,
-          scheduledDate: new Date(followUpDate),
+          scheduledDate: parseDateString(followUpDate)!,
           notes: notes || 'Scheduled during lead update',
           type: 'CALL',
         }
@@ -438,19 +457,22 @@ export const createPublicLead = async (req: Request, res: Response): Promise<Res
       email,
       phone,
       courseId,
+      branchId,
       location,
     } = req.body;
 
-    // Find default branch (first one) and default user (CEO)
-    const [defaultBranch, defaultUser] = await Promise.all([
-      prisma.branch.findFirst(),
+    // Find requested or default branch (first one) and default user (CEO)
+    const [branch, defaultUser] = await Promise.all([
+      branchId ? prisma.branch.findUnique({ where: { id: branchId } }) : prisma.branch.findFirst(),
       prisma.user.findFirst({ where: { role: UserRole.CEO } }),
     ]);
 
-    console.log('createPublicLead: defaultBranch', defaultBranch?.id);
+    if (!branch) {
+      return errorResponse(res, 'Branch not found', 404);
+    }
     console.log('createPublicLead: defaultUser', defaultUser?.id);
 
-    if (!defaultBranch || !defaultUser) {
+    if (!branch || !defaultUser) {
       console.error('createPublicLead: Missing default branch or user');
       return errorResponse(res, 'System configuration error: Missing default branch or user', 500);
     }
@@ -475,7 +497,7 @@ export const createPublicLead = async (req: Request, res: Response): Promise<Res
         phone,
         source: 'Website Enquiry',
         interestedCourse,
-        branchId: defaultBranch.id,
+        branchId: branch.id,
         assignedToId: defaultUser.id,
         location,
         status: LeadStatus.NEW,
@@ -511,19 +533,50 @@ export const logCall = async (req: AuthRequest, res: Response): Promise<Response
           telecallerId: req.user!.id!,
           callStatus,
           notes,
-          nextFollowUpDate: nextFollowUpDate ? new Date(nextFollowUpDate) : null,
+          nextFollowUpDate: parseDateString(nextFollowUpDate),
         }
       });
 
-      // 2. Mark older PENDING and OVERDUE follow-ups as COMPLETED since a new interaction happened
-      await tx.followUp.updateMany({
-        where: {
-          leadId,
-          telecallerId: req.user!.id!,
-          status: { in: ['PENDING', 'OVERDUE'] }
-        },
-        data: { status: 'COMPLETED' }
-      });
+      // 1.5 Update Lead status if provided
+      const leadStatus = req.body.status;
+      if (leadStatus) {
+        const oldLead = await tx.lead.findUnique({ where: { id: leadId } });
+        if (oldLead && oldLead.status !== leadStatus) {
+          await tx.lead.update({
+            where: { id: leadId },
+            data: { status: leadStatus }
+          });
+
+          // Log status history
+          await tx.leadStatusHistory.create({
+            data: {
+              leadId,
+              oldStatus: oldLead.status,
+              newStatus: leadStatus,
+              changedById: req.user!.id!,
+              notes: notes || `Status updated during call log: ${callStatus}`,
+            }
+          });
+        }
+      }
+
+      // 2. Mark older PENDING and OVERDUE follow-ups as COMPLETED 
+      // ONLY if a new follow-up is scheduled OR the lead is converted/terminal
+      const isTerminalStatus = [
+        LeadStatus.CONVERTED,
+        LeadStatus.NOT_INTERESTED,
+        LeadStatus.LOST
+      ].includes(leadStatus as LeadStatus);
+
+      if (nextFollowUpDate || isTerminalStatus) {
+        await tx.followUp.updateMany({
+          where: {
+            leadId,
+            status: { in: ['PENDING', 'OVERDUE'] }
+          },
+          data: { status: 'COMPLETED' }
+        });
+      }
 
       // 3. Create the next follow-up if scheduled
       if (nextFollowUpDate) {
@@ -531,7 +584,7 @@ export const logCall = async (req: AuthRequest, res: Response): Promise<Response
           data: {
             leadId,
             telecallerId: req.user!.id!,
-            scheduledDate: new Date(nextFollowUpDate),
+            scheduledDate: parseDateString(nextFollowUpDate)!,
             type: followupType || 'CALL',
             notes,
           }
@@ -590,14 +643,13 @@ export const getTelecallerDashboard = async (req: AuthRequest, res: Response): P
       ? {}
       : (userRole === UserRole.TELECALLER ? { telecallerId: userId } : {});
 
-    const now = new Date();
+    const { date: queryDate } = req.query;
+    const now = queryDate ? new Date(queryDate as string) : new Date();
+
     const todayStart = new Date(now);
     todayStart.setHours(0, 0, 0, 0);
 
-    const todayEnd = new Date(now);
-    todayEnd.setHours(23, 59, 59, 999);
-
-    const [stats, followUpsToday, followUpsOverdue] = await Promise.all([
+    const [stats, upcomingFollowUps, followUpsOverdue] = await Promise.all([
       prisma.lead.groupBy({
         by: ['status'],
         where: leadFilter,
@@ -606,10 +658,11 @@ export const getTelecallerDashboard = async (req: AuthRequest, res: Response): P
       prisma.followUp.findMany({
         where: {
           ...followUpFilter,
-          scheduledDate: { gte: todayStart, lte: todayEnd },
+          scheduledDate: { gte: todayStart },
           status: 'PENDING'
         },
-        include: { lead: true }
+        include: { lead: true },
+        orderBy: { scheduledDate: 'asc' }
       }),
       prisma.followUp.findMany({
         where: {
@@ -617,11 +670,16 @@ export const getTelecallerDashboard = async (req: AuthRequest, res: Response): P
           scheduledDate: { lt: todayStart },
           status: 'PENDING'
         },
-        include: { lead: true }
+        include: { lead: true },
+        orderBy: { scheduledDate: 'asc' }
       })
     ]);
 
-    return successResponse(res, { stats, followUpsToday, followUpsOverdue });
+    return successResponse(res, {
+      stats,
+      upcomingFollowUps,
+      followUpsOverdue
+    });
   } catch (error) {
     return errorResponse(res, 'Failed to fetch telecaller dashboard', 500, error);
   }
@@ -643,7 +701,7 @@ export const getCPTelecallerAnalytics = async (req: AuthRequest, res: Response):
   }
 };
 
-export const getCEOTelecallerAnalytics = async (req: AuthRequest, res: Response): Promise<Response> => {
+export const getCEOTelecallerAnalytics = async (_req: AuthRequest, res: Response): Promise<Response> => {
   try {
     const branchStats = await prisma.branch.findMany({
       include: {

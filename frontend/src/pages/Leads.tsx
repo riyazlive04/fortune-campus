@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import PageHeader from "@/components/PageHeader";
 import DataTable from "@/components/DataTable";
 import StatusBadge from "@/components/StatusBadge";
-import { leadsApi, branchesApi, storage } from "@/lib/api";
+import { leadsApi, branchesApi, usersApi, storage } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import LeadModal from "@/components/LeadModal";
 import {
@@ -27,6 +27,7 @@ const Leads = () => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [telecallers, setTelecallers] = useState<any[]>([]);
   const [searchParams] = useSearchParams();
   const [filters, setFilters] = useState({
     status: "all",
@@ -35,6 +36,7 @@ const Leads = () => {
   });
   const user = storage.getUser();
   const isAdminOrCEO = user?.role === "CEO" || user?.role === "ADMIN";
+  const isAssigner = isAdminOrCEO || user?.role === "CHANNEL_PARTNER";
   const { toast } = useToast();
 
   useEffect(() => {
@@ -53,6 +55,21 @@ const Leads = () => {
       }
     } catch (error) {
       console.error("Failed to fetch branches", error);
+    }
+  };
+
+  const fetchTelecallers = async () => {
+    try {
+      if (isAssigner) {
+        const params: any = { role: "TELECALLER", limit: 100 };
+        if (filters.branchId !== "all") params.branchId = filters.branchId;
+        const data = await usersApi.getUsers(params);
+        if (data.success) {
+          setTelecallers(data.data.users || data.data);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch telecallers", error);
     }
   };
 
@@ -78,6 +95,8 @@ const Leads = () => {
         branch: l.branch?.name || "N/A",
         status: l.status,
         date: new Date(l.createdAt).toLocaleDateString(),
+        assignedTo: (l.assignedTo && l.assignedTo.role === 'TELECALLER') ? `${l.assignedTo.firstName} ${l.assignedTo.lastName}` : "Unassigned",
+        assignedToId: (l.assignedTo && l.assignedTo.role === 'TELECALLER') ? l.assignedTo.id : null,
       }));
 
       // If source filter is set and not handled by backend, filter locally
@@ -112,6 +131,10 @@ const Leads = () => {
     fetchBranches();
   }, []);
 
+  useEffect(() => {
+    fetchTelecallers();
+  }, [filters.branchId]);
+
   const handleOpenModal = (id?: string) => {
     setSelectedLeadId(id || null);
     setModalOpen(true);
@@ -142,6 +165,16 @@ const Leads = () => {
     }
   };
 
+  const handleAssignLead = async (leadId: string, telecallerId: string) => {
+    try {
+      await leadsApi.updateLead(leadId, { assignedToId: telecallerId === "unassigned" ? null : telecallerId });
+      toast({ title: "Success", description: "Lead reassigned successfully" });
+      fetchLeads();
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Error", description: error.message || "Failed to reassign lead" });
+    }
+  };
+
   const statusVariant = (s: string) => {
     const map: Record<string, "success" | "warning" | "danger" | "info" | "neutral"> = {
       NEW: "info",
@@ -160,13 +193,32 @@ const Leads = () => {
     { key: "phone", label: "Phone" },
     { key: "source", label: "Source" },
     { key: "branch", label: "Branch" },
+    { key: "assignedTo", label: "Assigned To" },
     { key: "status", label: "Status", render: (r: any) => <StatusBadge status={r.status} variant={statusVariant(r.status)} /> },
     { key: "date", label: "Date" },
     {
       key: "actions",
       label: "Actions",
       render: (r: any) => (
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          {isAssigner && telecallers.length > 0 && (
+            <Select
+              value={telecallers.some(t => t.id === r.assignedToId) ? r.assignedToId : "unassigned"}
+              onValueChange={(val) => {
+                if (val !== r.assignedToId) handleAssignLead(r.id, val);
+              }}
+            >
+              <SelectTrigger className="w-32 h-8 text-xs bg-background">
+                <SelectValue placeholder="Unassigned" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unassigned">Unassigned</SelectItem>
+                {telecallers.map(t => (
+                  <SelectItem key={t.id} value={t.id}>{t.firstName} {t.lastName}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <Button
             variant="ghost"
             size="icon"

@@ -101,7 +101,7 @@ const TopBar = ({ sidebarCollapsed }: TopBarProps) => {
               <UserIcon className="mr-2 h-4 w-4 opacity-70" />
               Profile
             </DropdownMenuItem>
-            <DropdownMenuItem disabled className="rounded-lg mx-1">
+            <DropdownMenuItem onClick={() => navigate("/profile")} className="rounded-lg mx-1 cursor-pointer">
               <Settings className="mr-2 h-4 w-4 opacity-70" />
               Settings
             </DropdownMenuItem>

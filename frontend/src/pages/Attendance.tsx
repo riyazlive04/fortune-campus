@@ -48,6 +48,8 @@ const Attendance = () => {
   const [attendanceData, setAttendanceData] = useState<any[]>([]);
   const [loadingSummary, setLoadingSummary] = useState(false);
   const [selectedHistoryStudent, setSelectedHistoryStudent] = useState<any | null>(null);
+  const [summaryCourseFilter, setSummaryCourseFilter] = useState("all");
+  const [summaryStudentFilter, setSummaryStudentFilter] = useState("");
 
   // ── Global Student Dropdown State ───────────────────────────
   const [isStudentDropdownOpen, setIsStudentDropdownOpen] = useState(false);
@@ -437,16 +439,30 @@ const Attendance = () => {
               {displayedBatches.length === 0 ? (
                 <tr><td colSpan={6} className="text-center py-4 text-muted-foreground">No active batches found</td></tr>
               ) : (
-                displayedBatches.map((b: any) => (
-                  <tr key={b.id}>
-                    <td>{b.startTime || "—"} – {b.endTime || "—"}</td>
-                    <td>{b.course?.name || "N/A"}</td>
-                    <td>{b.trainer?.user ? `${b.trainer.user.firstName} ${b.trainer.user.lastName}` : "Unassigned"}</td>
-                    <td>{b.code || "N/A"}</td>
-                    <td>{b.branch?.name || "N/A"}</td>
-                    <td><StatusBadge status={b.isActive ? "Active" : "Inactive"} variant={b.isActive ? "success" : "neutral"} /></td>
-                  </tr>
-                ))
+                displayedBatches.map((b: any) => {
+                  const filterValue = b.code && b.code !== "N/A" ? `${b.course?.name || ""} - ${b.code}` : b.course?.name;
+                  return (
+                    <tr
+                      key={b.id}
+                      className="cursor-pointer hover:bg-muted/30 transition-colors"
+                      onClick={() => {
+                        if (filterValue) {
+                          setSummaryCourseFilter(filterValue);
+                          // Scroll down to the summary table smoothly
+                          window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+                        }
+                      }}
+                      title={`Click to view attendance summary for ${filterValue}`}
+                    >
+                      <td>{b.startTime || "—"} – {b.endTime || "—"}</td>
+                      <td className="font-bold text-primary">{b.course?.name || "N/A"}</td>
+                      <td>{b.trainer?.user ? `${b.trainer.user.firstName} ${b.trainer.user.lastName}` : "Unassigned"}</td>
+                      <td>{b.code || "N/A"}</td>
+                      <td>{b.branch?.name || "N/A"}</td>
+                      <td><StatusBadge status={b.isActive ? "Active" : "Inactive"} variant={b.isActive ? "success" : "neutral"} /></td>
+                    </tr>
+                  )
+                })
               )}
             </tbody>
           </table>
@@ -455,18 +471,54 @@ const Attendance = () => {
 
       {/* ── Attendance Summary ── */}
       <div>
-        <h3 className="mb-3 text-sm font-semibold text-foreground">Attendance Summary</h3>
-        <div className="rounded-xl border border-border bg-card overflow-x-auto">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+          <h3 className="text-sm font-semibold text-foreground">Attendance Summary</h3>
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search student..."
+                value={summaryStudentFilter}
+                onChange={(e) => setSummaryStudentFilter(e.target.value)}
+                className="w-56 pl-9 h-9 border-border bg-background"
+              />
+            </div>
+            <Select onValueChange={setSummaryCourseFilter} value={summaryCourseFilter}>
+              <SelectTrigger className="w-48 h-9 border-border bg-background">
+                <SelectValue placeholder="Filter by Course" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Courses / Batches</SelectItem>
+                {/* Dynamically extract unique course+batch combinations from attendance data */}
+                {Array.from(new Set((Array.isArray(attendanceData) ? attendanceData : []).map(a => a.batch && a.batch !== 'Unassigned' ? `${a.course} - ${a.batch}` : a.course).filter(Boolean))).map(course => (
+                  <SelectItem key={course} value={course as string}>{course as string}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        <div className="rounded-xl border border-border bg-card overflow-x-auto shadow-sm">
           <table className="data-table">
             <thead><tr><th>Student</th><th>Course</th><th>Branch</th><th>Present</th><th>Absent</th><th>Percentage</th></tr></thead>
             <tbody>
               {loadingSummary ? (
-                <tr><td colSpan={6} className="text-center py-4">Loading attendance data…</td></tr>
+                <tr><td colSpan={6} className="text-center py-6 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin mx-auto mb-2 text-primary" />Loading attendance data…</td></tr>
               ) : (!Array.isArray(attendanceData) || attendanceData.length === 0) ? (
-                <tr><td colSpan={6} className="text-center py-4 text-muted-foreground">No attendance records found</td></tr>
-              ) : (
-                attendanceData.map((a, i) => (
-                  <tr key={i} className="hover:bg-muted/30 transition-colors">
+                <tr><td colSpan={6} className="text-center py-8 text-muted-foreground"><ClipboardList className="h-8 w-8 mx-auto mb-3 opacity-20" />No attendance records found</td></tr>
+              ) : (() => {
+                const filteredData = attendanceData.filter(a => {
+                  const matchStudent = !summaryStudentFilter || (a.student && a.student.toLowerCase().includes(summaryStudentFilter.toLowerCase()));
+                  const aFilterKey = a.batch && a.batch !== 'Unassigned' ? `${a.course} - ${a.batch}` : a.course;
+                  const matchCourse = summaryCourseFilter === "all" || aFilterKey === summaryCourseFilter || a.course === summaryCourseFilter;
+                  return matchStudent && matchCourse;
+                });
+
+                if (filteredData.length === 0) {
+                  return <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">No records match your filters</td></tr>;
+                }
+
+                return filteredData.map((a, i) => (
+                  <tr key={`${a.student}-${a.course}-${i}`} className="hover:bg-muted/30 transition-colors">
                     <td className="font-medium whitespace-nowrap">
                       <button
                         onClick={() => setSelectedHistoryStudent({ id: a.id, name: a.student })}
@@ -478,7 +530,16 @@ const Attendance = () => {
                         <span>{a.student}</span>
                       </button>
                     </td>
-                    <td>{a.course}</td>
+                    <td>
+                      <div className="flex flex-col">
+                        <span>{a.course}</span>
+                        {a.batch && a.batch !== 'Unassigned' && (
+                          <span className="text-[10px] bg-muted w-fit px-1.5 py-0.5 rounded text-muted-foreground font-semibold uppercase mt-1">
+                            {a.batch}
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td>{a.branch}</td>
                     <td>{a.present}</td>
                     <td>{a.absent}</td>
@@ -489,8 +550,8 @@ const Attendance = () => {
                       />
                     </td>
                   </tr>
-                ))
-              )}
+                ));
+              })()}
             </tbody>
           </table>
         </div>
@@ -501,6 +562,7 @@ const Attendance = () => {
         isOpen={!!selectedHistoryStudent}
         onClose={() => setSelectedHistoryStudent(null)}
         student={selectedHistoryStudent}
+        courseFilter={summaryCourseFilter}
       />
     </div>
   );

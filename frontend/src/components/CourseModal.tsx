@@ -20,8 +20,9 @@ import {
 } from "@/components/ui/select";
 import { coursesApi, branchesApi, storage } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
-
+import { Loader2, Download, FileText, Upload } from "lucide-react";
+import { downloadSyllabusReport } from "@/lib/reportUtils";
+import { extractTextFromPDF } from "@/lib/pdfUtils";
 interface CourseModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -34,6 +35,7 @@ const CourseModal = ({ isOpen, onClose, onSuccess, courseId, readonly = false }:
     const [loading, setLoading] = useState(false);
     const [fetching, setFetching] = useState(false);
     const [branches, setBranches] = useState<any[]>([]);
+    const [parsingPdf, setParsingPdf] = useState(false);
     const { toast } = useToast();
     const user = storage.getUser();
     const isAdmin = user?.role === 'ADMIN' || user?.role === 'CEO';
@@ -149,6 +151,40 @@ const CourseModal = ({ isOpen, onClose, onSuccess, courseId, readonly = false }:
         }
     };
 
+    const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (file.type !== "application/pdf") {
+            toast({
+                variant: "destructive",
+                title: "Invalid File",
+                description: "Please upload a PDF file.",
+            });
+            return;
+        }
+
+        try {
+            setParsingPdf(true);
+            const extractedText = await extractTextFromPDF(file);
+            setFormData(prev => ({ ...prev, syllabus: extractedText }));
+            toast({
+                title: "Text Extracted",
+                description: "Syllabus has been populated from the PDF.",
+            });
+        } catch (error: any) {
+            toast({
+                variant: "destructive",
+                title: "Extraction Failed",
+                description: error.message || "Could not extract text from PDF.",
+            });
+        } finally {
+            setParsingPdf(false);
+            // Reset input
+            e.target.value = "";
+        }
+    };
+
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
             <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
@@ -253,14 +289,62 @@ const CourseModal = ({ isOpen, onClose, onSuccess, courseId, readonly = false }:
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="syllabus">Syllabus</Label>
-                            <Textarea
-                                id="syllabus"
-                                value={formData.syllabus}
-                                onChange={(e) => setFormData({ ...formData, syllabus: e.target.value })}
-                                rows={6}
-                                disabled={readonly}
-                            />
+                            <Label htmlFor="syllabus" className="flex items-center justify-between">
+                                Syllabus
+                                <div className="flex items-center gap-2">
+                                    {!readonly && (
+                                        <>
+                                            <input
+                                                type="file"
+                                                id="pdf-upload"
+                                                accept=".pdf"
+                                                className="hidden"
+                                                onChange={handlePdfUpload}
+                                            />
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-7 text-[10px] gap-1 px-2 border-primary/20 text-primary hover:bg-primary/5"
+                                                onClick={() => document.getElementById('pdf-upload')?.click()}
+                                                disabled={parsingPdf}
+                                            >
+                                                {parsingPdf ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
+                                                Upload PDF
+                                            </Button>
+                                        </>
+                                    )}
+                                    {readonly && formData.syllabus && (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-7 text-[10px] gap-1 px-2 hover:bg-primary/5"
+                                            onClick={() => downloadSyllabusReport(formData.name, formData.code, formData.syllabus)}
+                                        >
+                                            <Download className="h-3 w-3" />
+                                            Download Report
+                                        </Button>
+                                    )}
+                                </div>
+                            </Label>
+                            {readonly ? (
+                                <div className="min-h-[150px] w-full rounded-md border border-input bg-muted/20 px-4 py-3 text-sm shadow-sm overflow-y-auto max-h-[400px]">
+                                    <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap leading-relaxed">
+                                        {formData.syllabus || "No syllabus content added yet."}
+                                    </div>
+                                </div>
+                            ) : (
+                                <Textarea
+                                    id="syllabus"
+                                    value={formData.syllabus}
+                                    onChange={(e) => setFormData({ ...formData, syllabus: e.target.value })}
+                                    rows={8}
+                                    disabled={readonly}
+                                    placeholder="Enter detailed syllabus contents here..."
+                                    className="resize-none"
+                                />
+                            )}
                         </div>
 
                         <DialogFooter>

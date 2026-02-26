@@ -5,8 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { trainersApi } from "@/lib/api";
+import { trainersApi, ratingsApi, incentivesApi } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
+import { Star, Info, Check } from "lucide-react";
 
 interface AllocateIncentiveModalProps {
     isOpen: boolean;
@@ -26,6 +27,9 @@ const AllocateIncentiveModal = ({ isOpen, onClose, onSuccess, defaultTrainerId }
         month: new Date().getMonth() + 1,
         year: new Date().getFullYear(),
     });
+    const [performanceData, setPerformanceData] = useState<any | null>(null);
+    const [suggestedAmount, setSuggestedAmount] = useState<number | null>(null);
+    const [multiplier, setMultiplier] = useState<number>(1);
     const { toast } = useToast();
 
     useEffect(() => {
@@ -33,6 +37,7 @@ const AllocateIncentiveModal = ({ isOpen, onClose, onSuccess, defaultTrainerId }
             fetchTrainers();
             if (defaultTrainerId) {
                 setFormData(prev => ({ ...prev, trainerId: defaultTrainerId }));
+                fetchPerformanceMetrics(defaultTrainerId);
             }
         } else {
             // Reset form when closed
@@ -44,8 +49,37 @@ const AllocateIncentiveModal = ({ isOpen, onClose, onSuccess, defaultTrainerId }
                 month: new Date().getMonth() + 1,
                 year: new Date().getFullYear(),
             });
+            setPerformanceData(null);
+            setSuggestedAmount(null);
+            setMultiplier(1);
         }
     }, [isOpen, defaultTrainerId]);
+
+    const fetchPerformanceMetrics = async (id: string) => {
+        try {
+            const res = await ratingsApi.getPerformanceMetrics(id);
+            if (res.success) {
+                setPerformanceData(res.data);
+                calculateSuggestion(res.data.totalScore);
+            }
+        } catch (error) {
+            console.error("Failed to fetch performance metrics", error);
+        }
+    };
+
+    const calculateSuggestion = (score: number) => {
+        let mult = 1;
+        if (score >= 90) mult = 1.5;
+        else if (score >= 80) mult = 1.25;
+        else if (score >= 70) mult = 1.1;
+        else if (score >= 60) mult = 1.0;
+        else mult = 0.8;
+
+        setMultiplier(mult);
+        // Base performance incentive: 5000
+        const base = 5000;
+        setSuggestedAmount(Math.round(base * mult));
+    };
 
     const fetchTrainers = async () => {
         try {
@@ -60,6 +94,19 @@ const AllocateIncentiveModal = ({ isOpen, onClose, onSuccess, defaultTrainerId }
 
     const handleChange = (field: string, value: any) => {
         setFormData(prev => ({ ...prev, [field]: value }));
+        if (field === "trainerId" && value) {
+            fetchPerformanceMetrics(value);
+        }
+    };
+
+    const applySuggestion = () => {
+        if (suggestedAmount) {
+            setFormData(prev => ({
+                ...prev,
+                amount: suggestedAmount.toString(),
+                description: `${prev.description}${prev.description ? '. ' : ''}Based on ${performanceData?.totalScore}/100 performance score (${multiplier}x multiplier).`.trim()
+            }));
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -143,6 +190,56 @@ const AllocateIncentiveModal = ({ isOpen, onClose, onSuccess, defaultTrainerId }
                             </SelectContent>
                         </Select>
                     </div>
+
+                    {performanceData && formData.type === "PERFORMANCE" && (
+                        <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 animate-fade-in space-y-3">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1.5 text-sm font-bold text-slate-800">
+                                    <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                                    <span>Total Score: {performanceData.totalScore}/100</span>
+                                </div>
+                                <div className="text-xs font-bold px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full border border-blue-200">
+                                    {multiplier}x Multiplier
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px] border-t border-slate-200 pt-2">
+                                <div className="flex justify-between items-center text-slate-600">
+                                    <span>Trainer Rating (15%):</span>
+                                    <span className="font-semibold text-slate-800">{performanceData.metrics?.rating?.score.toFixed(1)}%</span>
+                                </div>
+                                <div className="flex justify-between items-center text-slate-600">
+                                    <span>Attendance (15%):</span>
+                                    <span className="font-semibold text-slate-800">{performanceData.metrics?.attendance?.score.toFixed(1)}%</span>
+                                </div>
+                                <div className="flex justify-between items-center text-slate-600">
+                                    <span>Student Portfolio (35%):</span>
+                                    <span className="font-semibold text-slate-800">{performanceData.metrics?.portfolio?.score.toFixed(1)}%</span>
+                                </div>
+                                <div className="flex justify-between items-center text-slate-600">
+                                    <span>Student Tests (35%):</span>
+                                    <span className="font-semibold text-slate-800">{performanceData.metrics?.tests?.score.toFixed(1)}%</span>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center justify-between pt-1">
+                                <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                                    <Info className="h-3.5 w-3.5" />
+                                    <span>Suggested: ₹{suggestedAmount?.toLocaleString()}</span>
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={applySuggestion}
+                                    className="h-7 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                >
+                                    <Check className="h-3 w-3 mr-1" />
+                                    Apply Multiplier
+                                </Button>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">

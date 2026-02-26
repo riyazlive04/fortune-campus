@@ -2,8 +2,8 @@
 import { useState, useEffect } from "react";
 import PageHeader from "@/components/PageHeader";
 import KPICard from "@/components/KPICard";
-import { Award, Users, Building2, Plus } from "lucide-react";
-import { incentivesApi, trainersApi } from "@/lib/api";
+import { incentivesApi, trainersApi, ratingsApi } from "@/lib/api";
+import { Award, Users, Building2, Plus, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import AllocateIncentiveModal from "@/components/incentives/AllocateIncentiveModal";
@@ -39,12 +39,17 @@ const Incentives = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [incentivesRes, trainersRes] = await Promise.all([
+      const [incentivesRes, trainersRes, ratingsRes] = await Promise.all([
         incentivesApi.getIncentives({ limit: 1000 }),
-        trainersApi.getTrainers({ limit: 100, isActive: true })
+        trainersApi.getTrainers({ limit: 100, isActive: true }),
+        ratingsApi.getAllPerformanceMetrics()
       ]);
       const incentives = incentivesRes.data?.incentives || incentivesRes.data || [];
       const allTrainers = trainersRes.data?.trainers || trainersRes.data || [];
+      const allRatings = ratingsRes.success ? ratingsRes.data : [];
+
+      const ratingMap = new Map();
+      allRatings.forEach((r: any) => ratingMap.set(r.trainerId, { score: r.totalScore, rating: r.metrics.rating }));
 
       // 1. Overall Stats
       let total = 0;
@@ -111,15 +116,25 @@ const Incentives = () => {
         if (inc.type === 'PLACEMENT') entry.placementIncentives += 1;
       });
 
-      const aggregatedTrainers = Array.from(trainerMap.values()).map((t: any) => ({
-        trainerId: t.trainerId,
-        trainer: t.trainer,
-        branch: t.branch,
-        students: t.studentIds.size,
-        placements: t.placementIncentives,
-        incentive: t.totalIncentive,
-        status: t.pendingIncentive > 0 ? "Pending" : "Paid"
-      }));
+      const aggregatedTrainers = Array.from(trainerMap.values()).map((t: any) => {
+        const perfData = ratingMap.get(t.trainerId) || { score: 0, rating: 0 };
+        return {
+          trainerId: t.trainerId,
+          trainer: t.trainer,
+          branch: t.branch,
+          students: t.studentIds.size,
+          placements: t.placementIncentives,
+          rating: perfData.rating,
+          score: perfData.score,
+          incentive: t.totalIncentive,
+          status: t.pendingIncentive > 0 ? "Pending" : "Paid"
+        };
+      }).sort((a, b) => {
+        // Sort by score descending
+        if (b.score !== a.score) return b.score - a.score;
+        // Then by incentive descending
+        return b.incentive - a.incentive;
+      });
 
       setTrainerIncentives(aggregatedTrainers);
 
@@ -205,13 +220,13 @@ const Incentives = () => {
           title="Total Incentives"
           value={formatCurrency(stats.total)}
           icon={Award}
-          accentColor="bg-primary"
+          accentColor="bg-violet-500"
         />
         <KPICard
           title="Paid Out"
           value={formatCurrency(stats.paid)}
           icon={Users}
-          accentColor="bg-success"
+          accentColor="bg-emerald-500"
           change={`${stats.disbursedPercentage}% disbursed`}
           changeType="positive"
         />
@@ -219,7 +234,7 @@ const Incentives = () => {
           title="Pending"
           value={formatCurrency(stats.pending)}
           icon={Building2}
-          accentColor="bg-warning"
+          accentColor="bg-amber-500"
           change={`${stats.remainingPercentage}% remaining`}
           changeType="neutral"
         />
@@ -261,12 +276,23 @@ const aggregatedTable = (data: any[], formatCurrency: (v: number) => string, onV
   if (data.length === 0) return <div className="p-4 text-muted-foreground">No incentive records found.</div>;
   return (
     <table className="data-table">
-      <thead><tr><th>Trainer</th><th>Branch</th><th>Students</th><th>Placements</th><th>Incentive</th><th>Status</th><th className="text-right pr-6">Action</th></tr></thead>
+      <thead><tr><th>Trainer</th><th>Branch</th><th>Rating</th><th>Score</th><th>Students</th><th>Placements</th><th>Incentive</th><th>Status</th><th className="text-right pr-6">Action</th></tr></thead>
       <tbody>
         {data.map((t, i) => (
           <tr key={i}>
             <td className="font-medium">{t.trainer}</td>
             <td className="text-sm text-muted-foreground">{t.branch}</td>
+            <td>
+              <div className="flex items-center gap-1">
+                <Star className={`h-3.5 w-3.5 ${t.rating > 0 ? "text-yellow-500 fill-yellow-500" : "text-slate-300"}`} />
+                <span className="text-sm font-medium">{t.rating > 0 ? t.rating.toFixed(1) : "N/A"}</span>
+              </div>
+            </td>
+            <td>
+              <div className="text-sm font-bold text-blue-600">
+                {t.score > 0 ? `${t.score}/100` : "N/A"}
+              </div>
+            </td>
             <td>{t.students}</td>
             <td>{t.placements}</td>
             <td className="font-medium">{formatCurrency(t.incentive)}</td>

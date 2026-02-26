@@ -5,6 +5,7 @@ import {
   getAdmissionsReport,
   getPlacementsReport,
   getRevenueReport,
+  getCEOOverallReport,
 } from './report.controller';
 import {
   submitGrowthReport,
@@ -21,6 +22,10 @@ import {
   getSocialEngagement,
   submitEventPlan,
 } from './branch-workflow.controller';
+import {
+  createPerformanceGap,
+  getPerformanceGaps,
+} from '../performance/performance-gap.controller';
 import { authenticateToken } from '../../middlewares/auth.middleware';
 import { enforceBranchAccess } from '../../middlewares/branch.middleware';
 
@@ -36,6 +41,7 @@ router.post('/files', submitFileReport);
 router.get('/performance', getTrainerPerformance);
 
 // Standard Reports
+router.get('/ceo-overall', getCEOOverallReport);
 router.get('/branch', getBranchReport);
 router.get('/trainer', getTrainerReport);
 router.get('/admissions', getAdmissionsReport);
@@ -50,5 +56,9 @@ router.get('/expenses', getExpenseReport);
 router.post('/expenses', submitExpense);
 router.get('/social-engagement', getSocialEngagement);
 router.post('/event-plan', submitEventPlan);
+
+// Performance Gaps
+router.post('/performance-gaps', createPerformanceGap);
+router.get('/performance-gaps', getPerformanceGaps);
 
 export default router;

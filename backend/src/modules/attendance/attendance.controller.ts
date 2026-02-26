@@ -60,6 +60,9 @@ export const getAttendance = async (req: AuthRequest, res: Response): Promise<Re
           course: {
             select: { id: true, name: true, code: true },
           },
+          batch: {
+            select: { id: true, name: true, code: true },
+          },
           trainer: {
             include: {
               user: {
@@ -508,6 +511,9 @@ export const getAttendanceStats = async (req: AuthRequest, res: Response): Promi
         },
         branch: {
           select: { name: true }
+        },
+        batch: {
+          select: { name: true, code: true }
         }
       }
     });
@@ -522,9 +528,10 @@ export const getAttendanceStats = async (req: AuthRequest, res: Response): Promi
 
       return {
         id: student.id,
-        student: `${student.user?.firstName} ${student.user?.lastName}`,
+        student: `${student.user?.firstName || ''} ${student.user?.lastName || ''}`.trim(),
         course: student.course?.name || 'N/A',
         branch: student.branch?.name || 'N/A',
+        batch: student.batch?.code || student.batch?.name || 'Unassigned',
         present,
         absent,
         percentage: `${percentage}%`

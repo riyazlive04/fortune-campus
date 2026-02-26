@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import TrainerDashboard from "./TrainerDashboard";
 import StudentDashboard from "./StudentDashboard";
 import BranchHeadDashboard from "./BranchHeadDashboard";
+import { motion, Variants } from "framer-motion";
 import {
   Dialog,
   DialogContent,
@@ -36,40 +37,6 @@ const Dashboard = () => {
   const [modalLoading, setModalLoading] = useState(false);
   const [isTopPerformerModalOpen, setIsTopPerformerModalOpen] = useState(false);
   const [selectedHistoryTrainer, setSelectedHistoryTrainer] = useState<{ id: string, name: string } | null>(null);
-
-  // 2. EARLY RETURNS
-  if (user?.role === 'TRAINER') {
-    return <TrainerDashboard />;
-  }
-
-  if (viewingTrainerId) {
-    return (
-      <div className="space-y-6">
-        <button
-          onClick={() => setViewingTrainerId(null)}
-          className="flex items-center gap-2 text-primary hover:underline font-bold"
-        >
-          <Zap className="h-4 w-4 rotate-180" />
-          Back to Campus Overview
-        </button>
-        <TrainerDashboard trainerId={viewingTrainerId} />
-      </div>
-    );
-  }
-
-  if (user?.role === 'STUDENT') {
-    return <StudentDashboard />;
-  }
-
-  if (user?.role === 'CHANNEL_PARTNER') {
-    return <BranchHeadDashboard />;
-  }
-
-  if (user?.role === 'TELECALLER') {
-    // Safety redirect to telecaller dashboard
-    window.location.href = '/telecaller/dashboard';
-    return null;
-  }
 
   const openModal = async (type: 'leads' | 'students' | 'placements' | 'admissions') => {
     setModalType(type);
@@ -161,8 +128,48 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
-    fetchStats();
+    const isMainDashboardRole = !['TRAINER', 'STUDENT', 'CHANNEL_PARTNER', 'TELECALLER'].includes(user?.role || '');
+    if (isMainDashboardRole) {
+      fetchStats();
+    } else {
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 2. EARLY RETURNS
+  if (user?.role === 'TRAINER') {
+    return <TrainerDashboard />;
+  }
+
+  if (viewingTrainerId) {
+    return (
+      <div className="space-y-6">
+        <button
+          onClick={() => setViewingTrainerId(null)}
+          className="flex items-center gap-2 text-primary hover:underline font-bold"
+        >
+          <Zap className="h-4 w-4 rotate-180" />
+          Back to Campus Overview
+        </button>
+        <TrainerDashboard trainerId={viewingTrainerId} />
+      </div>
+    );
+  }
+
+  if (user?.role === 'STUDENT') {
+    return <StudentDashboard />;
+  }
+
+  if (user?.role === 'CHANNEL_PARTNER') {
+    return <BranchHeadDashboard />;
+  }
+
+  if (user?.role === 'TELECALLER') {
+    // Safety redirect to telecaller dashboard
+    window.location.href = '/telecaller/dashboard';
+    return null;
+  }
 
   if (loading) {
     return <DashboardSkeleton />;
@@ -190,19 +197,45 @@ const Dashboard = () => {
     ? "Overview of all branches and operations"
     : `Overview of ${user?.branch?.name || 'branch'} operations`;
 
+  const containerVariants: Variants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+        delayChildren: 0.1,
+      }
+    }
+  };
+
+  const itemVariants: Variants = {
+    hidden: { y: 20, opacity: 0, filter: "blur(4px)" },
+    visible: {
+      y: 0,
+      opacity: 1,
+      filter: "blur(0px)",
+      transition: { type: "spring", stiffness: 300, damping: 24 }
+    }
+  };
+
   return (
-    <div className="animate-fade-in max-w-[1600px] mx-auto space-y-8">
-      <div className="flex flex-col gap-2">
+    <motion.div
+      className="max-w-[1600px] mx-auto space-y-8"
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+    >
+      <motion.div variants={itemVariants} className="flex flex-col gap-2">
         <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
           Campus Performance Dashboard
         </h1>
         <p className="text-[13px] text-muted-foreground font-medium">
           Visualize academic performance, student success rates, and faculty delivery excellence.
         </p>
-      </div>
+      </motion.div>
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <motion.div variants={itemVariants} className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KPICard
           title="Total Leads"
           value={data?.kpis?.leads?.value?.toString() || "0"}
@@ -239,9 +272,9 @@ const Dashboard = () => {
           accentColor="bg-purple-500"
           onClick={() => openModal('placements')}
         />
-      </div>
+      </motion.div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <motion.div variants={itemVariants} className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Profile/Standing Section */}
         <div className="lg:col-span-1 flex flex-col gap-6">
           <div
@@ -358,9 +391,9 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
-      </div>
+      </motion.div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <motion.div variants={itemVariants} className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Trainer Attendance Section */}
         <div className="lg:col-span-3 rounded-2xl border border-border bg-card overflow-hidden flex flex-col h-full">
           <div className="p-6 border-b border-border flex justify-between items-center bg-muted/5">
@@ -429,7 +462,7 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Detail Modal */}
       {modalType && (
@@ -646,7 +679,7 @@ const Dashboard = () => {
         trainerId={selectedHistoryTrainer?.id || null}
         trainerName={selectedHistoryTrainer?.name || null}
       />
-    </div>
+    </motion.div>
   );
 };
 
