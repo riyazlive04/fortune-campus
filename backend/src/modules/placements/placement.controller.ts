@@ -8,7 +8,7 @@ import { AuthRequest } from '../../middlewares/auth.middleware';
 export const getPlacements = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
     const { page = 1, limit = 10, studentId, companyId, status, search } = req.query;
-    
+
     const { skip, take } = paginationHelper(Number(page), Number(limit));
 
     const where: any = {};
@@ -274,5 +274,23 @@ export const updatePlacementStatus = async (req: AuthRequest, res: Response): Pr
     return successResponse(res, placement, 'Placement status updated successfully');
   } catch (error) {
     return errorResponse(res, 'Failed to update placement status', 500, error);
+  }
+};
+
+export const getPublicPlacementStats = async (req: any, res: Response): Promise<Response> => {
+  try {
+    const placedCount = await prisma.placement.count({
+      where: { status: PlacementStatus.PLACED },
+    });
+
+    const studentsCount = await prisma.student.count();
+
+    return successResponse(res, {
+      placedCount: placedCount || 0,
+      studentsCount: studentsCount || 0,
+      successRate: studentsCount > 0 ? Math.round((placedCount / studentsCount) * 100) : 0
+    });
+  } catch (error) {
+    return errorResponse(res, 'Failed to fetch public placement stats', 500, error);
   }
 };

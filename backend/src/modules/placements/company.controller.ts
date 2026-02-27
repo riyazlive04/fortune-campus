@@ -6,7 +6,7 @@ import { AuthRequest } from '../../middlewares/auth.middleware';
 export const getCompanies = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
     const { page = 1, limit = 10, isActive, search } = req.query;
-    
+
     const { skip, take } = paginationHelper(Number(page), Number(limit));
 
     const where: any = {};
@@ -151,5 +151,28 @@ export const deleteCompany = async (req: AuthRequest, res: Response): Promise<Re
     return successResponse(res, null, 'Company deleted successfully');
   } catch (error) {
     return errorResponse(res, 'Failed to delete company', 500, error);
+  }
+};
+
+export const getPublicCompanyList = async (req: any, res: Response): Promise<Response> => {
+  try {
+    const companies = await prisma.company.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        name: true,
+        industry: true,
+        website: true,
+        _count: {
+          select: { placements: true },
+        },
+      },
+      orderBy: { placements: { _count: 'desc' } },
+      take: 20,
+    });
+
+    return successResponse(res, { companies });
+  } catch (error) {
+    return errorResponse(res, 'Failed to fetch public company list', 500, error);
   }
 };

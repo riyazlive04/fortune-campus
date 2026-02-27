@@ -234,7 +234,7 @@ const Dashboard = () => {
     >
       <motion.div variants={itemVariants} className="flex flex-col gap-2">
         <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
-          Campus Performance Dashboard
+          CEO Dashboard
         </h1>
         <p className="text-[13px] text-muted-foreground font-medium">
           Visualize academic performance, student success rates, and faculty delivery excellence.

@@ -520,17 +520,17 @@ const Users = () => {
               <DropdownMenuContent align="end" className="w-48 animate-in fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2">
                 <DropdownMenuItem className="cursor-pointer py-2.5" onClick={() => handleCreateUser('STUDENT')}>
                   <School className="mr-2 h-4 w-4 text-emerald-600" />
-                  <span>New Student</span>
+                  <span>Student</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem className="cursor-pointer py-2.5" onClick={() => handleCreateUser('TRAINER')}>
                   <UsersIcon className="mr-2 h-4 w-4 text-emerald-600" />
-                  <span>New Trainer</span>
+                  <span>Trainer</span>
                 </DropdownMenuItem>
                 {isAdmin && (
                   <>
                     <DropdownMenuItem className="cursor-pointer py-2.5" onClick={() => handleCreateUser('TELECALLER')}>
                       <UserPlus className="mr-2 h-4 w-4 text-emerald-600" />
-                      <span>New Telecaller</span>
+                      <span>Telecaller</span>
                     </DropdownMenuItem>
                     <DropdownMenuItem className="cursor-pointer py-2.5" onClick={() => handleCreateUser('CHANNEL_PARTNER')}>
                       <UserPlus className="mr-2 h-4 w-4 text-emerald-600" />

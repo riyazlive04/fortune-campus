@@ -6,12 +6,15 @@ import {
   updatePlacement,
   deletePlacement,
   updatePlacementStatus,
+  getPublicPlacementStats,
 } from './placement.controller';
 import { authenticateToken } from '../../middlewares/auth.middleware';
 import { enforceBranchAccess } from '../../middlewares/branch.middleware';
 import { requireTrainer } from '../../middlewares/role.middleware';
 
 const router = Router();
+
+router.get('/public/stats', getPublicPlacementStats);
 
 router.use(authenticateToken);
 router.use(enforceBranchAccess);

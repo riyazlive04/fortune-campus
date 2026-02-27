@@ -1401,7 +1401,13 @@ export const placementApi = {
     }
 
     return result;
-  }
+  },
+  getPublicStats: async () => {
+    const response = await fetch(`${API_BASE_URL}/placements/public/stats`);
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch public stats');
+    return result;
+  },
 };
 
 // Company API Service
@@ -1497,7 +1503,13 @@ export const companyApi = {
     }
 
     return result;
-  }
+  },
+  getPublicList: async () => {
+    const response = await fetch(`${API_BASE_URL}/companies/public/list`);
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch public companies');
+    return result;
+  },
 };
 
 // Incentives API Service
