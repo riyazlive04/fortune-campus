@@ -19,7 +19,9 @@ export const getAdmissions = async (req: AuthRequest, res: Response): Promise<Re
             where.branchId = branchId;
         }
 
-        if (status) {
+        if (status === 'all') {
+            // No status filter
+        } else if (status) {
             where.status = status;
         } else {
             where.status = { not: AdmissionStatus.CONVERTED };

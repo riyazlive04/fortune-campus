@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, Plus, Edit2, Trash2, Users, Clock, BookOpen, X, Loader2, ChevronRight, UserPlus, UserMinus } from "lucide-react";
+import { Search, Plus, Edit2, Trash2, Users, Clock, BookOpen, X, Loader2, ChevronRight, UserPlus, UserMinus, MapPin, Activity, GraduationCap } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import ClockPicker from "@/components/ClockPicker";
 import { batchesApi, studentsApi, branchesApi, trainersApi, storage, API_BASE_URL } from "@/lib/api";
@@ -610,34 +610,80 @@ const Batches = () => {
                                         <Loader2 className="h-8 w-8 animate-spin text-primary" />
                                     </div>
                                 ) : detailTab === "info" ? (
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="rounded-xl bg-muted/30 p-4">
-                                            <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Course</p>
-                                            <p className="font-semibold text-foreground text-sm">{detailBatch.course?.name || "—"}</p>
+                                    <div className="flex flex-col gap-0 rounded-2xl border border-border/60 bg-card overflow-hidden shadow-sm">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-border/60 border-b border-border/60">
+                                            <div className="flex items-start gap-4 p-5 hover:bg-muted/20 transition-colors">
+                                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                                    <BookOpen className="h-[18px] w-[18px]" />
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Course</p>
+                                                    <p className="font-bold text-foreground text-[14px] leading-tight">{detailBatch.course?.name || "—"}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-start gap-4 p-5 hover:bg-muted/20 transition-colors">
+                                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500">
+                                                    <Users className="h-[18px] w-[18px]" />
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Trainer</p>
+                                                    <p className="font-bold text-foreground text-[14px] leading-tight">
+                                                        {detailBatch.trainer ? `${detailBatch.trainer.user?.firstName} ${detailBatch.trainer.user?.lastName}` : "Not assigned"}
+                                                    </p>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div className="rounded-xl bg-muted/30 p-4">
-                                            <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Trainer</p>
-                                            <p className="font-semibold text-foreground text-sm">
-                                                {detailBatch.trainer ? `${detailBatch.trainer.user?.firstName} ${detailBatch.trainer.user?.lastName}` : "Not assigned"}
-                                            </p>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-border/60 border-b border-border/60">
+                                            <div className="flex items-start gap-4 p-5 hover:bg-muted/20 transition-colors">
+                                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-orange-500/10 text-orange-500">
+                                                    <Clock className="h-[18px] w-[18px]" />
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Schedule</p>
+                                                    <p className="font-medium text-foreground text-[14px] leading-tight font-mono tracking-tight">
+                                                        {detailBatch.startTime || "—"} - {detailBatch.endTime || "—"}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-start gap-4 p-5 hover:bg-muted/20 transition-colors">
+                                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500">
+                                                    <MapPin className="h-[18px] w-[18px]" />
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Location</p>
+                                                    <p className="font-bold text-foreground text-[14px] leading-tight">
+                                                        {detailBatch.branch?.name ? `${detailBatch.branch.name} Branch` : "—"}
+                                                    </p>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div className="rounded-xl bg-muted/30 p-4">
-                                            <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Schedule</p>
-                                            <p className="font-semibold text-foreground text-sm">{detailBatch.startTime || "—"} – {detailBatch.endTime || "—"}</p>
-                                        </div>
-                                        <div className="rounded-xl bg-muted/30 p-4">
-                                            <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Branch</p>
-                                            <p className="font-semibold text-foreground text-sm">{detailBatch.branch?.name || "—"}</p>
-                                        </div>
-                                        <div className="rounded-xl bg-muted/30 p-4">
-                                            <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Status</p>
-                                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-bold ${detailBatch.isActive ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-500"}`}>
-                                                {detailBatch.isActive ? "Active" : "Inactive"}
-                                            </span>
-                                        </div>
-                                        <div className="rounded-xl bg-muted/30 p-4">
-                                            <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Total Students</p>
-                                            <p className="font-semibold text-foreground text-sm">{detailBatch.students?.length ?? 0}</p>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-border/60">
+                                            <div className="flex items-start gap-4 p-5 hover:bg-muted/20 transition-colors">
+                                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-purple-500/10 text-purple-500">
+                                                    <Activity className="h-[18px] w-[18px]" />
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1.5">Status</p>
+                                                    <div>
+                                                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-black tracking-widest ${detailBatch.isActive ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" : "bg-muted text-muted-foreground"}`}>
+                                                            {detailBatch.isActive ? "ACTIVE" : "INACTIVE"}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-start gap-4 p-5 hover:bg-muted/20 transition-colors">
+                                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-pink-500/10 text-pink-500">
+                                                    <GraduationCap className="h-[18px] w-[18px]" />
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Enrollment</p>
+                                                    <p className="font-bold text-foreground text-[14px] leading-tight">
+                                                        <span className="text-lg">{detailBatch.students?.length ?? 0}</span> <span className="text-muted-foreground font-normal text-[13px]">Students</span>
+                                                    </p>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 ) : detailTab === "students" ? (

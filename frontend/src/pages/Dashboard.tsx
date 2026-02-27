@@ -40,6 +40,13 @@ const Dashboard = () => {
 
   const openModal = async (type: 'leads' | 'students' | 'placements' | 'admissions') => {
     setModalType(type);
+
+    // For CEO, we use the branchPerformance data already fetched, no need for separate API calls
+    if (user?.role === 'CEO') {
+      setModalLoading(false);
+      return;
+    }
+
     setModalData([]);
     setModalLoading(true);
     try {
@@ -56,7 +63,7 @@ const Dashboard = () => {
         const placements = res.data?.placements || res.data || [];
         setModalData(Array.isArray(placements) ? placements : []);
       } else if (type === 'admissions') {
-        const res = await admissionsApi.getAdmissions({ limit: 100 });
+        const res = await admissionsApi.getAdmissions({ limit: 100, status: 'all' });
         const admissions = res.data?.admissions || res.data || [];
         setModalData(Array.isArray(admissions) ? admissions : []);
       }
@@ -465,159 +472,182 @@ const Dashboard = () => {
       </motion.div>
 
       {/* Detail Modal */}
-      {modalType && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
-          onClick={() => setModalType(null)}
-        >
-          <div
-            className="bg-card border border-border rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-6 border-b border-border">
-              <div>
-                <h2 className="text-xl font-black text-foreground">
-                  {modalType === 'leads' ? '📋 Total Leads' : modalType === 'students' ? '🎓 Active Students' : modalType === 'admissions' ? '✅ Admissions' : '💼 Placements'}
-                </h2>
-                <p className="text-[12px] text-muted-foreground mt-0.5">
-                  {modalLoading ? 'Loading...' : `${modalData.length} record${modalData.length !== 1 ? 's' : ''} found`}
-                </p>
-              </div>
-              <button
-                onClick={() => setModalType(null)}
-                className="p-2 rounded-full hover:bg-muted transition-colors"
-              >
-                <X className="h-5 w-5 text-muted-foreground" />
-              </button>
+      <Dialog open={!!modalType} onOpenChange={(open) => !open && setModalType(null)}>
+        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col p-0 overflow-hidden border-none shadow-2xl">
+          {/* Modal Header */}
+          <div className="flex items-center justify-between p-6 border-b border-border bg-card">
+            <div>
+              <DialogTitle className="text-xl font-black text-foreground capitalize">
+                {modalType === 'leads' ? 'Total Leads' : modalType === 'students' ? 'Active Students' : modalType === 'admissions' ? 'Admissions' : 'Placements'} Breakdown
+              </DialogTitle>
+              <p className="text-[12px] text-muted-foreground mt-1 font-medium">
+                {modalLoading ? 'Loading statistics...' : user?.role === 'CEO' ? 'Detailed performance metrics across all branches' : `${modalData.length} records found`}
+              </p>
             </div>
+          </div>
 
-            {/* Modal Body */}
-            <div className="overflow-auto flex-1 p-4">
-              {modalLoading ? (
-                <div className="flex items-center justify-center py-20">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-              ) : modalData.length === 0 ? (
-                <div className="text-center py-20 text-muted-foreground font-semibold">No records found</div>
-              ) : modalType === 'leads' ? (
-                <table className="w-full text-[13px]">
-                  <thead>
-                    <tr className="border-b border-border text-left">
-                      <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Name</th>
-                      <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Phone</th>
-                      <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Course</th>
-                      <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Branch</th>
-                      <th className="pb-3 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Status</th>
+          {/* Modal Body */}
+          <div className="overflow-auto flex-1 p-6 bg-background">
+            {modalLoading ? (
+              <div className="flex items-center justify-center py-20">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : user?.role === 'CEO' ? (
+              <div className="border border-border/60 rounded-xl overflow-hidden shadow-sm bg-card">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/40 border-b border-border/60">
+                    <tr>
+                      <th className="p-4 text-left font-bold text-muted-foreground uppercase text-[10px] tracking-widest">Branch Name</th>
+                      <th className="p-4 text-right font-bold text-muted-foreground uppercase text-[10px] tracking-widest">Metric Value</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-border/40">
+                    {(data?.branchPerformance || []).map((branch: any) => (
+                      <tr key={branch.branch} className="hover:bg-muted/20 transition-colors group">
+                        <td className="p-4 font-bold text-foreground/90 group-hover:text-primary transition-colors">{branch.branch}</td>
+                        <td className="p-4 text-right font-black text-foreground tabular-nums">
+                          {modalType === 'leads' ? branch.leads :
+                            modalType === 'admissions' ? branch.admissions :
+                              modalType === 'students' ? branch.students :
+                                branch.placements}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : modalData.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                <div className="bg-muted/20 p-4 rounded-full mb-3">
+                  <GraduationCap className="h-8 w-8 opacity-20" />
+                </div>
+                <p className="font-semibold italic">No records found for this category.</p>
+              </div>
+            ) : modalType === 'leads' ? (
+              <div className="border rounded-xl overflow-hidden shadow-sm bg-card">
+                <table className="w-full text-[13px]">
+                  <thead className="bg-muted/40 border-b border-border/60">
+                    <tr className="text-left">
+                      <th className="p-4 font-bold text-muted-foreground uppercase text-[10px] tracking-widest">Student Name</th>
+                      <th className="p-4 font-bold text-muted-foreground uppercase text-[10px] tracking-widest">Contact</th>
+                      <th className="p-4 font-bold text-muted-foreground uppercase text-[10px] tracking-widest">Course</th>
+                      <th className="p-4 font-bold text-muted-foreground uppercase text-[10px] tracking-widest">Branch</th>
+                      <th className="p-4 font-bold text-muted-foreground uppercase text-[10px] tracking-widest">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/40">
                     {modalData.map((lead: any) => (
-                      <tr key={lead.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                        <td className="py-3 pr-4 font-semibold text-foreground">{lead.name || lead.firstName + ' ' + lead.lastName}</td>
-                        <td className="py-3 pr-4 text-muted-foreground">{lead.phone || lead.mobile || '—'}</td>
-                        <td className="py-3 pr-4 text-muted-foreground">{lead.course?.name || lead.courseName || '—'}</td>
-                        <td className="py-3 pr-4 text-muted-foreground">{lead.branch?.name || lead.branchName || '—'}</td>
-                        <td className="py-3">
-                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${lead.status === 'CONVERTED' ? 'bg-emerald-50 text-emerald-700' :
-                            lead.status === 'HOT' ? 'bg-red-50 text-red-700' :
-                              lead.status === 'WARM' ? 'bg-orange-50 text-orange-700' :
-                                'bg-gray-50 text-gray-700'
+                      <tr key={lead.id} className="hover:bg-muted/20 transition-all group">
+                        <td className="p-4 font-bold text-foreground group-hover:text-primary transition-colors">{lead.name || lead.firstName + ' ' + lead.lastName}</td>
+                        <td className="p-4 text-muted-foreground selection:bg-primary/10">{lead.phone || lead.mobile || '—'}</td>
+                        <td className="p-4 text-muted-foreground font-medium">{lead.course?.name || lead.courseName || '—'}</td>
+                        <td className="p-4 text-muted-foreground font-medium">{lead.branch?.name || lead.branchName || '—'}</td>
+                        <td className="p-4">
+                          <span className={`inline-flex items-center rounded-xl px-2.5 py-1 text-[10px] font-black tracking-wider shadow-sm ${lead.status === 'CONVERTED' ? 'bg-emerald-100/50 text-emerald-700 border border-emerald-200/50' :
+                            lead.status === 'HOT' ? 'bg-red-100/50 text-red-700 border border-red-200/50' :
+                              lead.status === 'WARM' ? 'bg-orange-100/50 text-orange-700 border border-orange-200/50' :
+                                'bg-slate-100/50 text-slate-700 border border-slate-200/50'
                             }`}>{lead.status || '—'}</span>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              ) : modalType === 'students' ? (
+              </div>
+            ) : modalType === 'students' ? (
+              <div className="border rounded-xl overflow-hidden shadow-sm bg-card">
                 <table className="w-full text-[13px]">
-                  <thead>
-                    <tr className="border-b border-border text-left">
-                      <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Name</th>
-                      <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Course</th>
-                      <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Branch</th>
-                      <th className="pb-3 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Batch</th>
+                  <thead className="bg-muted/40 border-b border-border/60">
+                    <tr className="text-left">
+                      <th className="p-4 font-bold text-muted-foreground uppercase text-[10px] tracking-widest">Student</th>
+                      <th className="p-4 font-bold text-muted-foreground uppercase text-[10px] tracking-widest">Enrolled Course</th>
+                      <th className="p-4 font-bold text-muted-foreground uppercase text-[10px] tracking-widest">Branch</th>
+                      <th className="p-4 font-bold text-muted-foreground uppercase text-[10px] tracking-widest">Batch Code</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-border/40">
                     {modalData.map((student: any) => (
-                      <tr key={student.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                        <td className="py-3 pr-4 font-semibold text-foreground">
+                      <tr key={student.id} className="hover:bg-muted/20 transition-all group">
+                        <td className="p-4 font-bold text-foreground group-hover:text-primary transition-colors">
                           {student.user?.firstName} {student.user?.lastName}
                         </td>
-                        <td className="py-3 pr-4 text-muted-foreground">{student.course?.name || '—'}</td>
-                        <td className="py-3 pr-4 text-muted-foreground">{student.branch?.name || '—'}</td>
-                        <td className="py-3 text-muted-foreground">{student.batch?.name || student.batchCode || '—'}</td>
+                        <td className="p-4 text-muted-foreground font-medium">{student.course?.name || '—'}</td>
+                        <td className="p-4 text-muted-foreground font-medium">{student.branch?.name || '—'}</td>
+                        <td className="p-4 text-muted-foreground font-bold">{student.batch?.name || student.batchCode || '—'}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              ) : modalType === 'admissions' ? (
+              </div>
+            ) : modalType === 'admissions' ? (
+              <div className="border rounded-xl overflow-hidden shadow-sm bg-card">
                 <table className="w-full text-[13px]">
-                  <thead>
-                    <tr className="border-b border-border text-left">
-                      <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Name</th>
-                      <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Phone</th>
-                      <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Course</th>
-                      <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Branch</th>
-                      <th className="pb-3 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Status</th>
+                  <thead className="bg-muted/40 border-b border-border/60">
+                    <tr className="text-left">
+                      <th className="p-4 font-bold text-muted-foreground uppercase text-[10px] tracking-widest">Student</th>
+                      <th className="p-4 font-bold text-muted-foreground uppercase text-[10px] tracking-widest">Phone</th>
+                      <th className="p-4 font-bold text-muted-foreground uppercase text-[10px] tracking-widest">Course</th>
+                      <th className="p-4 font-bold text-muted-foreground uppercase text-[10px] tracking-widest">Branch</th>
+                      <th className="p-4 font-bold text-muted-foreground uppercase text-[10px] tracking-widest">Admission Status</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-border/40">
                     {modalData.map((admission: any) => (
-                      <tr key={admission.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                        <td className="py-3 pr-4 font-semibold text-foreground">
+                      <tr key={admission.id} className="hover:bg-muted/20 transition-all group">
+                        <td className="p-4 font-bold text-foreground group-hover:text-primary transition-colors">
                           {admission.firstName} {admission.lastName}
                         </td>
-                        <td className="py-3 pr-4 text-muted-foreground">{admission.phone || '—'}</td>
-                        <td className="py-3 pr-4 text-muted-foreground">{admission.course?.name || '—'}</td>
-                        <td className="py-3 pr-4 text-muted-foreground">{admission.branch?.name || '—'}</td>
-                        <td className="py-3">
-                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${admission.status === 'CONFIRMED' ? 'bg-emerald-50 text-emerald-700' :
-                            admission.status === 'PENDING' ? 'bg-yellow-50 text-yellow-700' :
-                              admission.status === 'DROPOUT' ? 'bg-red-50 text-red-700' :
-                                'bg-gray-50 text-gray-700'
+                        <td className="p-4 text-muted-foreground">{admission.phone || '—'}</td>
+                        <td className="p-4 text-muted-foreground font-medium">{admission.course?.name || '—'}</td>
+                        <td className="p-4 text-muted-foreground font-medium">{admission.branch?.name || '—'}</td>
+                        <td className="p-4">
+                          <span className={`inline-flex items-center rounded-xl px-2.5 py-1 text-[10px] font-black tracking-wider shadow-sm ${admission.status === 'CONVERTED' || admission.status === 'APPROVED' || admission.status === 'ADMITTED' || admission.status === 'CONFIRMED' ? 'bg-emerald-100/50 text-emerald-700 border border-emerald-200/50' :
+                            admission.status === 'PENDING' || admission.status === 'NEW' ? 'bg-amber-100/50 text-amber-700 border border-amber-200/50' :
+                              admission.status === 'DROPOUT' ? 'bg-red-100/50 text-red-700 border border-red-200/50' :
+                                'bg-slate-100/50 text-slate-700 border border-slate-200/50'
                             }`}>{admission.status || '—'}</span>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              ) : (
+              </div>
+            ) : (
+              <div className="border rounded-xl overflow-hidden shadow-sm bg-card">
                 <table className="w-full text-[13px]">
-                  <thead>
-                    <tr className="border-b border-border text-left">
-                      <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Student</th>
-                      <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Company</th>
-                      <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Role</th>
-                      <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Package</th>
-                      <th className="pb-3 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Status</th>
+                  <thead className="bg-muted/40 border-b border-border/60">
+                    <tr className="text-left">
+                      <th className="p-4 font-bold text-muted-foreground uppercase text-[10px] tracking-widest">Student</th>
+                      <th className="p-4 font-bold text-muted-foreground uppercase text-[10px] tracking-widest">Company</th>
+                      <th className="p-4 font-bold text-muted-foreground uppercase text-[10px] tracking-widest">Role</th>
+                      <th className="p-4 font-bold text-muted-foreground uppercase text-[10px] tracking-widest">Package Details</th>
+                      <th className="p-4 font-bold text-muted-foreground uppercase text-[10px] tracking-widest">Current Status</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-border/40">
                     {modalData.map((p: any) => (
-                      <tr key={p.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                        <td className="py-3 pr-4 font-semibold text-foreground">
+                      <tr key={p.id} className="hover:bg-muted/20 transition-all group">
+                        <td className="p-4 font-bold text-foreground group-hover:text-primary transition-colors">
                           {p.student?.user?.firstName} {p.student?.user?.lastName}
                         </td>
-                        <td className="py-3 pr-4 text-muted-foreground">{p.company?.name || p.companyName || '—'}</td>
-                        <td className="py-3 pr-4 text-muted-foreground">{p.role || p.jobTitle || '—'}</td>
-                        <td className="py-3 pr-4 text-muted-foreground">{p.package || p.salary ? `₹${p.package || p.salary}` : '—'}</td>
-                        <td className="py-3">
-                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${p.status === 'PLACED' ? 'bg-emerald-50 text-emerald-700' :
-                            p.status === 'PENDING' ? 'bg-yellow-50 text-yellow-700' :
-                              'bg-gray-50 text-gray-700'
+                        <td className="p-4 text-muted-foreground font-semibold">{p.company?.name || p.companyName || '—'}</td>
+                        <td className="p-4 text-muted-foreground font-medium">{p.role || p.jobTitle || '—'}</td>
+                        <td className="p-4 text-muted-foreground font-black">{p.package || p.salary ? `₹${p.package || p.salary}` : '—'}</td>
+                        <td className="p-4">
+                          <span className={`inline-flex items-center rounded-xl px-2.5 py-1 text-[10px] font-black tracking-wider shadow-sm ${p.status === 'PLACED' ? 'bg-emerald-100/50 text-emerald-700 border border-emerald-200/50' :
+                            p.status === 'PENDING' ? 'bg-amber-100/50 text-amber-700 border border-amber-200/50' :
+                              'bg-slate-100/50 text-slate-700 border border-slate-200/50'
                             }`}>{p.status || '—'}</span>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-              )}
-            </div>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {/* Top Performer Details Modal */}
       <Dialog open={isTopPerformerModalOpen} onOpenChange={setIsTopPerformerModalOpen}>

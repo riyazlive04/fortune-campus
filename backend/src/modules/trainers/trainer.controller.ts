@@ -9,13 +9,13 @@ import { NotificationService } from '../notifications/notification.service';
 
 export const getTrainers = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
-    const { page = 1, limit = 10, branchId, isActive, search } = req.query;
+    const { page = 1, limit = 10, branchId, isActive, search, allowGlobal } = req.query;
 
     const { skip, take } = paginationHelper(Number(page), Number(limit));
 
     const where: any = {};
 
-    if (req.user?.role !== UserRole.CEO && req.user?.role !== UserRole.ADMIN) {
+    if (req.user?.role !== UserRole.CEO && req.user?.role !== UserRole.ADMIN && allowGlobal !== 'true') {
       where.branchId = req.user?.branchId;
     } else if (branchId) {
       where.branchId = branchId as string;

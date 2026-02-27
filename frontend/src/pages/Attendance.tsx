@@ -7,7 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { attendanceApi, branchesApi, batchesApi, studentsApi, storage } from "@/lib/api";
+import { attendanceApi, branchesApi, batchesApi, studentsApi, trainersApi, storage } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -71,6 +71,25 @@ const Attendance = () => {
       .catch(() => { });
   }, []);
 
+  // ── Substitute Trainer state ──────────────────────────────
+  const [isSubstituteMode, setIsSubstituteMode] = useState(false);
+  const [availableTrainers, setAvailableTrainers] = useState<any[]>([]);
+  const [selectedSubstituteId, setSelectedSubstituteId] = useState<string>("");
+  const [loadingTrainers, setLoadingTrainers] = useState(false);
+
+  // ── Fetch trainers when substitute mode is enabled ──────────
+  useEffect(() => {
+    if (!isSubstituteMode) {
+      setSelectedSubstituteId("");
+      return;
+    }
+    setLoadingTrainers(true);
+    trainersApi.getTrainers({ isActive: true, limit: 1000, allowGlobal: true })
+      .then(r => setAvailableTrainers(r.data?.trainers || r.data || []))
+      .catch(() => setAvailableTrainers([]))
+      .finally(() => setLoadingTrainers(false));
+  }, [isSubstituteMode]);
+
   // ── Load students when batch changes ─────────────────────────
   useEffect(() => {
     if (!selectedBatchId) {
@@ -90,10 +109,15 @@ const Attendance = () => {
         const map: Record<string, string> = {};
         students.forEach((s: any) => { map[s.id] = "PRESENT"; });
         setAttendanceMap(map);
+
+        // Auto-select original trainer as default substitute if mode is on
+        if (isSubstituteMode && batch.trainerId) {
+          setSelectedSubstituteId(batch.trainerId);
+        }
       })
       .catch(() => setBatchStudents([]))
       .finally(() => setLoadingStudents(false));
-  }, [selectedBatchId]);
+  }, [selectedBatchId, isSubstituteMode]);
 
   // ── Fetch attendance summary ─────────────────────────────────
   const fetchSummary = useCallback(async () => {
@@ -140,6 +164,11 @@ const Attendance = () => {
   const handleSubmit = async () => {
     if (!selectedBatchId || batchStudents.length === 0) return;
 
+    if (isSubstituteMode && !selectedSubstituteId) {
+      toast({ variant: "destructive", title: "Substitute Required", description: "Please select a substitute trainer" });
+      return;
+    }
+
     const courseId = batchStudents[0]?.courseId;
     if (!courseId) {
       toast({ variant: "destructive", title: "Error", description: "Course ID not found for this batch" });
@@ -155,9 +184,13 @@ const Attendance = () => {
     }));
 
     try {
+      const selectedBatch = batches.find(b => b.id === selectedBatchId);
       await attendanceApi.markBatchAttendance({
         courseId,
         date: dateStr,
+        trainerId: isSubstituteMode ? selectedSubstituteId : (selectedBatch?.trainerId || undefined),
+        isSubstitute: isSubstituteMode,
+        originalTrainerId: !isSubstituteMode ? undefined : selectedBatch?.trainerId,
         attendanceRecords
       });
 
@@ -287,7 +320,7 @@ const Attendance = () => {
       </div>
 
       {/* ── BATCH-WISE ATTENDANCE SECTION ── */}
-      {isTrainer && (
+      {(isTrainer || currentUser?.role === "CHANNEL_PARTNER" || isCEO) && (
         <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
           {/* Header */}
           <div className="flex flex-wrap items-center justify-between px-6 py-4 border-b border-border bg-muted/30 gap-4">
@@ -296,7 +329,18 @@ const Attendance = () => {
               <h3 className="text-sm font-black text-foreground uppercase tracking-wide">Take Attendance</h3>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
+              {/* Substitute Toggle */}
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-yellow-50 border border-yellow-200">
+                <span className="text-[10px] font-black uppercase text-yellow-700 tracking-tighter">Substitute?</span>
+                <input
+                  type="checkbox"
+                  checked={isSubstituteMode}
+                  onChange={(e) => setIsSubstituteMode(e.target.checked)}
+                  className="h-4 w-4 rounded border-yellow-300 text-yellow-600 focus:ring-yellow-500"
+                />
+              </div>
+
               {/* Batch selector */}
               <div className="w-64">
                 <Select onValueChange={(v) => { setSelectedBatchId(v); }} value={selectedBatchId}>
@@ -314,6 +358,30 @@ const Attendance = () => {
               </div>
             </div>
           </div>
+
+          {/* Substitute Trainer Selector (Conditional) */}
+          {isSubstituteMode && (
+            <div className="px-6 py-3 bg-yellow-50/50 border-b border-yellow-100 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2 text-yellow-800">
+                <User className="h-4 w-4" />
+                <span className="text-xs font-bold uppercase tracking-tight">Select Substitute Trainer:</span>
+              </div>
+              <div className="flex-1 max-w-sm">
+                <Select onValueChange={setSelectedSubstituteId} value={selectedSubstituteId}>
+                  <SelectTrigger className="h-8 text-xs bg-white border-yellow-200">
+                    <SelectValue placeholder={loadingTrainers ? "Loading trainers..." : "Choose trainer..."} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableTrainers.map(t => (
+                      <SelectItem key={t.id} value={t.id} className="text-xs">
+                        {t.user?.firstName} {t.user?.lastName} <span className="text-[10px] text-muted-foreground ml-1">({t.branch?.name})</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
 
           {/* Body */}
           {!selectedBatchId ? (

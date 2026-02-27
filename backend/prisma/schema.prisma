@@ -44,6 +44,7 @@ model User {
   uploadedReports BranchReport[]
   performanceGapsTarget PerformanceGap[] @relation("GapTarget")
   performanceGapsCreated PerformanceGap[] @relation("GapCreator")
+  recordedAttendances Attendance[] @relation("AttendanceRecorder")
   
   @@index([email])
   @@index([branchId])
@@ -455,6 +456,10 @@ model Attendance {
   period          Int              @default(1)
   isVerified      Boolean          @default(false)
   
+  // Substitute Tracking
+  isSubstitute    Boolean          @default(false)
+  recordedById    String?          // The trainer who actually marked it
+
   studentId       String
   courseId        String
   batchId         String?
@@ -468,6 +473,7 @@ model Attendance {
   course          Course           @relation(fields: [courseId], references: [id])
   batch           Batch?           @relation(fields: [batchId], references: [id], onDelete: SetNull)
   trainer         Trainer?         @relation(fields: [trainerId], references: [id], onDelete: SetNull)
+  recordedBy      User?            @relation("AttendanceRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
   
   @@unique([studentId, courseId, date, period])
   @@index([studentId])
@@ -486,6 +492,9 @@ model TrainerAttendance {
   inTime          DateTime?
   outTime         DateTime?
   
+  isSubstitute    Boolean          @default(false)
+  originalTrainerId String?        // If this is a substitution, who was the original?
+
   trainerId       String
   branchId        String
   batchId         String?

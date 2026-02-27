@@ -258,7 +258,7 @@ export const markAttendanceIdempotent = async (req: AuthRequest, res: Response):
 
 export const bulkMarkAttendance = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
-    const { courseId, date, trainerId, attendanceRecords } = req.body;
+    const { courseId, date, trainerId, attendanceRecords, isSubstitute, originalTrainerId } = req.body;
 
     if (!Array.isArray(attendanceRecords) || attendanceRecords.length === 0) {
       return errorResponse(res, 'Invalid attendance records', 400);
@@ -292,6 +292,8 @@ export const bulkMarkAttendance = async (req: AuthRequest, res: Response): Promi
               status: record.status,
               remarks: record.remarks,
               trainerId: trainerId || undefined,
+              isSubstitute: isSubstitute || false,
+              recordedById: req.user?.id,
               updatedAt: now
             }
           });
@@ -307,18 +309,98 @@ export const bulkMarkAttendance = async (req: AuthRequest, res: Response): Promi
               period: Number(period),
               isVerified: true,
               trainerId: trainerId || undefined,
+              isSubstitute: isSubstitute || false,
+              recordedById: req.user?.id
             }
           });
           results.push(created);
         }
       }
+
+      // If this is a substitution, also mark the trainer's attendance at this branch/batch
+      if (isSubstitute && trainerId) {
+        const student = await tx.student.findUnique({
+          where: { id: attendanceRecords[0].studentId as string },
+          select: { branchId: true, batchId: true }
+        });
+
+        if (student) {
+          const existingTrainerAttendance = await tx.trainerAttendance.findFirst({
+            where: {
+              trainerId: trainerId,
+              batchId: student.batchId || null,
+              date: attendanceDate
+            }
+          });
+
+          if (existingTrainerAttendance) {
+            await tx.trainerAttendance.update({
+              where: { id: existingTrainerAttendance.id },
+              data: {
+                status: AttendanceStatus.PRESENT,
+                isSubstitute: true,
+                originalTrainerId: originalTrainerId || null,
+                remarks: `Substitute for ${originalTrainerId ? 'original trainer' : 'absent trainer'}`,
+                updatedAt: now
+              }
+            });
+          } else {
+            await tx.trainerAttendance.create({
+              data: {
+                trainerId: trainerId,
+                batchId: student.batchId || null,
+                date: attendanceDate,
+                status: AttendanceStatus.PRESENT,
+                isSubstitute: true,
+                originalTrainerId: originalTrainerId || null,
+                branchId: student.branchId,
+                remarks: `Substitute class`
+              }
+            });
+          }
+
+          if (originalTrainerId) {
+            const existingOriginalAttendance = await tx.trainerAttendance.findFirst({
+              where: {
+                trainerId: originalTrainerId,
+                batchId: student.batchId || null,
+                date: attendanceDate
+              }
+            });
+
+            if (existingOriginalAttendance) {
+              await tx.trainerAttendance.update({
+                where: { id: existingOriginalAttendance.id },
+                data: {
+                  status: AttendanceStatus.ABSENT,
+                  remarks: existingOriginalAttendance.remarks ? `${existingOriginalAttendance.remarks} (Class taken by substitute)` : `Class taken by substitute trainer`,
+                  updatedAt: now
+                }
+              });
+            } else {
+              await tx.trainerAttendance.create({
+                data: {
+                  trainerId: originalTrainerId,
+                  batchId: student.batchId || null,
+                  date: attendanceDate,
+                  status: AttendanceStatus.ABSENT,
+                  isSubstitute: false,
+                  branchId: student.branchId,
+                  remarks: `Class taken by substitute trainer`
+                }
+              });
+            }
+          }
+        }
+      }
+
       return results;
     });
 
     return successResponse(res, { result }, `${result.length} attendance records processed successfully`, 201);
-  } catch (error) {
+  } catch (error: any) {
     console.error(`[Attendance] Bulk mark error:`, error);
-    return errorResponse(res, 'Failed to mark bulk attendance', 500, error);
+    return errorResponse(res, `Failed to mark bulk attendance: ${error.message}`, 500, error);
   }
 };
 
