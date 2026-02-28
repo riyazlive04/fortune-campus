@@ -6,6 +6,7 @@ import Footer from "./Footer";
 import { storage } from "@/lib/api";
 import { AnimatePresence } from "framer-motion";
 import PageTransition from "./PageTransition";
+import GlowOverlay from "./GlowOverlay";
 
 const Layout = () => {
   const [collapsed, setCollapsed] = useState(false);
@@ -24,10 +25,11 @@ const Layout = () => {
   }, [navigate]);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col relative">
+      <GlowOverlay />
       <AppSidebar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} />
       <TopBar sidebarCollapsed={collapsed} />
-      <main className={`pt-16 flex-1 transition-all duration-300 ${collapsed ? "ml-16" : "ml-60"}`}>
+      <main className={`pt-16 flex-1 transition-all duration-300 ${collapsed ? "ml-28" : "ml-72"}`}>
         <div className="p-6 h-full relative">
           <AnimatePresence mode="wait">
             <PageTransition key={location.pathname}>
@@ -36,7 +38,7 @@ const Layout = () => {
           </AnimatePresence>
         </div>
       </main>
-      <div className={`transition-all duration-300 ${collapsed ? "ml-16" : "ml-60"}`}>
+      <div className={`transition-all duration-300 ${collapsed ? "ml-28" : "ml-72"}`}>
         <Footer />
       </div>
     </div>

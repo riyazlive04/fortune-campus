@@ -1,4 +1,5 @@
 import { LucideIcon } from "lucide-react";
+import { motion } from "framer-motion";
 
 interface KPICardProps {
     title: string;
@@ -12,47 +13,47 @@ interface KPICardProps {
 
 const KPICard = ({ title, value, change, changeType = "neutral", icon: Icon, onClick, accentColor }: KPICardProps) => {
     return (
-        <div
+        <motion.div
+            whileHover={{ scale: 1.02, y: -5 }}
+            whileTap={{ scale: 0.98 }}
             onClick={onClick}
-            className={`relative overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm transition-all duration-300 hover:shadow-lg animate-fade-in group h-full flex flex-col justify-between ${onClick ? 'cursor-pointer hover:border-primary/40 hover:-translate-y-1' : ''}`}
+            className={`glass-card relative overflow-hidden rounded-[24px] p-6 transition-all duration-300 group h-full flex flex-col justify-between ${onClick ? 'cursor-pointer' : ''}`}
         >
-            {/* Top Border Accent */}
-            <div className={`absolute top-0 left-0 w-full h-[3px] opacity-80 ${accentColor}`} />
+            {/* Background Glow */}
+            <div className={`absolute -top-10 -right-10 w-32 h-32 rounded-full blur-[40px] opacity-10 transition-opacity duration-300 group-hover:opacity-30 ${accentColor}`} />
 
-            {/* Corner Glowing Blob */}
-            <div className={`absolute -top-6 -right-6 w-24 h-24 rounded-full blur-[30px] opacity-20 transition-opacity duration-300 group-hover:opacity-40 ${accentColor}`} />
-
-            <div className="flex flex-col gap-1 w-full relative z-10">
+            <div className="flex flex-col gap-2 w-full relative z-10">
                 <div className="flex items-center justify-between">
-                    <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">
+                    <p className="text-[10px] font-black uppercase tracking-[0.1em] text-muted-foreground/60">
                         {title}
                     </p>
-                    <div className={`rounded-full p-2.5 transition-colors ${accentColor} bg-opacity-10 group-hover:bg-opacity-20`}>
-                        <Icon className={`h-4.5 w-4.5 text-foreground/80`} />
+                    <div className={`rounded-2xl p-3 transition-all duration-300 ${accentColor} bg-opacity-10 group-hover:scale-110 shadow-sm shadow-black/5`}>
+                        <Icon className={`h-5 w-5 text-foreground/80`} />
                     </div>
                 </div>
 
-                <div className="mt-2 flex items-baseline gap-2">
-                    <h3 className="text-2xl font-black tracking-tight text-foreground">
+                <div className="mt-4 flex flex-col">
+                    <h3 className="text-3xl font-black tracking-tight text-foreground bg-clip-text">
                         {value}
                     </h3>
                 </div>
 
                 {change && (
-                    <div className="mt-1">
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${changeType === "positive"
-                            ? "bg-emerald-50 text-emerald-600 border border-emerald-100/50"
+                    <div className="mt-4">
+                        <span className={`inline-flex items-center rounded-full px-3 py-1 text-[10px] font-bold tracking-tight ${changeType === "positive"
+                            ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
                             : changeType === "negative"
-                                ? "bg-red-50 text-red-600 border border-red-100/50"
-                                : "bg-muted/50 text-muted-foreground border border-border/50"
+                                ? "bg-red-500/10 text-red-500 border border-red-500/20"
+                                : "bg-primary/10 text-primary border border-primary/20"
                             }`}>
                             {change}
                         </span>
                     </div>
                 )}
             </div>
-        </div>
+        </motion.div>
     );
 };
+
 
 export default KPICard;

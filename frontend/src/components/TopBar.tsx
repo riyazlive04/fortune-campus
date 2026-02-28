@@ -50,7 +50,7 @@ const TopBar = ({ sidebarCollapsed }: TopBarProps) => {
   };
 
   return (
-    <header className={`fixed top-0 right-0 z-30 flex h-16 items-center justify-between bg-card/80 backdrop-blur-md px-6 transition-all duration-300 ${sidebarCollapsed ? "left-16" : "left-60"}`}>
+    <header className={`fixed top-0 right-0 z-30 flex h-16 items-center justify-between bg-card/80 backdrop-blur-md px-6 transition-all duration-300 ${sidebarCollapsed ? "left-28" : "left-72"}`}>
       <div className="flex items-center gap-3">
         {/* Branch selector */}
         {user?.branch && (

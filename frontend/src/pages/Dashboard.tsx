@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import TrainerHistoryModal from "@/components/TrainerHistoryModal";
+import ModernBackground from "@/components/ModernBackground";
 
 const COLORS = ["hsl(217, 71%, 53%)", "hsl(142, 71%, 45%)", "hsl(38, 92%, 50%)", "hsl(262, 60%, 55%)"];
 
@@ -227,17 +228,23 @@ const Dashboard = () => {
 
   return (
     <motion.div
-      className="max-w-[1600px] mx-auto space-y-8"
+      className="max-w-[1600px] mx-auto space-y-10 pb-20"
       variants={containerVariants}
       initial="hidden"
       animate="visible"
     >
-      <motion.div variants={itemVariants} className="flex flex-col gap-2">
-        <h1 className="text-3xl font-extrabold tracking-tight text-foreground">
-          CEO Dashboard
+      <ModernBackground />
+
+      <motion.div variants={itemVariants} className="flex flex-col gap-3 relative group">
+        {/* Decorative background square design element */}
+        <div className="absolute -top-10 -left-10 w-32 h-32 bg-primary/5 rounded-3xl -z-10 blur-2xl group-hover:bg-primary/10 transition-colors duration-700" />
+        <div className="absolute top-0 right-0 w-20 h-20 border border-primary/10 rounded-2xl -z-10 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-700" />
+
+        <h1 className="text-5xl font-black tracking-tight text-foreground bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/60">
+          Campus Analytics
         </h1>
-        <p className="text-[13px] text-muted-foreground font-medium">
-          Visualize academic performance, student success rates, and faculty delivery excellence.
+        <p className="text-[14px] text-muted-foreground font-medium max-w-2xl leading-relaxed">
+          Monitor your institution's pulse with real-time tracking of academic performance, student success, and faculty excellence.
         </p>
       </motion.div>
 
@@ -332,13 +339,13 @@ const Dashboard = () => {
         </div>
 
         {/* Rankings Section */}
-        <div className="lg:col-span-2 rounded-2xl border border-border bg-card overflow-hidden flex flex-col h-full">
-          <div className="p-6 border-b border-border flex justify-between items-center bg-muted/5">
+        <div className="lg:col-span-2 glass-card rounded-3xl overflow-hidden flex flex-col h-full border border-border/40">
+          <div className="p-8 border-b border-border/20 flex justify-between items-center bg-muted/5">
             <div>
-              <h3 className="text-lg font-black text-foreground">Faculty Performance Rankings</h3>
-              <p className="text-[11px] text-muted-foreground font-semibold">Ranked by training quality and success scores</p>
+              <h3 className="text-xl font-black text-foreground">Faculty Rankings</h3>
+              <p className="text-[12px] text-muted-foreground font-semibold">Performance scores based on training quality</p>
             </div>
-            <div className="bg-primary/5 p-3 rounded-full">
+            <div className="bg-primary/10 p-3 rounded-2xl shadow-sm">
               <Award className="h-6 w-6 text-primary" />
             </div>
           </div>
@@ -402,13 +409,13 @@ const Dashboard = () => {
 
       <motion.div variants={itemVariants} className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Trainer Attendance Section */}
-        <div className="lg:col-span-3 rounded-2xl border border-border bg-card overflow-hidden flex flex-col h-full">
-          <div className="p-6 border-b border-border flex justify-between items-center bg-muted/5">
+        <div className="lg:col-span-3 glass-card rounded-3xl overflow-hidden flex flex-col h-full border border-border/40">
+          <div className="p-8 border-b border-border/20 flex justify-between items-center bg-muted/5">
             <div>
-              <h3 className="text-lg font-black text-foreground">Trainer Attendance (Today)</h3>
-              <p className="text-[11px] text-muted-foreground font-semibold">Live tracking of all trainers across branches</p>
+              <h3 className="text-xl font-black text-foreground">Live Attendance</h3>
+              <p className="text-[12px] text-muted-foreground font-semibold">Daily trainer presence across all campus branches</p>
             </div>
-            <div className="bg-primary/5 p-3 rounded-full">
+            <div className="bg-primary/10 p-3 rounded-2xl shadow-sm">
               <Calendar className="h-6 w-6 text-primary" />
             </div>
           </div>
