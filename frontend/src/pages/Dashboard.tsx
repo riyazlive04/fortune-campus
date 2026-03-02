@@ -260,13 +260,12 @@ const Dashboard = () => {
           onClick={() => openModal('leads')}
         />
         <KPICard
-          title="Admissions"
-          value={data?.kpis?.admissions?.value?.toString() || "0"}
-          change="Click to view details"
-          changeType="neutral"
-          icon={Users}
+          title="Overall Revenue"
+          value={`₹${(data?.kpis?.revenue?.value || 0).toLocaleString('en-IN')}`}
+          change={`${data?.kpis?.revenue?.change >= 0 ? '+' : ''}${data?.kpis?.revenue?.change || 0}% from last month`}
+          changeType={data?.kpis?.revenue?.change >= 0 ? "positive" : "negative"}
+          icon={Briefcase}
           accentColor="bg-emerald-500"
-          onClick={() => openModal('admissions')}
         />
         <KPICard
           title="Active Students"
@@ -459,7 +458,7 @@ const Dashboard = () => {
                         <td className="py-3 pr-4">
                           <StatusBadge
                             status={att.status}
-                            variant={att.status === 'PRESENT' ? 'success' : att.status === 'ABSENT' ? 'danger' : 'warning'}
+                            variant={att.status === 'PRESENT' ? 'success' : att.status === 'LATE' ? 'warning' : att.status === 'ABSENT' ? 'danger' : 'neutral'}
                           />
                         </td>
                         <td className="py-3 pr-4 text-muted-foreground font-medium">
@@ -551,9 +550,11 @@ const Dashboard = () => {
                         <td className="p-4 text-muted-foreground font-medium">{lead.branch?.name || lead.branchName || '—'}</td>
                         <td className="p-4">
                           <span className={`inline-flex items-center rounded-xl px-2.5 py-1 text-[10px] font-black tracking-wider shadow-sm ${lead.status === 'CONVERTED' ? 'bg-emerald-100/50 text-emerald-700 border border-emerald-200/50' :
-                            lead.status === 'HOT' ? 'bg-red-100/50 text-red-700 border border-red-200/50' :
-                              lead.status === 'WARM' ? 'bg-orange-100/50 text-orange-700 border border-orange-200/50' :
-                                'bg-slate-100/50 text-slate-700 border border-slate-200/50'
+                            lead.status === 'DEMO_SCHEDULED' ? 'bg-teal-100/50 text-teal-700 border border-teal-200/50' :
+                              lead.status === 'NEGOTIATING' ? 'bg-amber-100/50 text-amber-700 border border-amber-200/50' :
+                                lead.status === 'HOT' ? 'bg-red-100/50 text-red-700 border border-red-200/50' :
+                                  lead.status === 'WARM' ? 'bg-orange-100/50 text-orange-700 border border-orange-200/50' :
+                                    'bg-slate-100/50 text-slate-700 border border-slate-200/50'
                             }`}>{lead.status || '—'}</span>
                         </td>
                       </tr>

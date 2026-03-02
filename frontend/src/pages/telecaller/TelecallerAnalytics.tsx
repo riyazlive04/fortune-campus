@@ -72,6 +72,7 @@ const TelecallerAnalytics = () => {
             case "CONTACTED": return "#64748b"; // slate-500
             case "INTERESTED": return "#a855f7"; // purple-500
             case "NEGOTIATING": return "#f97316"; // orange-500
+            case "DEMO_SCHEDULED": return "#14b8a6"; // teal-500
             case "CONVERTED": return "#22c55e"; // green-500
             default: return "#6b7280"; // gray-500
         }

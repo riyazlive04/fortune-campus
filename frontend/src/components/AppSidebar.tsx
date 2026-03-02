@@ -15,7 +15,6 @@ const navSections = [
       { title: "Dashboard", path: "/", icon: LayoutDashboard, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER', 'TRAINER', 'STUDENT'] },
       { title: "Telecaller Desk", path: "/telecaller/dashboard", icon: LayoutDashboard, roles: ['TELECALLER', 'ADMIN'] },
       { title: "Lead Pipeline", path: "/telecaller/pipeline", icon: FolderKanban, roles: ['TELECALLER', 'ADMIN', 'CEO', 'CHANNEL_PARTNER'] },
-      { title: "Admissions", path: "/admissions", icon: ClipboardList, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER'] },
       { title: "Fees Management System", path: "/fees", icon: DollarSign, roles: ['ADMIN', 'CEO', 'CHANNEL_PARTNER'] },
     ],
   },

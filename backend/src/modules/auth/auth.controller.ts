@@ -102,6 +102,13 @@ export const login = async (req: Request, res: Response): Promise<Response> => {
             code: true,
           },
         },
+        assignedBranches: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          }
+        },
       },
     });
 
@@ -140,6 +147,7 @@ export const login = async (req: Request, res: Response): Promise<Response> => {
         role: user.role,
         branchId: user.branchId,
         branch: user.branch,
+        assignedBranches: user.assignedBranches,
       },
     }, 'Login successful');
   } catch (error) {
@@ -167,6 +175,13 @@ export const getCurrentUser = async (req: AuthRequest, res: Response): Promise<R
             code: true,
           },
         },
+        assignedBranches: {
+          select: {
+            id: true,
+            name: true,
+            code: true,
+          }
+        },
       },
     });
 
@@ -182,6 +197,7 @@ export const getCurrentUser = async (req: AuthRequest, res: Response): Promise<R
       role: user.role,
       branchId: user.branchId,
       branch: user.branch,
+      assignedBranches: user.assignedBranches,
       isActive: user.isActive,
     }, 'User retrieved successfully');
   } catch (error) {

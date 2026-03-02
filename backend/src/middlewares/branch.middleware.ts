@@ -31,7 +31,16 @@ export const enforceBranchAccess = (
     return next();
   }
 
-  // Verify user has access to the requested branch
+  // For TELECALLER, check if the requested branch is in their assignedBranches
+  if (req.user.role === UserRole.TELECALLER) {
+    const isAssigned = req.user.assignedBranches?.some(b => b.id === requestedBranchId);
+    if (!isAssigned) {
+      return errorResponse(res, 'Access denied: Branch mismatch for telecaller', 403);
+    }
+    return next();
+  }
+
+  // Verify user has access to the requested branch (default check)
   if (req.user.branchId !== requestedBranchId) {
     return errorResponse(res, 'Access denied: Branch mismatch', 403);
   }

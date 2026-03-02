@@ -21,7 +21,7 @@ export const getLeads = async (req: AuthRequest, res: Response): Promise<Respons
     const where: any = {};
 
     // Branch filtering - CEOs can filter by branchId from query, others are forced to their own branch
-    if (req.user?.role !== UserRole.CEO) {
+    if (req.user?.role !== UserRole.CEO && req.user?.role !== UserRole.TELECALLER) {
       where.branchId = req.user?.branchId;
     } else if (branchId && branchId !== 'all') {
       where.branchId = branchId as string;
@@ -33,19 +33,37 @@ export const getLeads = async (req: AuthRequest, res: Response): Promise<Respons
 
     // Role-based visibility enforcement
     if (req.user?.role === UserRole.TELECALLER) {
-      // Telecallers can only see their explicit leads
-      where.assignedToId = req.user.id;
+      // Telecallers can see leads explicitly assigned to them OR leads in any of their assigned branches
+      const telecaller = await prisma.user.findUnique({
+        where: { id: req.user.id },
+        include: { assignedBranches: true }
+      });
+
+      const branchIds = telecaller?.assignedBranches.map(b => b.id) || [];
+
+      where.OR = [
+        { assignedToId: req.user.id },
+        { branchId: { in: branchIds } }
+      ];
+
+      // If a specific assignedToId is requested by a Telecaller, respect it as an AND
+      if (assignedToId && assignedToId !== 'all') {
+        where.assignedToId = assignedToId as string;
+      }
     } else if (assignedToId && assignedToId !== 'all') {
       where.assignedToId = assignedToId as string;
     }
 
     if (search) {
-      where.OR = [
-        { firstName: { contains: search as string, mode: 'insensitive' } },
-        { lastName: { contains: search as string, mode: 'insensitive' } },
-        { email: { contains: search as string, mode: 'insensitive' } },
-        { phone: { contains: search as string, mode: 'insensitive' } },
-      ];
+      where.AND = where.AND || [];
+      where.AND.push({
+        OR: [
+          { firstName: { contains: search as string, mode: 'insensitive' } },
+          { lastName: { contains: search as string, mode: 'insensitive' } },
+          { email: { contains: search as string, mode: 'insensitive' } },
+          { phone: { contains: search as string, mode: 'insensitive' } },
+        ]
+      });
     }
 
     if (source && source !== 'all') {
@@ -119,9 +137,15 @@ export const getLeadById = async (req: AuthRequest, res: Response): Promise<Resp
       return errorResponse(res, 'Lead not found', 404);
     }
 
-    // Branch access control
-    if (req.user?.role !== UserRole.CEO && lead.branchId !== req.user?.branchId) {
-      return errorResponse(res, 'Access denied', 403);
+    // Access control
+    if (req.user?.role !== UserRole.CEO && req.user?.role !== UserRole.ADMIN) {
+      if (req.user?.role === UserRole.TELECALLER) {
+        if (lead.assignedToId !== req.user.id) {
+          return errorResponse(res, 'Access denied', 403);
+        }
+      } else if (req.user?.branchId && lead.branchId !== req.user.branchId) {
+        return errorResponse(res, 'Access denied', 403);
+      }
     }
 
     return successResponse(res, { lead });
@@ -150,13 +174,19 @@ export const createLead = async (req: AuthRequest, res: Response): Promise<Respo
       return errorResponse(res, 'Unauthorized', 401);
     }
 
-    const leadBranchId = branchId || req.user.branchId!;
+    const leadBranchId = branchId || req.user.branchId;
     let finalAssignedToId = assignedToId;
 
     // Round-robin assignment if no specific telecaller assigned
     if (!finalAssignedToId) {
       const telecallers = await prisma.user.findMany({
-        where: { branchId: leadBranchId, role: UserRole.TELECALLER, isActive: true },
+        where: {
+          role: UserRole.TELECALLER,
+          isActive: true,
+          assignedBranches: {
+            some: { id: leadBranchId }
+          }
+        },
         select: { id: true }
       });
 
@@ -260,9 +290,15 @@ export const updateLead = async (req: AuthRequest, res: Response): Promise<Respo
       return errorResponse(res, 'Lead not found', 404);
     }
 
-    // Branch access control
-    if (req.user?.role !== UserRole.CEO && existingLead.branchId !== req.user?.branchId) {
-      return errorResponse(res, 'Access denied', 403);
+    // Access control
+    if (req.user?.role !== UserRole.CEO && req.user?.role !== UserRole.ADMIN) {
+      if (req.user?.role === UserRole.TELECALLER) {
+        if (existingLead.assignedToId !== req.user.id) {
+          return errorResponse(res, 'Access denied', 403);
+        }
+      } else if (req.user?.branchId && existingLead.branchId !== req.user.branchId) {
+        return errorResponse(res, 'Access denied', 403);
+      }
     }
 
     const lead = await prisma.lead.update({
@@ -343,9 +379,15 @@ export const deleteLead = async (req: AuthRequest, res: Response): Promise<Respo
       return errorResponse(res, 'Lead not found', 404);
     }
 
-    // Branch access control
-    if (req.user?.role !== UserRole.CEO && existingLead.branchId !== req.user?.branchId) {
-      return errorResponse(res, 'Access denied', 403);
+    // Access control
+    if (req.user?.role !== UserRole.CEO && req.user?.role !== UserRole.ADMIN) {
+      if (req.user?.role === UserRole.TELECALLER) {
+        if (existingLead.assignedToId !== req.user.id) {
+          return errorResponse(res, 'Access denied', 403);
+        }
+      } else if (req.user?.branchId && existingLead.branchId !== req.user.branchId) {
+        return errorResponse(res, 'Access denied', 403);
+      }
     }
 
     // Unlink from admission if exists (to avoid FK constraint errors)
@@ -372,9 +414,15 @@ export const convertLeadToAdmission = async (req: AuthRequest, res: Response): P
       return errorResponse(res, 'Lead not found', 404);
     }
 
-    // Branch access control
-    if (req.user?.role !== UserRole.CEO && lead.branchId && lead.branchId !== req.user?.branchId) {
-      return errorResponse(res, 'Access denied', 403);
+    // Access control
+    if (req.user?.role !== UserRole.CEO && req.user?.role !== UserRole.ADMIN) {
+      if (req.user?.role === UserRole.TELECALLER) {
+        if (lead.assignedToId !== req.user.id) {
+          return errorResponse(res, 'Access denied', 403);
+        }
+      } else if (req.user?.branchId && lead.branchId !== req.user.branchId) {
+        return errorResponse(res, 'Access denied', 403);
+      }
     }
 
     if (lead.status === LeadStatus.CONVERTED) {
@@ -385,7 +433,7 @@ export const convertLeadToAdmission = async (req: AuthRequest, res: Response): P
     const year = new Date().getFullYear().toString().slice(-2);
     const effectiveBranchId = lead.branchId || req.user?.branchId || '';
     const count = await prisma.admission.count({
-      where: { branchId: effectiveBranchId },
+      where: { branchId: effectiveBranchId || undefined },
     });
     const branchCode = effectiveBranchId ? effectiveBranchId.slice(0, 4).toUpperCase() : 'GENE';
     const admissionNumber = `ADM${year}${branchCode}${(count + 1).toString().padStart(4, '0')}`;
@@ -635,13 +683,38 @@ export const getTelecallerDashboard = async (req: AuthRequest, res: Response): P
     const branchId = req.user!.branchId;
 
     // Determine the lead filter based on role
-    // Admins and CEOs see all leads. Telecallers and others see leads from their branch.
+    // Admins and CEOs see all leads. Telecallers see their assigned leads OR leads in assigned branches. Others see leads from their branch.
     const isGlobalView = userRole === UserRole.ADMIN || userRole === UserRole.CEO;
-    const leadFilter = isGlobalView ? {} : (branchId ? { branchId } : { assignedToId: userId });
 
-    const followUpFilter = isGlobalView
-      ? {}
-      : (userRole === UserRole.TELECALLER ? { telecallerId: userId } : {});
+    let leadFilter: any = {};
+    let followUpFilter: any = {};
+
+    if (!isGlobalView) {
+      if (userRole === UserRole.TELECALLER) {
+        const telecaller = await prisma.user.findUnique({
+          where: { id: userId },
+          include: { assignedBranches: true }
+        });
+        const branchIds = telecaller?.assignedBranches.map(b => b.id) || [];
+
+        leadFilter = {
+          OR: [
+            { assignedToId: userId },
+            { branchId: { in: branchIds } }
+          ]
+        };
+
+        followUpFilter = {
+          OR: [
+            { telecallerId: userId },
+            { lead: { branchId: { in: branchIds } } }
+          ]
+        };
+      } else {
+        leadFilter = { branchId: branchId || undefined };
+        followUpFilter = { lead: { branchId: branchId || undefined } };
+      }
+    }
 
     const { date: queryDate } = req.query;
     const now = queryDate ? new Date(queryDate as string) : new Date();
@@ -689,7 +762,12 @@ export const getCPTelecallerAnalytics = async (req: AuthRequest, res: Response):
   try {
     const branchId = req.user!.branchId!;
     const telecallers = await prisma.user.findMany({
-      where: { branchId, role: UserRole.TELECALLER },
+      where: {
+        role: UserRole.TELECALLER,
+        assignedBranches: {
+          some: { id: branchId }
+        }
+      },
       include: {
         _count: { select: { leadsAssigned: true, callLogs: true, conversions: true } }
       }

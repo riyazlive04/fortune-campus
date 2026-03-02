@@ -569,6 +569,14 @@ export const dashboardApi = {
       },
     });
 
+    // Handle token expiration — redirect to login
+    if (response.status === 401) {
+      storage.removeToken();
+      storage.removeUser();
+      window.location.href = '/login';
+      throw new Error('Session expired. Please log in again.');
+    }
+
     const result = await response.json();
 
     if (!response.ok) {
@@ -1059,6 +1067,72 @@ export const studentsApi = {
       throw new Error(result.message || 'Failed to delete student');
     }
 
+    return result;
+  },
+
+  getFeeRequests: async (status?: string) => {
+    const token = storage.getToken();
+    const url = status
+      ? `${API_BASE_URL}/students/fees/requests?status=${status}`
+      : `${API_BASE_URL}/students/fees/requests`;
+
+    const response = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch fee requests');
+    return result;
+  },
+
+  approveFeeRequest: async (id: string) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/students/fees/requests/${id}/approve`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to approve fee request');
+    return result;
+  },
+
+  rejectFeeRequest: async (id: string) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/students/fees/requests/${id}/reject`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to reject fee request');
+    return result;
+  },
+
+  getFeeRequest: async (id: string) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/students/fees/requests/${id}`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch fee request');
+    return result.data;
+  },
+
+  sendFeeReceipt: async (id: string) => {
+    const token = storage.getToken();
+    const response = await fetch(`${API_BASE_URL}/students/fees/requests/${id}/send`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to send receipt');
     return result;
   },
 };

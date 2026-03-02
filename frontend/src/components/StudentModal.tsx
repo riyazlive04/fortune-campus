@@ -96,6 +96,9 @@ const StudentModal = ({ isOpen, onClose, onSuccess, student, initialData, mode =
         totalFee: "",
         paymentPlan: "",
         initialPaid: "",
+        paymentAmount: "",
+        paymentMode: "CASH",
+        transactionId: "",
         // balanceAmount is calculated, not stored
     });
 
@@ -160,6 +163,9 @@ const StudentModal = ({ isOpen, onClose, onSuccess, student, initialData, mode =
                 totalFee: student.admission?.feeAmount?.toString() || "",
                 paymentPlan: student.admission?.paymentPlan || "SINGLE",
                 initialPaid: student.admission?.feePaid?.toString() || "",
+                paymentAmount: "",
+                paymentMode: student.admission?.paymentMode || "CASH",
+                transactionId: student.admission?.transactionId || "",
             });
             // Set selected software from student data
             const savedSoftware = student.selectedSoftware ? student.selectedSoftware.split(", ") : [];
@@ -187,6 +193,9 @@ const StudentModal = ({ isOpen, onClose, onSuccess, student, initialData, mode =
                 totalFee: "",
                 paymentPlan: "SINGLE",
                 initialPaid: "",
+                paymentAmount: "",
+                paymentMode: "CASH",
+                transactionId: "",
             });
             // Reset selected software
             setSelectedSoftware([]);
@@ -215,6 +224,11 @@ const StudentModal = ({ isOpen, onClose, onSuccess, student, initialData, mode =
 
     const calculateBalance = () => {
         const total = parseFloat(formData.totalFee) || 0;
+        if (isChannelPartner && isEditMode) {
+            const existingPaid = student?.admission?.feePaid || 0;
+            const newPayment = parseFloat(formData.paymentAmount) || 0;
+            return total - (existingPaid + newPayment);
+        }
         const paid = parseFloat(formData.initialPaid) || 0;
         return total - paid;
     };
@@ -231,7 +245,8 @@ const StudentModal = ({ isOpen, onClose, onSuccess, student, initialData, mode =
         const missingFields = requiredFields.filter(field => {
             const value = formData[field as keyof typeof formData];
             // For initialPaid, we allow empty string (treat as 0)
-            if (field === 'initialPaid') return false;
+            if (field === 'initialPaid' && !(isChannelPartner && isEditMode)) return false;
+            // For CPs editing fees, we actually care about paymentAmount if that is required
             return !value;
         });
 
@@ -240,6 +255,15 @@ const StudentModal = ({ isOpen, onClose, onSuccess, student, initialData, mode =
                 variant: "destructive",
                 title: "Validation Error",
                 description: `Please fill in all required fields marked with *`,
+            });
+            return;
+        }
+
+        if (formData.paymentMode === 'UPI' && !formData.transactionId) {
+            toast({
+                variant: "destructive",
+                title: "Validation Error",
+                description: `Transaction Number is required for UPI payments.`,
             });
             return;
         }
@@ -299,6 +323,9 @@ const StudentModal = ({ isOpen, onClose, onSuccess, student, initialData, mode =
                     feeAmount: Number(formData.totalFee) || 0,
                     feePaid: Number(formData.initialPaid) || 0,
                     paymentPlan: formData.paymentPlan,
+                    paymentMode: formData.paymentMode,
+                    transactionId: formData.paymentMode === 'UPI' ? formData.transactionId : null,
+                    paymentAmount: (isChannelPartner && isEditMode) ? (Number(formData.paymentAmount) || 0) : undefined,
                 };
 
                 await studentsApi.updateStudent(student.id, updateData);
@@ -332,6 +359,8 @@ const StudentModal = ({ isOpen, onClose, onSuccess, student, initialData, mode =
                     feeAmount: parseFloat(formData.totalFee),
                     feePaid: parseFloat(formData.initialPaid),
                     paymentPlan: formData.paymentPlan,
+                    paymentMode: formData.paymentMode,
+                    transactionId: formData.paymentMode === 'UPI' ? formData.transactionId : null,
                 };
 
                 const res = await studentsApi.createStudent(createData);
@@ -737,7 +766,7 @@ const StudentModal = ({ isOpen, onClose, onSuccess, student, initialData, mode =
                                     type="number"
                                     value={formData.totalFee}
                                     onChange={(e) => handleChange("totalFee", e.target.value)}
-                                    disabled={loading || isTrainer}
+                                    disabled={loading || isTrainer || (isChannelPartner && isEditMode)}
                                     placeholder="Enter total fee"
                                     min="0"
                                     step="0.01"
@@ -750,7 +779,7 @@ const StudentModal = ({ isOpen, onClose, onSuccess, student, initialData, mode =
                                 <Select
                                     value={formData.paymentPlan}
                                     onValueChange={(value) => handleChange("paymentPlan", value)}
-                                    disabled={loading || isTrainer}
+                                    disabled={loading || isTrainer || (isChannelPartner && isEditMode)}
                                 >
                                     <SelectTrigger>
                                         <SelectValue placeholder="Select payment plan" />
@@ -762,19 +791,68 @@ const StudentModal = ({ isOpen, onClose, onSuccess, student, initialData, mode =
                                 </Select>
                             </div>
 
+                            {isChannelPartner && isEditMode ? (
+                                <div className="space-y-2">
+                                    <Label htmlFor="paymentAmount">New Payment Amount</Label>
+                                    <Input
+                                        id="paymentAmount"
+                                        type="number"
+                                        value={formData.paymentAmount}
+                                        onChange={(e) => handleChange("paymentAmount", e.target.value)}
+                                        disabled={loading}
+                                        placeholder="Enter payment amount"
+                                        min="0"
+                                        step="0.01"
+                                    />
+                                    <p className="text-[10px] text-orange-600">Pending CEO approval</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    <Label htmlFor="initialPaid">{mode === 'fees' ? "Total Paid Amount *" : "Amount Paid *"}</Label>
+                                    <Input
+                                        id="initialPaid"
+                                        type="number"
+                                        value={formData.initialPaid}
+                                        onChange={(e) => handleChange("initialPaid", e.target.value)}
+                                        disabled={loading || isTrainer}
+                                        placeholder="Enter amount paid"
+                                        min="0"
+                                        step="0.01"
+                                    />
+                                </div>
+                            )}
+
                             <div className="space-y-2">
-                                <Label htmlFor="initialPaid">{mode === 'fees' ? "Total Paid Amount *" : "Amount Paid *"}</Label>
-                                <Input
-                                    id="initialPaid"
-                                    type="number"
-                                    value={formData.initialPaid}
-                                    onChange={(e) => handleChange("initialPaid", e.target.value)}
+                                <Label htmlFor="paymentMode">Mode of Payment *</Label>
+                                <Select
+                                    value={formData.paymentMode}
+                                    onValueChange={(value) => handleChange("paymentMode", value)}
                                     disabled={loading || isTrainer}
-                                    placeholder="Enter amount paid"
-                                    min="0"
-                                    step="0.01"
-                                />
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select payment mode" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="CASH">Cash</SelectItem>
+                                        <SelectItem value="UPI">UPI</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
+
+                            {formData.paymentMode === 'UPI' && (
+                                <div className="space-y-2">
+                                    <Label htmlFor="transactionId">Transaction Number *</Label>
+                                    <Input
+                                        id="transactionId"
+                                        type="text"
+                                        value={formData.transactionId}
+                                        onChange={(e) => handleChange("transactionId", e.target.value)}
+                                        disabled={loading || isTrainer}
+                                        placeholder="Enter UPI transaction ID"
+                                        required
+                                    />
+                                </div>
+                            )}
 
                             <div className="space-y-2">
                                 <Label htmlFor="balanceAmount">Balance Amount</Label>

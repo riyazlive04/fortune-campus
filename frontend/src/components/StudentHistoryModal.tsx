@@ -260,11 +260,15 @@ const StudentHistoryModal = ({ isOpen, onClose, student, courseFilter }: Student
                             <span className="h-2 w-2 rounded-full bg-rose-500"></span>
                             <span className="text-sm font-semibold text-muted-foreground">Absent: <strong className="text-foreground">{stats["ABSENT"] || 0}</strong></span>
                         </div>
-                        {((stats["LATE"] || 0) + (stats["HALFDAY"] || 0) + (stats["HOLIDAY"] || 0) + (stats["LEAVE"] || 0)) > 0 && (
+                        <div className="flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full bg-amber-500"></span>
+                            <span className="text-sm font-semibold text-muted-foreground">Late: <strong className="text-foreground">{stats["LATE"] || 0}</strong></span>
+                        </div>
+                        {((stats["HALFDAY"] || 0) + (stats["HOLIDAY"] || 0) + (stats["LEAVE"] || 0)) > 0 && (
                             <div className="flex items-center gap-2">
-                                <span className="h-2 w-2 rounded-full bg-amber-500"></span>
+                                <span className="h-2 w-2 rounded-full bg-blue-500"></span>
                                 <span className="text-sm font-semibold text-muted-foreground">Other: <strong className="text-foreground">
-                                    {(stats["LATE"] || 0) + (stats["HALFDAY"] || 0) + (stats["HOLIDAY"] || 0) + (stats["LEAVE"] || 0)}
+                                    {(stats["HALFDAY"] || 0) + (stats["HOLIDAY"] || 0) + (stats["LEAVE"] || 0)}
                                 </strong></span>
                             </div>
                         )}

@@ -45,6 +45,11 @@ model User {
   performanceGapsTarget PerformanceGap[] @relation("GapTarget")
   performanceGapsCreated PerformanceGap[] @relation("GapCreator")
   recordedAttendances Attendance[] @relation("AttendanceRecorder")
+  feeRequestsCreated FeePaymentRequest[] @relation("FeeRequestedBy")
+  feeRequestsApproved FeePaymentRequest[] @relation("FeeApprovedBy")
+  
+  // Custom multi-branch assignment for Telecallers
+  assignedBranches Branch[] @relation("TelecallerAssignments")
   
   @@index([email])
   @@index([branchId])
@@ -80,6 +85,10 @@ model Branch {
   eventPlans  EventPlan[]
   branchReports BranchReport[]
   performanceGaps PerformanceGap[]
+  feeRequests     FeePaymentRequest[]
+  
+  // Telecallers assigned to this branch
+  telecallers User[] @relation("TelecallerAssignments")
   
   @@map("branches")
 }
@@ -113,7 +122,7 @@ model Lead {
   firstName       String
   lastName        String
   email           String?
-  phone           String     @unique
+  phone           String
   location        String?
   source          String     @default("OTHER")
   status          String     @default("NEW")
@@ -258,6 +267,8 @@ model Admission {
   panNumber       String?
   selectedSoftware String?
   paymentPlan     String?
+  paymentMode     String?         // CASH or UPI
+  transactionId   String?         // Number for UPI
 
   softwareFinishedAt DateTime?    // To trigger conduct exam reminders
   
@@ -274,12 +285,46 @@ model Admission {
   student         Student?
   conversionLog   LeadConversionLog?
   whatsappLogs    WhatsAppLog[]
+  feePaymentRequests FeePaymentRequest[]
   
   @@index([branchId])
   @@index([courseId])
   @@index([status])
   @@index([createdAt])
   @@map("admissions")
+}
+
+model FeePaymentRequest {
+  id              String   @id @default(uuid())
+  studentId       String
+  admissionId     String
+  amount          Float
+  paymentMode     String   // CASH, UPI
+  transactionId   String?  // Number for UPI
+  
+  status          String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  
+  requestedById   String
+  branchId        String
+  approvedById    String?
+  
+  isSentToStudent Boolean  @default(false)
+  sentAt          DateTime?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  admission       Admission @relation(fields: [admissionId], references: [id], onDelete: Cascade)
+  requestedBy     User     @relation("FeeRequestedBy", fields: [requestedById], references: [id])
+  approvedBy      User?    @relation("FeeApprovedBy", fields: [approvedById], references: [id])
+  branch          Branch   @relation(fields: [branchId], references: [id])
+
+  @@index([status])
+  @@index([requestedById])
+  @@index([branchId])
+  @@map("fee_payment_requests")
 }
 
 model Student {
@@ -331,6 +376,7 @@ model Student {
   feedbacks       StudentFeedback[]
   batchEnrollments StudentBatch[] // Many-to-many enrollment tracking
   trainerRatings  TrainerRating[]
+  feePaymentRequests FeePaymentRequest[]
   
   @@index([branchId])
   @@index([courseId])

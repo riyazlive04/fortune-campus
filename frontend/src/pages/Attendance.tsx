@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   Loader2, History as HistoryIcon, Calendar, User, CalendarDays,
-  CheckCircle2, XCircle, ClipboardList, Users, Send, Search
+  CheckCircle2, XCircle, ClipboardList, Users, Send, Search, Filter, ArrowRight, History, Clock
 } from "lucide-react";
 import { format } from "date-fns";
 import StudentHistoryModal from "@/components/StudentHistoryModal";
@@ -145,16 +145,9 @@ const Attendance = () => {
       .finally(() => setLoadingAllStudents(false));
   }, [isCEO, currentUser?.branchId]);
 
-  // ── Toggle attendance for one student ────────────────────────
-  const toggle = (studentId: string) => {
-    setAttendanceMap(prev => ({
-      ...prev,
-      [studentId]: prev[studentId] === "PRESENT" ? "ABSENT" : "PRESENT",
-    }));
-  };
 
-  // ── Mark all present / absent ────────────────────────────────
-  const markAll = (status: "PRESENT" | "ABSENT") => {
+  // ── Mark all present / late / absent ────────────────────────
+  const markAll = (status: "PRESENT" | "LATE" | "ABSENT") => {
     const map: Record<string, string> = {};
     batchStudents.forEach(s => { map[s.id] = status; });
     setAttendanceMap(map);
@@ -210,6 +203,7 @@ const Attendance = () => {
     : batches;
 
   const presentCount = Object.values(attendanceMap).filter(v => v === "PRESENT").length;
+  const lateCount = Object.values(attendanceMap).filter(v => v === "LATE").length;
   const absentCount = Object.values(attendanceMap).filter(v => v === "ABSENT").length;
 
   return (
@@ -407,6 +401,9 @@ const Attendance = () => {
                   <span className="flex items-center gap-1.5 font-semibold text-emerald-600">
                     <CheckCircle2 className="h-4 w-4" /> {presentCount} Present
                   </span>
+                  <span className="flex items-center gap-1.5 font-semibold text-amber-600">
+                    <Clock className="h-4 w-4" /> {lateCount} Late
+                  </span>
                   <span className="flex items-center gap-1.5 font-semibold text-red-500">
                     <XCircle className="h-4 w-4" /> {absentCount} Absent
                   </span>
@@ -417,6 +414,10 @@ const Attendance = () => {
                     onClick={() => markAll("PRESENT")}
                     className="text-xs px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-semibold hover:bg-emerald-100 transition-colors border border-emerald-200"
                   >All Present</button>
+                  <button
+                    onClick={() => markAll("LATE")}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 font-semibold hover:bg-amber-100 transition-colors border border-amber-200"
+                  >All Late</button>
                   <button
                     onClick={() => markAll("ABSENT")}
                     className="text-xs px-3 py-1.5 rounded-lg bg-red-50 text-red-600 font-semibold hover:bg-red-100 transition-colors border border-red-200"
@@ -433,11 +434,21 @@ const Attendance = () => {
                   return (
                     <div
                       key={student.id}
-                      className={`flex items-center justify-between px-6 py-3.5 transition-colors ${isPresent ? "hover:bg-emerald-50/30" : "hover:bg-red-50/30 bg-red-50/10"}`}
+                      className={`flex items-center justify-between px-6 py-3.5 transition-colors ${attendanceMap[student.id] === "PRESENT"
+                          ? "hover:bg-emerald-50/30"
+                          : attendanceMap[student.id] === "LATE"
+                            ? "hover:bg-amber-50/30 bg-amber-50/10"
+                            : "hover:bg-red-50/30 bg-red-50/10"
+                        }`}
                     >
                       <div className="flex items-center gap-3">
                         <span className="text-xs text-muted-foreground w-6 text-right">{idx + 1}</span>
-                        <div className={`h-9 w-9 rounded-full flex items-center justify-center text-sm font-black ${isPresent ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-600"}`}>
+                        <div className={`h-9 w-9 rounded-full flex items-center justify-center text-sm font-black ${attendanceMap[student.id] === "PRESENT"
+                          ? "bg-emerald-100 text-emerald-700"
+                          : attendanceMap[student.id] === "LATE"
+                            ? "bg-amber-100 text-amber-700"
+                            : "bg-red-100 text-red-600"
+                          }`}>
                           {name.charAt(0).toUpperCase()}
                         </div>
                         <div>
@@ -446,17 +457,39 @@ const Attendance = () => {
                         </div>
                       </div>
                       {/* Actions column */}
-                      <div className="flex items-center gap-3">
-                        {/* Toggle button */}
-                        <button
-                          onClick={() => toggle(student.id)}
-                          className={`flex items-center w-[90px] justify-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${isPresent
-                            ? "bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600 shadow-sm"
-                            : "bg-red-500 text-white border-red-500 hover:bg-red-600 shadow-sm"
-                            }`}
-                        >
-                          {isPresent ? <><CheckCircle2 className="h-3.5 w-3.5" /> Present</> : <><XCircle className="h-3.5 w-3.5" /> Absent</>}
-                        </button>
+                      <div className="flex items-center gap-2">
+                        {/* Status Buttons */}
+                        <div className="flex bg-muted/30 p-1 rounded-xl border border-border/50 gap-1">
+                          <button
+                            onClick={() => setAttendanceMap(prev => ({ ...prev, [student.id]: "PRESENT" }))}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${attendanceMap[student.id] === "PRESENT"
+                              ? "bg-emerald-500 text-white shadow-sm"
+                              : "text-emerald-600 hover:bg-emerald-50"
+                              }`}
+                          >
+                            <CheckCircle2 className="h-3 w-3" /> Present
+                          </button>
+
+                          <button
+                            onClick={() => setAttendanceMap(prev => ({ ...prev, [student.id]: "LATE" }))}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${attendanceMap[student.id] === "LATE"
+                              ? "bg-amber-500 text-white shadow-sm"
+                              : "text-amber-600 hover:bg-amber-50"
+                              }`}
+                          >
+                            <Clock className="h-3 w-3" /> Late
+                          </button>
+
+                          <button
+                            onClick={() => setAttendanceMap(prev => ({ ...prev, [student.id]: "ABSENT" }))}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${attendanceMap[student.id] === "ABSENT"
+                              ? "bg-red-500 text-white shadow-sm"
+                              : "text-red-600 hover:bg-red-50"
+                              }`}
+                          >
+                            <XCircle className="h-3 w-3" /> Absent
+                          </button>
+                        </div>
 
                         {/* History Button */}
                         <button
@@ -567,7 +600,7 @@ const Attendance = () => {
         </div>
         <div className="rounded-xl border border-border bg-card overflow-x-auto shadow-sm">
           <table className="data-table">
-            <thead><tr><th>Student</th><th>Course</th><th>Branch</th><th>Present</th><th>Absent</th><th>Percentage</th></tr></thead>
+            <thead><tr><th>Student</th><th>Course</th><th>Branch</th><th>Present</th><th>Late</th><th>Absent</th><th>Percentage</th></tr></thead>
             <tbody>
               {loadingSummary ? (
                 <tr><td colSpan={6} className="text-center py-6 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin mx-auto mb-2 text-primary" />Loading attendance data…</td></tr>
@@ -610,6 +643,7 @@ const Attendance = () => {
                     </td>
                     <td>{a.branch}</td>
                     <td>{a.present}</td>
+                    <td>{a.late || 0}</td>
                     <td>{a.absent}</td>
                     <td>
                       <StatusBadge

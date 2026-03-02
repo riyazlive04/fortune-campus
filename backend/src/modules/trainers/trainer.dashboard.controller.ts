@@ -76,6 +76,7 @@ export const getTrainerDashboardStats = async (req: AuthRequest, res: Response):
 
         const presentCount = attendances.filter(a => a.status === 'PRESENT').length;
         const absentCount = attendances.filter(a => a.status === 'ABSENT').length;
+        const lateCount = attendances.filter(a => a.status === 'LATE').length;
 
         // 4. Low Attendance Students (< 75%)
         const students = await (prisma as any).student.findMany({
@@ -98,8 +99,10 @@ export const getTrainerDashboardStats = async (req: AuthRequest, res: Response):
 
         const studentAttendanceStats = students.map((s: any) => {
             const totalExpected = (s.course?.duration || 1) * 22;
-            const present = s.attendances.length;
-            const percentage = totalExpected > 0 ? Math.min(100, Math.round((present / totalExpected) * 100)) : 0;
+            const present = s.attendances.filter((a: any) => a.status === 'PRESENT').length;
+            const late = s.attendances.filter((a: any) => a.status === 'LATE').length;
+            const effectivePresent = present + (late * 0.5);
+            const percentage = totalExpected > 0 ? Math.min(100, Math.round((effectivePresent / totalExpected) * 100)) : 0;
             return { id: s.id, percentage };
         });
 
@@ -140,6 +143,7 @@ export const getTrainerDashboardStats = async (req: AuthRequest, res: Response):
             todayClasses: todayClasses,
             presentToday: presentCount,
             absentToday: absentCount,
+            lateToday: lateCount,
             lowAttendance: lowAttendanceCount,
             pendingPortfolios,
             eligibleForPlacement,
@@ -199,7 +203,9 @@ export const checkBatchEligibility = async (req: AuthRequest, res: Response): Pr
             // 1. Attendance Check (>75%) based on expected course duration
             const totalExpectedDays = (student.course?.duration || 1) * 22;
             const presentDays = student.attendances.filter((a: any) => a.status === 'PRESENT').length;
-            const attendancePercentage = totalExpectedDays > 0 ? (presentDays / totalExpectedDays) * 100 : 0;
+            const lateDays = student.attendances.filter((a: any) => a.status === 'LATE').length;
+            const effectivePresentDays = presentDays + (lateDays * 0.5);
+            const attendancePercentage = totalExpectedDays > 0 ? (effectivePresentDays / totalExpectedDays) * 100 : 0;
 
             // 2. Portfolio Check (At least one approved or specific logic)
             // Simplified: If certificate is unlocked, they are eligible for placement
@@ -316,8 +322,10 @@ export const getStudentDetailsForTrainer = async (req: AuthRequest, res: Respons
 
         // Calculate some basic stats for the popup
         const presentAttendance = await prisma.attendance.count({ where: { studentId, status: 'PRESENT' } });
+        const lateAttendance = await prisma.attendance.count({ where: { studentId, status: 'LATE' } });
         const totalExpectedDays = (student.course?.duration || 1) * 22;
-        const attendancePercentage = totalExpectedDays > 0 ? Math.min(100, Math.round((presentAttendance / totalExpectedDays) * 100)) : 0;
+        const effectivePresent = presentAttendance + (lateAttendance * 0.5);
+        const attendancePercentage = totalExpectedDays > 0 ? Math.min(100, Math.round((effectivePresent / totalExpectedDays) * 100)) : 0;
 
         return successResponse(res, {
             ...student,

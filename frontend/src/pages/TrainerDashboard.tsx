@@ -124,7 +124,7 @@ const TrainerDashboard = ({ trainerId }: { trainerId?: string }) => {
                 <div onClick={() => openModal("attendance")} className="cursor-pointer hover:shadow-md transition-shadow rounded-xl">
                     <KPICard
                         title="Attendance (Today)"
-                        value={`${stats?.presentToday || 0}/${(stats?.presentToday || 0) + (stats?.absentToday || 0)}`}
+                        value={`${stats?.presentToday || 0}/${stats?.lateToday || 0}/${stats?.absentToday || 0}`}
                         change="Click to view details"
                         changeType="neutral"
                         icon={ClipboardCheck}
@@ -252,7 +252,7 @@ const TrainerDashboard = ({ trainerId }: { trainerId?: string }) => {
             {/* Detail Modal */}
             {modalType && (
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-white/40 backdrop-blur-[2px] p-4"
                     onClick={() => setModalType(null)}
                 >
                     <div
@@ -331,8 +331,9 @@ const TrainerDashboard = ({ trainerId }: { trainerId?: string }) => {
                                                     </td>
                                                     <td className="py-3">
                                                         <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${todayAtt?.status === 'PRESENT' ? 'bg-emerald-50 text-emerald-700' :
-                                                            todayAtt?.status === 'ABSENT' ? 'bg-red-50 text-red-700' :
-                                                                'bg-gray-50 text-gray-700'
+                                                            todayAtt?.status === 'LATE' ? 'bg-amber-50 text-amber-700' :
+                                                                todayAtt?.status === 'ABSENT' ? 'bg-red-50 text-red-700' :
+                                                                    'bg-gray-50 text-gray-700'
                                                             }`}>
                                                             {todayAtt?.status || 'NOT MARKED'}
                                                         </span>

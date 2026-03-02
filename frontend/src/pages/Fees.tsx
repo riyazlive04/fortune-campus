@@ -17,8 +17,12 @@ import {
     AlertCircle,
     Wallet,
     TrendingDown,
-    IndianRupee
+    IndianRupee,
+    Loader2
 } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
+import FeeReceipt from '@/components/FeeReceipt';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -45,16 +49,29 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card';
+import {
+    Tabs,
+    TabsContent,
+    TabsList,
+    TabsTrigger,
+} from "@/components/ui/tabs";
 import PageHeader from '@/components/PageHeader';
 import StudentModal from '@/components/StudentModal';
 
 const Fees = () => {
     const [loading, setLoading] = useState(true);
     const [students, setStudents] = useState<any[]>([]);
+    const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+    const [bills, setBills] = useState<any[]>([]);
+    const [loadingRequests, setLoadingRequests] = useState(false);
+    const [activeTab, setActiveTab] = useState('records');
+
     const [searchTerm, setSearchTerm] = useState('');
     const [branchFilter, setBranchFilter] = useState('all');
     const [selectedStudent, setSelectedStudent] = useState<any>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [downloadingId, setDownloadingId] = useState<string | null>(null);
+    const [receiptData, setReceiptData] = useState<any>(null);
     const { toast } = useToast();
     const user = storage.getUser();
     const isCEO = user?.role === 'CEO';
@@ -77,8 +94,25 @@ const Fees = () => {
         }
     };
 
+    const fetchRequests = async () => {
+        try {
+            setLoadingRequests(true);
+            const [pendingRes, approvedRes] = await Promise.all([
+                studentsApi.getFeeRequests('PENDING'),
+                studentsApi.getFeeRequests('APPROVED')
+            ]);
+            if (pendingRes.success) setPendingRequests(pendingRes.data);
+            if (approvedRes.success) setBills(approvedRes.data);
+        } catch (error) {
+            console.error("Failed to fetch fee requests", error);
+        } finally {
+            setLoadingRequests(false);
+        }
+    };
+
     useEffect(() => {
         fetchStudents();
+        fetchRequests();
     }, []);
 
     const filteredStudents = students.filter(s => {
@@ -102,6 +136,94 @@ const Fees = () => {
     const handleEditFee = (student: any) => {
         setSelectedStudent(student);
         setIsModalOpen(true);
+    };
+
+    const handleApprove = async (id: string) => {
+        try {
+            await studentsApi.approveFeeRequest(id);
+            toast({ title: "Success", description: "Fee request approved" });
+            fetchRequests();
+            fetchStudents();
+        } catch (err: any) {
+            toast({ variant: "destructive", title: "Error", description: err.message });
+        }
+    };
+
+    const handleReject = async (id: string) => {
+        try {
+            await studentsApi.rejectFeeRequest(id);
+            toast({ title: "Success", description: "Fee request rejected" });
+            fetchRequests();
+        } catch (err: any) {
+            toast({ variant: "destructive", title: "Error", description: err.message });
+        }
+    };
+
+    const handleDownloadReceipt = async (request: any) => {
+        try {
+            setDownloadingId(request.id);
+            const res = await studentsApi.getFeeRequest(request.id);
+            if (!res) throw new Error("Failed to fetch receipt details");
+
+            const fullData = res;
+            setReceiptData(fullData);
+
+            setTimeout(async () => {
+                const element = document.getElementById('fee-receipt-content');
+                if (!element) return;
+
+                const canvas = await html2canvas(element, {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    backgroundColor: '#ffffff'
+                });
+
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF({
+                    orientation: 'portrait',
+                    unit: 'px',
+                    format: [canvas.width / 2, canvas.height / 2]
+                });
+
+                pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+                pdf.save(`Receipt_${fullData.student.enrollmentNumber}_${request.id.substring(0, 8)}.pdf`);
+
+                setDownloadingId(null);
+                setReceiptData(null);
+
+                toast({
+                    title: "Success",
+                    description: "Receipt downloaded successfully",
+                });
+            }, 500);
+
+        } catch (error) {
+            console.error("Download Error:", error);
+            setDownloadingId(null);
+            toast({
+                variant: "destructive",
+                title: "Download Failed",
+                description: "Could not generate receipt PDF"
+            });
+        }
+    };
+
+    const handleSendToStudent = async (id: string) => {
+        try {
+            await studentsApi.sendFeeReceipt(id);
+            toast({
+                title: "Success",
+                description: "Receipt sent to student dashboard successfully",
+            });
+            fetchRequests();
+        } catch (err: any) {
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: err.message || "Failed to send receipt to student",
+            });
+        }
     };
 
     return (
@@ -167,119 +289,278 @@ const Fees = () => {
                 </div>
             </div>
 
-            <Card>
-                <CardHeader>
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                        <div>
-                            <CardTitle>Fee Records</CardTitle>
-                            <CardDescription>Consolidated view of all student payment statuses.</CardDescription>
-                        </div>
-                        <div className="flex items-center gap-2 w-full md:w-auto">
-                            <div className="relative flex-1 md:w-64">
-                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    placeholder="Search student or ID..."
-                                    className="pl-9"
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                />
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+                <TabsList>
+                    <TabsTrigger value="records">Fee Records</TabsTrigger>
+                    {isCEO && (
+                        <TabsTrigger value="pending">
+                            Pending Approvals {pendingRequests.length > 0 && <Badge variant="secondary" className="ml-2">{pendingRequests.length}</Badge>}
+                        </TabsTrigger>
+                    )}
+                    <TabsTrigger value="bills">Bills / Receipts</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="records">
+                    <Card>
+                        <CardHeader>
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                <div>
+                                    <CardTitle>Fee Records</CardTitle>
+                                    <CardDescription>Consolidated view of all student payment statuses.</CardDescription>
+                                </div>
+                                <div className="flex items-center gap-2 w-full md:w-auto">
+                                    <div className="relative flex-1 md:w-64">
+                                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            placeholder="Search student or ID..."
+                                            className="pl-9"
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                        />
+                                    </div>
+                                    <Button variant="outline" size="icon">
+                                        <Download className="h-4 w-4" />
+                                    </Button>
+                                </div>
                             </div>
-                            <Button variant="outline" size="icon">
-                                <Download className="h-4 w-4" />
-                            </Button>
-                        </div>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    <div className="rounded-md border overflow-hidden">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Student</TableHead>
-                                    <TableHead>ID / Enrollment</TableHead>
-                                    <TableHead>Total Fee</TableHead>
-                                    <TableHead>Paid</TableHead>
-                                    <TableHead>Balance</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {loading ? (
-                                    <TableRow>
-                                        <TableCell colSpan={7} className="text-center py-10">
-                                            Loading records...
-                                        </TableCell>
-                                    </TableRow>
-                                ) : filteredStudents.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={7} className="text-center py-10">
-                                            No fee records found.
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    filteredStudents.map((student) => {
-                                        const status = getFeeStatus(student);
-                                        return (
-                                            <TableRow key={student.id} className="hover:bg-muted/50 transition-colors">
-                                                <TableCell className="font-medium">
-                                                    {student.user?.firstName} {student.user?.lastName}
-                                                </TableCell>
-                                                <TableCell className="text-muted-foreground">
-                                                    {student.enrollmentNumber}
-                                                </TableCell>
-                                                <TableCell>₹{(student.admission?.feeAmount || 0).toLocaleString()}</TableCell>
-                                                <TableCell className="text-green-600 font-medium">
-                                                    ₹{(student.admission?.feePaid || 0).toLocaleString()}
-                                                </TableCell>
-                                                <TableCell className="text-red-600 font-medium">
-                                                    ₹{(student.admission?.feeBalance || 0).toLocaleString()}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge className={`flex items-center gap-1 w-fit ${status.class}`}>
-                                                        {status.icon}
-                                                        {status.label}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <Button variant="ghost" size="icon">
-                                                                <MoreHorizontal className="h-4 w-4" />
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end">
-                                                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                            <DropdownMenuItem onClick={() => handleEditFee(student)}>
-                                                                <Edit className="mr-2 h-4 w-4" /> Edit Fees
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuSeparator />
-                                                            <DropdownMenuItem>
-                                                                <Eye className="mr-2 h-4 w-4" /> View Transactions
-                                                            </DropdownMenuItem>
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="rounded-md border overflow-hidden">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Student</TableHead>
+                                            <TableHead>ID / Enrollment</TableHead>
+                                            <TableHead>Total Fee</TableHead>
+                                            <TableHead>Paid</TableHead>
+                                            <TableHead>Balance</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead className="text-right">Actions</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {loading ? (
+                                            <TableRow>
+                                                <TableCell colSpan={7} className="text-center py-10">
+                                                    Loading records...
                                                 </TableCell>
                                             </TableRow>
-                                        );
-                                    })
-                                )}
-                            </TableBody>
-                        </Table>
-                    </div>
-                </CardContent>
-            </Card>
+                                        ) : filteredStudents.length === 0 ? (
+                                            <TableRow>
+                                                <TableCell colSpan={7} className="text-center py-10">
+                                                    No fee records found.
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : (
+                                            filteredStudents.map((student) => {
+                                                const status = getFeeStatus(student);
+                                                return (
+                                                    <TableRow key={student.id} className="hover:bg-muted/50 transition-colors">
+                                                        <TableCell className="font-medium">
+                                                            {student.user?.firstName} {student.user?.lastName}
+                                                        </TableCell>
+                                                        <TableCell className="text-muted-foreground">
+                                                            {student.enrollmentNumber}
+                                                        </TableCell>
+                                                        <TableCell>₹{(student.admission?.feeAmount || 0).toLocaleString()}</TableCell>
+                                                        <TableCell className="text-green-600 font-medium">
+                                                            ₹{(student.admission?.feePaid || 0).toLocaleString()}
+                                                        </TableCell>
+                                                        <TableCell className="text-red-600 font-medium">
+                                                            ₹{(student.admission?.feeBalance || 0).toLocaleString()}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Badge className={`flex items-center gap-1 w-fit ${status.class}`}>
+                                                                {status.icon}
+                                                                {status.label}
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell className="text-right">
+                                                            <DropdownMenu>
+                                                                <DropdownMenuTrigger asChild>
+                                                                    <Button variant="ghost" size="icon">
+                                                                        <MoreHorizontal className="h-4 w-4" />
+                                                                    </Button>
+                                                                </DropdownMenuTrigger>
+                                                                <DropdownMenuContent align="end">
+                                                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                                                    <DropdownMenuItem onClick={() => handleEditFee(student)}>
+                                                                        <Edit className="mr-2 h-4 w-4" /> Edit Fees
+                                                                    </DropdownMenuItem>
+                                                                    <DropdownMenuSeparator />
+                                                                    <DropdownMenuItem>
+                                                                        <Eye className="mr-2 h-4 w-4" /> View Transactions
+                                                                    </DropdownMenuItem>
+                                                                </DropdownMenuContent>
+                                                            </DropdownMenu>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
 
-            <StudentModal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                student={selectedStudent}
-                mode="fees"
-                onSuccess={() => {
-                    setIsModalOpen(false);
-                    fetchStudents();
-                }}
-            />
+                {isCEO && (
+                    <TabsContent value="pending">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Pending Fee Approvals</CardTitle>
+                                <CardDescription>Review and approve fee payment declarations from Channel Partners.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="rounded-md border overflow-hidden">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Date</TableHead>
+                                                <TableHead>Student</TableHead>
+                                                <TableHead>Branch</TableHead>
+                                                <TableHead>Mode/Txn</TableHead>
+                                                <TableHead>Amount</TableHead>
+                                                <TableHead>Requested By</TableHead>
+                                                {isCEO && <TableHead className="text-right">Actions</TableHead>}
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {loadingRequests ? (
+                                                <TableRow><TableCell colSpan={7} className="text-center py-10">Loading...</TableCell></TableRow>
+                                            ) : pendingRequests.length === 0 ? (
+                                                <TableRow><TableCell colSpan={7} className="text-center py-10">No pending requests.</TableCell></TableRow>
+                                            ) : (
+                                                pendingRequests.map(req => (
+                                                    <TableRow key={req.id}>
+                                                        <TableCell>{new Date(req.createdAt).toLocaleDateString()}</TableCell>
+                                                        <TableCell>{req.student.user.firstName} {req.student.user.lastName}</TableCell>
+                                                        <TableCell>{req.branch.name}</TableCell>
+                                                        <TableCell>
+                                                            <Badge variant="outline">{req.paymentMode}</Badge>
+                                                            {req.transactionId && <div className="text-xs text-muted-foreground mt-1">{req.transactionId}</div>}
+                                                        </TableCell>
+                                                        <TableCell className="font-bold text-blue-600">₹{(req.amount).toLocaleString()}</TableCell>
+                                                        <TableCell>{req.requestedBy.firstName} {req.requestedBy.lastName}</TableCell>
+                                                        {isCEO && (
+                                                            <TableCell className="text-right">
+                                                                <div className="flex justify-end gap-2">
+                                                                    <Button size="sm" variant="outline" className="text-green-600 border-green-200" onClick={() => handleApprove(req.id)}>Approve</Button>
+                                                                    <Button size="sm" variant="outline" className="text-red-600 border-red-200" onClick={() => handleReject(req.id)}>Reject</Button>
+                                                                </div>
+                                                            </TableCell>
+                                                        )}
+                                                    </TableRow>
+                                                ))
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                )}
+
+                <TabsContent value="bills">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Approved Bills & Receipts</CardTitle>
+                            <CardDescription>View all approved payment receipts.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="rounded-md border overflow-hidden">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Date</TableHead>
+                                            <TableHead>Student</TableHead>
+                                            <TableHead>Branch</TableHead>
+                                            <TableHead>Mode</TableHead>
+                                            <TableHead>Amount</TableHead>
+                                            <TableHead>Approved By</TableHead>
+                                            <TableHead className="text-right">Receipt</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {loadingRequests ? (
+                                            <TableRow><TableCell colSpan={7} className="text-center py-10">Loading...</TableCell></TableRow>
+                                        ) : bills.length === 0 ? (
+                                            <TableRow><TableCell colSpan={7} className="text-center py-10">No bills generated yet.</TableCell></TableRow>
+                                        ) : (
+                                            bills.map(req => (
+                                                <TableRow key={req.id}>
+                                                    <TableCell>{new Date(req.updatedAt).toLocaleDateString()}</TableCell>
+                                                    <TableCell>{req.student.user.firstName} {req.student.user.lastName}</TableCell>
+                                                    <TableCell>{req.branch.name}</TableCell>
+                                                    <TableCell>
+                                                        <Badge variant="outline">{req.paymentMode}</Badge>
+                                                        {req.transactionId && <div className="text-xs text-muted-foreground mt-1">{req.transactionId}</div>}
+                                                    </TableCell>
+                                                    <TableCell className="font-medium text-emerald-600">₹{(req.amount).toLocaleString()}</TableCell>
+                                                    <TableCell>{req.approvedBy?.firstName} {req.approvedBy?.lastName}</TableCell>
+                                                    <TableCell className="text-right">
+                                                        <div className="flex justify-end gap-2 text-right">
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                disabled={downloadingId === req.id}
+                                                                onClick={() => handleDownloadReceipt(req)}
+                                                            >
+                                                                {downloadingId === req.id ? (
+                                                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                                                ) : (
+                                                                    <Download className="h-4 w-4 mr-2" />
+                                                                )}
+                                                                Download
+                                                            </Button>
+
+                                                            {!isCEO && (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className="bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100"
+                                                                    disabled={req.isSentToStudent}
+                                                                    onClick={() => handleSendToStudent(req.id)}
+                                                                >
+                                                                    <Plus className="h-4 w-4 mr-2" />
+                                                                    {req.isSentToStudent ? "Sent" : "Send Receipt"}
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+            </Tabs>
+
+            {selectedStudent && (
+                <StudentModal
+                    isOpen={isModalOpen}
+                    onClose={() => setIsModalOpen(false)}
+                    student={selectedStudent}
+                    mode="fees"
+                    onSuccess={() => {
+                        setIsModalOpen(false);
+                        fetchStudents();
+                    }}
+                />
+            )}
+
+            {/* Hidden Receipt Component for PDF generation */}
+            <div style={{ position: 'fixed', left: '-9999px', top: '0' }}>
+                {receiptData && (
+                    <div id="fee-receipt-content" style={{ background: 'white' }}>
+                        <FeeReceipt data={receiptData} />
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

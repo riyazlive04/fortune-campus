@@ -53,10 +53,15 @@ const TopBar = ({ sidebarCollapsed }: TopBarProps) => {
     <header className={`fixed top-0 right-0 z-30 flex h-16 items-center justify-between bg-card/80 backdrop-blur-md px-6 transition-all duration-300 ${sidebarCollapsed ? "left-28" : "left-72"}`}>
       <div className="flex items-center gap-3">
         {/* Branch selector */}
-        {user?.branch && (
+        {/* Branch selector */}
+        {(user?.assignedBranches?.length > 0 || user?.branch) && (
           <div className="flex items-center gap-2 rounded-full border border-border bg-muted/30 px-4 py-1.5 transition-colors hover:bg-muted/50">
             <Building2 className="h-3.5 w-3.5 text-primary" />
-            <span className="text-[12px] font-bold text-foreground/80 lowercase first-letter:uppercase">{user.branch.name}</span>
+            <span className="text-[12px] font-bold text-foreground/80 capitalize">
+              {user?.role === 'TELECALLER' && user?.assignedBranches?.length > 0
+                ? user.assignedBranches.map((b: any) => b.name).join(', ')
+                : user?.branch?.name}
+            </span>
           </div>
         )}
         {!user?.branch && user?.role === 'ADMIN' && (

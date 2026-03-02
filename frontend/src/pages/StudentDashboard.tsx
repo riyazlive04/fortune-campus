@@ -7,6 +7,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
 import { storage, ratingsApi } from '@/lib/api';
 import {
@@ -27,8 +35,13 @@ import {
     Star,
     Send,
 } from 'lucide-react';
-import PageHeader from '@/components/PageHeader';
 import DashboardSkeleton from '@/components/DashboardSkeleton';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
+import FeeReceipt from '@/components/FeeReceipt';
+import { Download, Loader2 } from 'lucide-react';
+import { studentsApi } from '@/lib/api';
+import PageHeader from '@/components/PageHeader';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
@@ -59,6 +72,7 @@ interface StudentOverview {
         percentage: number;
         status: string;
         present: number;
+        late: number;
         total: number;
     };
     portfolio: {
@@ -114,6 +128,8 @@ const StudentDashboard = () => {
     const [feesData, setFeesData] = useState<any>(null);
     const [notifications, setNotifications] = useState<any[]>([]);
     const [error, setError] = useState<string | null>(null);
+    const [downloadingId, setDownloadingId] = useState<string | null>(null);
+    const [receiptData, setReceiptData] = useState<any>(null);
     const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
     const { toast } = useToast();
 
@@ -305,6 +321,56 @@ const StudentDashboard = () => {
         }
     };
 
+    const handleDownloadReceipt = async (request: any) => {
+        try {
+            setDownloadingId(request.id);
+            const res = await studentsApi.getFeeRequest(request.id);
+            if (!res) throw new Error("Failed to fetch receipt details");
+
+            const fullData = res;
+            setReceiptData(fullData);
+
+            setTimeout(async () => {
+                const element = document.getElementById('fee-receipt-content');
+                if (!element) return;
+
+                const canvas = await html2canvas(element, {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    backgroundColor: '#ffffff'
+                });
+
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF({
+                    orientation: 'portrait',
+                    unit: 'px',
+                    format: [canvas.width / 2, canvas.height / 2]
+                });
+
+                pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+                pdf.save(`Receipt_${fullData.student.enrollmentNumber}_${request.id.substring(0, 8)}.pdf`);
+
+                setDownloadingId(null);
+                setReceiptData(null);
+
+                toast({
+                    title: "Success",
+                    description: "Receipt downloaded successfully",
+                });
+            }, 500);
+
+        } catch (error) {
+            console.error("Download Error:", error);
+            setDownloadingId(null);
+            toast({
+                variant: "destructive",
+                title: "Download Failed",
+                description: "Could not generate receipt PDF"
+            });
+        }
+    };
+
     const fetchNotifications = async () => {
         try {
             const token = storage.getToken();
@@ -446,7 +512,7 @@ const StudentDashboard = () => {
                                 <div className="text-2xl font-bold">{overview.attendance.percentage}%</div>
                                 <Progress value={overview.attendance.percentage} className="mt-2" />
                                 <p className="text-xs text-muted-foreground mt-1">
-                                    {overview.attendance.present} / {overview.attendance.total} days
+                                    {overview.attendance.present}P / {overview.attendance.late}L / {overview.attendance.total} days
                                 </p>
                             </CardContent>
                         </Card>
@@ -1072,6 +1138,94 @@ const StudentDashboard = () => {
                     ) : (
                         <p>Loading fees data...</p>
                     )}
+
+                    {/* Sent Receipts Section */}
+                    {feesData && (
+                        <Card className="mt-6">
+                            <CardHeader>
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <CardTitle className="text-lg font-bold">My Bills & Receipts</CardTitle>
+                                        <CardDescription>Download your officially sent fee receipts.</CardDescription>
+                                    </div>
+                                    <div className="rounded-full p-2 bg-blue-50">
+                                        <FileText className="h-5 w-5 text-blue-600" />
+                                    </div>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="rounded-xl border border-border/50 overflow-hidden bg-card/50 px-0">
+                                    <Table>
+                                        <TableHeader className="bg-muted/30">
+                                            <TableRow>
+                                                <TableHead className="font-bold pl-4">Date</TableHead>
+                                                <TableHead className="font-bold">Amount</TableHead>
+                                                <TableHead className="font-bold">Details</TableHead>
+                                                <TableHead className="text-right font-bold pr-4">Action</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {!feesData.sentReceipts || feesData.sentReceipts.length === 0 ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={4} className="text-center py-10 text-muted-foreground italic">
+                                                        No receipts sent yet. Once a receipt is sent by the Channel Partner, it will appear here.
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : (
+                                                feesData.sentReceipts.map((req: any) => (
+                                                    <TableRow key={req.id} className="hover:bg-muted/20 transition-colors">
+                                                        <TableCell className="font-medium pl-4">
+                                                            {new Date(req.sentAt || req.updatedAt).toLocaleDateString(undefined, {
+                                                                year: 'numeric',
+                                                                month: 'short',
+                                                                day: 'numeric'
+                                                            })}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <span className="font-bold text-emerald-600">₹{req.amount.toLocaleString()}</span>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="flex flex-col gap-1">
+                                                                <Badge variant="outline" className="w-fit text-[10px] font-bold uppercase tracking-wider px-1.5 py-0">
+                                                                    {req.paymentMode}
+                                                                </Badge>
+                                                                {req.transactionId && <span className="text-[10px] text-muted-foreground font-mono">{req.transactionId}</span>}
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="text-right pr-4">
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                className="h-8 px-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                                                disabled={downloadingId === req.id}
+                                                                onClick={() => handleDownloadReceipt(req)}
+                                                            >
+                                                                {downloadingId === req.id ? (
+                                                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                                                ) : (
+                                                                    <Download className="h-4 w-4 mr-2" />
+                                                                )}
+                                                                Download
+                                                            </Button>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {/* Hidden Receipt Component for PDF generation */}
+                    <div style={{ position: 'fixed', left: '-9999px', top: '0' }}>
+                        {receiptData && (
+                            <div id="fee-receipt-content" style={{ background: 'white' }}>
+                                <FeeReceipt data={receiptData} />
+                            </div>
+                        )}
+                    </div>
                 </TabsContent>
 
                 {/* PROFILE TAB */}

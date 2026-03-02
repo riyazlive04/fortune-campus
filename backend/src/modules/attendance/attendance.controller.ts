@@ -605,8 +605,11 @@ export const getAttendanceStats = async (req: AuthRequest, res: Response): Promi
       const studentStats = stats.filter(s => s.studentId === student.id);
       const present = (studentStats.find(s => s.status === AttendanceStatus.PRESENT) as any)?._count?.status || 0;
       const absent = (studentStats.find(s => s.status === AttendanceStatus.ABSENT) as any)?._count?.status || 0;
-      const total = present + absent;
-      const percentage = total > 0 ? Math.round((present / total) * 100) : 0;
+      const late = (studentStats.find(s => s.status === AttendanceStatus.LATE) as any)?._count?.status || 0;
+
+      const total = present + absent + late;
+      const effectivePresent = present + (late * 0.5);
+      const percentage = total > 0 ? Math.round((effectivePresent / total) * 100) : 0;
 
       return {
         id: student.id,
@@ -616,6 +619,7 @@ export const getAttendanceStats = async (req: AuthRequest, res: Response): Promi
         batch: student.batch?.code || student.batch?.name || 'Unassigned',
         present,
         absent,
+        late,
         percentage: `${percentage}%`
       };
     });

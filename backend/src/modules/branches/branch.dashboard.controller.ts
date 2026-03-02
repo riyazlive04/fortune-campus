@@ -67,10 +67,12 @@ export const getBranchOverview = async (req: AuthRequest, res: Response): Promis
         const attendanceSummary = {
             present: attendanceToday.find(a => a.status === 'PRESENT')?._count || 0,
             absent: attendanceToday.find(a => a.status === 'ABSENT')?._count || 0,
+            late: attendanceToday.find(a => a.status === 'LATE')?._count || 0,
             studentsMarked: attendanceToday.length > 0,
 
             trainerPresent: trainerAttendanceToday.find(a => a.status === 'PRESENT')?._count || 0,
             trainerAbsent: trainerAttendanceToday.find(a => a.status === 'ABSENT')?._count || 0,
+            trainerLate: trainerAttendanceToday.find(a => a.status === 'LATE')?._count || 0,
             trainersMarked: trainerAttendanceToday.length > 0
         };
 
@@ -191,17 +193,24 @@ export const getAttendanceStats = async (req: AuthRequest, res: Response): Promi
             const atts = s.attendances || [];
 
             const presentCount = atts.filter((a: any) => a.status === 'PRESENT').length;
+            const lateCount = atts.filter((a: any) => a.status === 'LATE').length;
+            const absentCount = atts.filter((a: any) => a.status === 'ABSENT').length;
             const totalClasses = atts.length;
 
-            totalPresent += presentCount;
+            const effectivePresent = presentCount + (lateCount * 0.5);
+            totalPresent += effectivePresent;
             totalRecords += totalClasses;
 
-            const percentage = totalClasses > 0 ? Math.round((presentCount / totalClasses) * 100) : 0;
+            const percentage = totalClasses > 0 ? Math.round((effectivePresent / totalClasses) * 100) : 0;
 
             return {
                 id: s.id,
                 student: studentName,
                 course: courseName,
+                present: presentCount,
+                late: lateCount,
+                absent: absentCount,
+                total: totalClasses,
                 percentage: `${percentage}%`,
                 _rawPercent: percentage // used for sorting below
             };
@@ -422,7 +431,7 @@ export const getFeeStats = async (req: AuthRequest, res: Response): Promise<Resp
 export const updateAdmissionFees = async (req: AuthRequest, res: Response): Promise<Response> => {
     try {
         const { id } = req.params;
-        const { feeAmount, feePaid } = req.body;
+        const { feeAmount, feePaid, paymentMode, transactionId } = req.body;
 
         if (feeAmount === undefined || feePaid === undefined) {
             return errorResponse(res, 'Fee amount and fee paid are required', 400);
@@ -443,7 +452,9 @@ export const updateAdmissionFees = async (req: AuthRequest, res: Response): Prom
             data: {
                 feeAmount: parseFloat(feeAmount),
                 feePaid: parseFloat(feePaid),
-                feeBalance
+                feeBalance,
+                paymentMode,
+                transactionId
             }
         });
 

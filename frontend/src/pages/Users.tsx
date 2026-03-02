@@ -43,6 +43,10 @@ interface User {
   studentProfile?: {
     courseId: string;
   };
+  assignedBranches?: {
+    id: string;
+    name: string;
+  }[];
 }
 
 interface Branch {
@@ -89,6 +93,7 @@ const Users = () => {
     specialization: "",
     experience: "",
     courseId: "",
+    assignedBranchIds: [] as string[],
   });
 
   // Fetch users
@@ -172,7 +177,7 @@ const Users = () => {
     }
   }, [currentUser, formData.branchId]);
 
-  const handleChange = (name: string, value: string) => {
+  const handleChange = (name: keyof typeof formData, value: any) => {
     setFormData({
       ...formData,
       [name]: value,
@@ -201,9 +206,14 @@ const Users = () => {
       setError("Role is required");
       return false;
     }
-    if (formData.role !== 'ADMIN' && !formData.branchId) {
-      setError("Branch is required for non-admin users");
-      return false;
+    if (formData.role !== 'ADMIN') {
+      if (formData.role === 'TELECALLER' && formData.assignedBranchIds.length === 0) {
+        setError("At least one branch is required for Telecallers");
+        return false;
+      } else if (formData.role !== 'TELECALLER' && !formData.branchId) {
+        setError("Branch is required for non-admin users");
+        return false;
+      }
     }
     if (formData.role === 'STUDENT') {
       // Specialized fields moved to StudentModal
@@ -241,6 +251,7 @@ const Users = () => {
       specialization: user.trainerProfile?.specialization || "",
       experience: user.trainerProfile?.experience?.toString() || "",
       courseId: user.studentProfile?.courseId || "",
+      assignedBranchIds: user.assignedBranches?.map(b => b.id) || (user.branchId ? [user.branchId] : []),
     });
     setIsDialogOpen(true);
   };
@@ -257,6 +268,7 @@ const Users = () => {
       specialization: "",
       experience: "",
       courseId: "",
+      assignedBranchIds: currentUser?.role !== 'ADMIN' && currentUser?.branchId ? [currentUser.branchId] : [],
     });
 
     if (role === 'STUDENT') {
@@ -293,7 +305,11 @@ const Users = () => {
       if (!editMode) {
         body.email = formData.email;
         body.role = formData.role;
-        body.branchId = formData.branchId;
+        if (formData.role === 'TELECALLER') {
+          body.assignedBranchIds = formData.assignedBranchIds;
+        } else {
+          body.branchId = formData.branchId;
+        }
         if (formData.role === 'TRAINER') {
           body.specialization = formData.specialization;
           body.experience = formData.experience;
@@ -304,7 +320,11 @@ const Users = () => {
       }
       // For edit mode, only include optional fields
       else {
-        if (formData.branchId) body.branchId = formData.branchId;
+        if (formData.role === 'TELECALLER') {
+          body.assignedBranchIds = formData.assignedBranchIds;
+        } else if (formData.branchId) {
+          body.branchId = formData.branchId;
+        }
         // Include password only if it's provided
         if (formData.password) body.password = formData.password;
 
@@ -361,6 +381,7 @@ const Users = () => {
             specialization: "",
             experience: "",
             courseId: "",
+            assignedBranchIds: [],
           });
 
           toast({
@@ -439,6 +460,7 @@ const Users = () => {
       specialization: "",
       experience: "",
       courseId: "",
+      assignedBranchIds: [],
     });
   };
 
@@ -458,7 +480,14 @@ const Users = () => {
     { key: "email", label: "Email" },
     { key: "phone", label: "Phone", render: (r: User) => r.phone || "-" },
     { key: "role", label: "Role", render: (r: User) => <StatusBadge status={r.role} variant={roleVariant(r.role)} /> },
-    { key: "branch", label: "Branch", render: (r: User) => r.branch?.name || "-" },
+    {
+      key: "branch", label: "Branch", render: (r: User) => {
+        if (r.role === 'TELECALLER' && r.assignedBranches && r.assignedBranches.length > 0) {
+          return r.assignedBranches.map(b => b.code || b.name).join(', ');
+        }
+        return r.branch?.name || "-";
+      }
+    },
     {
       key: "status", label: "Status", render: (r: User) => (
         <StatusBadge
@@ -718,7 +747,7 @@ const Users = () => {
                 )}
 
                 {/* Branch Selection - Span full if alone, but here we can pair it or keep it single */}
-                {formData.role && formData.role !== 'ADMIN' && (
+                {formData.role && formData.role !== 'ADMIN' && formData.role !== 'TELECALLER' && (
                   <div className="space-y-2 sm:col-span-2">
                     <Label htmlFor="branchId">Branch *</Label>
                     <Select
@@ -744,6 +773,41 @@ const Users = () => {
                     )}
                   </div>
                 )}
+
+                {formData.role === 'TELECALLER' && (
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label>Assigned Branches *</Label>
+                    <div className="border border-border rounded-md p-4 space-y-3 bg-muted/10 max-h-48 overflow-y-auto">
+                      {branches.map((branch) => (
+                        <div key={branch.id} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                            id={`branch-${branch.id}`}
+                            checked={formData.assignedBranchIds.includes(branch.id)}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              const newIds = checked
+                                ? [...formData.assignedBranchIds, branch.id]
+                                : formData.assignedBranchIds.filter(id => id !== branch.id);
+                              handleChange("assignedBranchIds", newIds);
+                            }}
+                            disabled={submitting || (currentUser?.role === 'CHANNEL_PARTNER' && currentUser?.branchId !== branch.id)}
+                          />
+                          <Label htmlFor={`branch-${branch.id}`} className="font-normal cursor-pointer">
+                            {branch.name} ({branch.code})
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                    {currentUser?.role === 'CHANNEL_PARTNER' && (
+                      <p className="text-xs text-muted-foreground">
+                        You can only select your own branch
+                      </p>
+                    )}
+                  </div>
+                )}
+
 
 
               </div>

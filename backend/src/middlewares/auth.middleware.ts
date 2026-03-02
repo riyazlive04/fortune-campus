@@ -12,6 +12,7 @@ export interface AuthRequest extends Request {
     email: string;
     role: UserRole;
     branchId: string | null;
+    assignedBranches?: { id: string }[];
   };
 }
 
@@ -40,6 +41,9 @@ export const authenticateToken = async (
         role: true,
         branchId: true,
         isActive: true,
+        assignedBranches: {
+          select: { id: true }
+        }
       },
     });
 
@@ -52,6 +56,7 @@ export const authenticateToken = async (
       email: user.email,
       role: user.role as UserRole,
       branchId: user.branchId,
+      assignedBranches: user.assignedBranches,
     };
 
     next();

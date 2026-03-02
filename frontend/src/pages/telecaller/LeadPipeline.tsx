@@ -36,6 +36,7 @@ const PIPELINE_STATUSES = [
     { id: "CONTACTED", label: "Contacted", color: "bg-slate-500/10 text-slate-500 border-slate-500/20" },
     { id: "INTERESTED", label: "Interested", color: "bg-purple-500/10 text-purple-500 border-purple-500/20" },
     { id: "NEGOTIATING", label: "Negotiating", color: "bg-orange-500/10 text-orange-500 border-orange-500/20" },
+    { id: "DEMO_SCHEDULED", label: "Demo", color: "bg-teal-500/10 text-teal-500 border-teal-500/20" },
     { id: "CONVERTED", label: "Converted", color: "bg-green-500/10 text-green-500 border-green-500/20" },
 ];
 
@@ -106,6 +107,11 @@ const SortableLeadCard = ({ lead, status, onEdit }: { lead: any; status: any; on
                     {lead.source && (
                         <Badge variant="secondary" className="text-[10px] py-0 px-1 bg-muted/50">
                             {lead.source}
+                        </Badge>
+                    )}
+                    {lead.branch?.name && (
+                        <Badge variant="secondary" className="text-[10px] py-0 px-1 bg-primary/5 text-primary border-primary/20">
+                            {lead.branch.name}
                         </Badge>
                     )}
                 </div>
@@ -232,8 +238,13 @@ const LeadPipeline = () => {
             setLoading(true);
             const params: any = { limit: 100 };
 
-            // Explicitly set branchId from selector (CEO) or user state (Telecaller)
-            const targetBranchId = isCEO ? selectedBranchId : user?.branchId;
+            // Explicitly set branchId from selector or user state
+            let targetBranchId: string | undefined = undefined;
+            if (isCEO || user?.role === "TELECALLER") {
+                targetBranchId = selectedBranchId;
+            } else {
+                targetBranchId = user?.branchId;
+            }
 
             if (targetBranchId && targetBranchId !== "all") {
                 params.branchId = targetBranchId;
@@ -284,15 +295,15 @@ const LeadPipeline = () => {
     }, []);
 
     useEffect(() => {
-        if (isCEO || (user?.branchId)) {
+        if (isCEO || user?.role === 'TELECALLER' || (user?.branchId)) {
             fetchLeads();
         }
-    }, [selectedBranchId, selectedSource, selectedCourse, user?.branchId]);
+    }, [selectedBranchId, selectedSource, selectedCourse, user?.branchId, user?.role]);
 
     // Debounced search effect
     useEffect(() => {
         const timer = setTimeout(() => {
-            if (isCEO || (user?.branchId)) {
+            if (isCEO || user?.role === 'TELECALLER' || (user?.branchId)) {
                 fetchLeads();
             }
         }, 500);
@@ -367,7 +378,7 @@ const LeadPipeline = () => {
 
                 <div className="bg-card border border-border/50 rounded-xl p-4 mt-6 mb-6 shadow-sm">
                     <div className="flex flex-col md:flex-row gap-4 items-end">
-                        {isCEO && (
+                        {(isCEO || user?.role === 'TELECALLER') && (
                             <div className="space-y-1.5 flex-1 min-w-[200px]">
                                 <Label className="text-[10px] font-bold uppercase text-muted-foreground ml-1">Branch</Label>
                                 <Select value={selectedBranchId} onValueChange={setSelectedBranchId}>
@@ -376,7 +387,7 @@ const LeadPipeline = () => {
                                     </SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="all">All Branches</SelectItem>
-                                        {branches.map((b: any) => (
+                                        {(isCEO ? branches : (user?.assignedBranches || [])).map((b: any) => (
                                             <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
                                         ))}
                                     </SelectContent>

@@ -23,7 +23,7 @@ const generateTempPassword = (): string => {
  */
 export const createUser = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
-    const { email, firstName, lastName, phone, role, branchId, specialization, experience, qualification } = req.body;
+    const { email, firstName, lastName, phone, role, branchId, assignedBranchIds, specialization, experience, qualification } = req.body;
 
     // Validation
     if (!email || !firstName || !lastName || !role) {
@@ -112,6 +112,11 @@ export const createUser = async (req: AuthRequest, res: Response): Promise<Respo
           role: normalizedRole,
           branchId: normalizedRole === UserRole.ADMIN ? null : branchId,
           isActive: true,
+          ...(normalizedRole === UserRole.TELECALLER && Array.isArray(assignedBranchIds) && assignedBranchIds.length > 0 ? {
+            assignedBranches: {
+              connect: assignedBranchIds.map((id: string) => ({ id }))
+            }
+          } : {})
         },
       });
 
@@ -201,6 +206,9 @@ export const createUser = async (req: AuthRequest, res: Response): Promise<Respo
               code: true,
             },
           },
+          assignedBranches: {
+            select: { id: true, name: true, code: true }
+          },
           trainerProfile: {
             select: {
               specialization: true,
@@ -281,6 +289,13 @@ export const getUsers = async (req: AuthRequest, res: Response): Promise<Respons
               code: true,
             },
           },
+          assignedBranches: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+            }
+          },
           trainerProfile: {
             select: {
               specialization: true,
@@ -336,6 +351,12 @@ export const getUserById = async (req: AuthRequest, res: Response): Promise<Resp
             code: true,
           },
         },
+        assignedBranches: {
+          select: {
+            id: true,
+            name: true,
+          }
+        },
       },
     });
 
@@ -357,7 +378,7 @@ export const getUserById = async (req: AuthRequest, res: Response): Promise<Resp
 export const updateUser = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
     const { id } = req.params;
-    const { firstName, lastName, phone, isActive, branchId, password, specialization, experience, role, courseId } = req.body;
+    const { firstName, lastName, phone, isActive, branchId, assignedBranchIds, password, specialization, experience, role, courseId } = req.body;
 
     const existingUser = await prisma.user.findUnique({ where: { id } });
     if (!existingUser) {
@@ -407,6 +428,12 @@ export const updateUser = async (req: AuthRequest, res: Response): Promise<Respo
         ...((req.user?.role === UserRole.ADMIN || req.user?.role === UserRole.CEO) && branchId ? { branchId } : {}),
         ...((req.user?.role === UserRole.ADMIN || req.user?.role === UserRole.CEO) && role ? { role } : {}),
         ...(hashedPassword ? { password: hashedPassword } : {}),
+        ...((role === UserRole.TELECALLER || existingUser.role === UserRole.TELECALLER) && Array.isArray(assignedBranchIds) ? {
+          assignedBranches: {
+            set: [], // Clear existing
+            connect: assignedBranchIds.map((bid: string) => ({ id: bid }))
+          }
+        } : {}),
         // Handle Trainer Profile Upsert (Create or Update)
         ...((role === UserRole.TRAINER || (existingUser.role === UserRole.TRAINER && !role)) && (specialization || experience) ? {
           trainerProfile: {
@@ -473,6 +500,12 @@ export const updateUser = async (req: AuthRequest, res: Response): Promise<Respo
             code: true,
           },
         },
+        assignedBranches: {
+          select: {
+            id: true,
+            name: true,
+          }
+        },
         trainerProfile: {
           select: {
             specialization: true,
@@ -484,6 +517,7 @@ export const updateUser = async (req: AuthRequest, res: Response): Promise<Respo
 
     return successResponse(res, user, 'User updated successfully');
   } catch (error) {
+    console.error('Failed to update user error:', error);
     return errorResponse(res, 'Failed to update user', 500, error);
   }
 };

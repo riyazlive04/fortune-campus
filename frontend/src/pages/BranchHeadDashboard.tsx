@@ -231,6 +231,9 @@ const BranchHeadDashboard = () => {
                                             <span className="text-red-600 font-bold bg-red-50 px-2 py-0.5 rounded-md border border-red-100">
                                                 A: {stats?.attendance?.absent}
                                             </span>
+                                            <span className="text-amber-600 font-bold bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">
+                                                L: {stats?.attendance?.late || 0}
+                                            </span>
                                         </div>
                                     ) : (
                                         <span className="text-[10px] font-medium text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">
@@ -251,6 +254,9 @@ const BranchHeadDashboard = () => {
                                             </span>
                                             <span className="text-red-600 font-bold bg-red-50 px-2 py-0.5 rounded-md border border-red-100">
                                                 A: {stats?.attendance?.trainerAbsent}
+                                            </span>
+                                            <span className="text-amber-600 font-bold bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">
+                                                L: {stats?.attendance?.trainerLate || 0}
                                             </span>
                                         </div>
                                     ) : (
@@ -475,7 +481,7 @@ const BranchHeadDashboard = () => {
             {/* Detail Modal */}
             {modalType && (
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+                    className="fixed inset-0 z-50 flex items-center justify-center bg-white/40 backdrop-blur-[2px] p-4"
                     onClick={() => setModalType(null)}
                 >
                     <div
@@ -588,6 +594,10 @@ const BranchHeadDashboard = () => {
                                         <tr className="border-b border-border text-left">
                                             <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Student Name</th>
                                             <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider">Course</th>
+                                            <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider text-center" title="Present">P</th>
+                                            <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider text-center" title="Absent">A</th>
+                                            <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider text-center" title="Late">L</th>
+                                            <th className="pb-3 pr-4 font-bold text-muted-foreground uppercase text-[11px] tracking-wider text-center">Total Days</th>
                                             <th className="pb-3 font-bold text-muted-foreground uppercase text-[11px] tracking-wider text-right">Attendance %</th>
                                         </tr>
                                     </thead>
@@ -596,6 +606,18 @@ const BranchHeadDashboard = () => {
                                             <tr key={att.id || att.student} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
                                                 <td className="py-3 pr-4 font-semibold text-foreground">{att.student}</td>
                                                 <td className="py-3 pr-4 text-muted-foreground">{att.course}</td>
+                                                <td className="py-3 pr-4 text-center">
+                                                    <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">{att.present || 0}</span>
+                                                </td>
+                                                <td className="py-3 pr-4 text-center">
+                                                    <span className="text-[10px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded border border-red-100">{att.absent || 0}</span>
+                                                </td>
+                                                <td className="py-3 pr-4 text-center">
+                                                    <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100">{att.late || 0}</span>
+                                                </td>
+                                                <td className="py-3 pr-4 text-center font-bold text-muted-foreground text-[12px]">
+                                                    {att.total || 0}
+                                                </td>
                                                 <td className="py-3 text-right">
                                                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ${parseInt(att.percentage) < 75 ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
                                                         {att.percentage}

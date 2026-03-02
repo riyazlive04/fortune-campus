@@ -17,12 +17,17 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
         const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
-        // Define all promises upfront for parallel execution
+        // Revenue: sum of all approved/paid fee payment requests
+        const revenueWhere: any = branchId
+            ? { status: 'APPROVED', student: { branchId } }
+            : { status: 'APPROVED' };
+        const lastMonthRevenueWhere: any = branchId
+            ? { status: 'APPROVED', student: { branchId }, updatedAt: { gte: startOfLastMonth, lte: endOfLastMonth } }
+            : { status: 'APPROVED', updatedAt: { gte: startOfLastMonth, lte: endOfLastMonth } };
+
         const kpiPromises = [
             prisma.lead.count({ where }),
             prisma.lead.count({ where: { ...where, createdAt: { gte: startOfLastMonth, lte: endOfLastMonth } } }),
-            prisma.admission.count({ where }),
-            prisma.admission.count({ where: { ...where, createdAt: { gte: startOfLastMonth, lte: endOfLastMonth } } }),
             prisma.user.count({ where: { ...where, role: UserRole.STUDENT, isActive: true } }),
             prisma.user.count({ where: { ...where, role: UserRole.STUDENT, isActive: true, createdAt: { lte: endOfLastMonth } } }),
             prisma.placement.count({
@@ -39,6 +44,12 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
                 }
             }),
         ];
+
+        // Revenue queries (kept separate to avoid mixed-type Promise.all inference issues)
+        const revenuePromises = Promise.all([
+            prisma.feePaymentRequest.aggregate({ where: revenueWhere, _sum: { amount: true } }),
+            prisma.feePaymentRequest.aggregate({ where: lastMonthRevenueWhere, _sum: { amount: true } }),
+        ]);
 
         const placementTrendPromises = [];
         for (let i = 5; i >= 0; i--) {
@@ -57,7 +68,15 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
             );
         }
 
-        const corePromises = Promise.all([
+        const [
+            kpiResults,
+            placementTrend,
+            courseDistribution,
+            trainers,
+            branches,
+            allPlacements,
+            [revenueResult, lastMonthRevenueResult]
+        ] = await Promise.all([
             Promise.all(kpiPromises),
             Promise.all(placementTrendPromises),
             prisma.admission.groupBy({
@@ -82,18 +101,19 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
             isCEO ? prisma.placement.findMany({
                 where: { status: { notIn: [PlacementStatus.REJECTED, PlacementStatus.NOT_ELIGIBLE] } },
                 select: { student: { select: { branchId: true } } }
-            }) : Promise.resolve([])
+            }) : Promise.resolve([]),
+            revenuePromises,
         ]);
-
-        const [kpiResults, placementTrend, courseDistribution, trainers, branches, allPlacements] = await corePromises;
 
         // Process KPI stats
         const [
             totalLeads, lastMonthLeads,
-            totalAdmissions, lastMonthAdmissions,
             activeStudents, lastMonthActiveStudents,
             totalPlacements, lastMonthPlacements
         ] = kpiResults;
+
+        const totalRevenue = Number(revenueResult._sum?.amount || 0);
+        const lastMonthRevenue = Number(lastMonthRevenueResult._sum?.amount || 0);
 
         const calculateChange = (current: number, last: number) => {
             if (last === 0) return current > 0 ? 100 : 0;
@@ -102,7 +122,7 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
 
         const kpis = {
             leads: { value: totalLeads, change: calculateChange(totalLeads, lastMonthLeads) },
-            admissions: { value: totalAdmissions, change: calculateChange(totalAdmissions, lastMonthAdmissions) },
+            revenue: { value: totalRevenue, change: calculateChange(totalRevenue, lastMonthRevenue) },
             activeStudents: { value: activeStudents, change: calculateChange(activeStudents, lastMonthActiveStudents) },
             placements: { value: totalPlacements, change: calculateChange(totalPlacements, lastMonthPlacements) },
         };

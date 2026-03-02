@@ -132,8 +132,12 @@ export const getTrainerPerformance = async (req: AuthRequest, res: Response): Pr
             return errorResponse(res, 'Branch ID is required', 400);
         }
 
-        const startDate = new Date(Number(year), Number(month) - 1, 1);
-        const endDate = new Date(Number(year), Number(month), 0);
+        const inputYear = Number(year) || new Date().getFullYear();
+        const inputMonth = Number(month) || new Date().getMonth() + 1;
+
+        // Use a 3-month rolling window so scores don't drop to 0 at the start of a new month
+        const startDate = new Date(inputYear, inputMonth - 3, 1);
+        const endDate = new Date(inputYear, inputMonth, 0);
 
         const whereClause: any = { isActive: true };
         if (effectiveBranchId) {

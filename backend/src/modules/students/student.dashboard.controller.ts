@@ -93,9 +93,17 @@ export const getStudentOverview = async (req: AuthRequest, res: Response): Promi
             },
         });
 
+        const lateAttendance = await prisma.attendance.count({
+            where: {
+                studentId: student.id,
+                status: 'LATE',
+            },
+        });
+
         // Use the total expected days for percentage, but cap at 100 if present > expected
+        const effectivePresent = presentAttendance + (lateAttendance * 0.5);
         const attendancePercentage = totalExpectedDays > 0
-            ? Math.min(100, Math.round((presentAttendance / totalExpectedDays) * 100))
+            ? Math.min(100, Math.round((effectivePresent / totalExpectedDays) * 100))
             : 0;
 
 
@@ -280,6 +288,7 @@ export const getStudentOverview = async (req: AuthRequest, res: Response): Promi
                 percentage: attendancePercentage,
                 status: attendancePercentage >= 75 ? 'ELIGIBLE' : 'NOT_ELIGIBLE',
                 present: presentAttendance,
+                late: lateAttendance,
                 total: totalExpectedDays, // Show expected total rather than just marked
                 marked: totalMarkedDays
             },
@@ -378,8 +387,9 @@ export const getStudentAttendance = async (req: AuthRequest, res: Response): Pro
         const lateDays = attendances.filter((a) => a.status === 'LATE').length;
         const absentDays = attendances.filter((a) => a.status === 'ABSENT').length;
 
+        const effectivePresentDays = presentDays + (lateDays * 0.5);
         const attendancePercentage = totalExpectedDays > 0
-            ? Math.min(100, Math.round((presentDays / totalExpectedDays) * 100))
+            ? Math.min(100, Math.round((effectivePresentDays / totalExpectedDays) * 100))
             : 0;
 
         // Check for consecutive absences
@@ -718,11 +728,22 @@ export const getStudentFees = async (req: AuthRequest, res: Response): Promise<R
         const paid = student.admission.feePaid;
         const balance = student.admission.feeBalance;
 
+        // Fetch sent receipts
+        const sentReceipts = await prisma.feePaymentRequest.findMany({
+            where: {
+                studentId: student.id,
+                status: 'APPROVED',
+                isSentToStudent: true
+            },
+            orderBy: { sentAt: 'desc' }
+        });
+
         return successResponse(res, {
             total: totalFee,
             paid,
             balance,
             admissionDate: student.admission.admissionDate,
+            sentReceipts,
             paymentHistory: [],
         });
     } catch (error: any) {

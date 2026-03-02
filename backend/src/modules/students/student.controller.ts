@@ -141,7 +141,7 @@ export const createStudent = async (req: AuthRequest, res: Response): Promise<Re
       qualification, leadSource,
       aadhaarNumber, panNumber,
       selectedSoftware,
-      feeAmount, feePaid, paymentPlan
+      feeAmount, feePaid, paymentPlan, paymentMode, transactionId
     } = req.body;
 
     console.log('Create Student Payload received for:', email);
@@ -214,6 +214,8 @@ export const createStudent = async (req: AuthRequest, res: Response): Promise<Re
           feePaid: Number(feePaid) || 0,
           feeBalance: (Number(feeAmount) || 0) - (Number(feePaid) || 0),
           paymentPlan: paymentPlan || 'SINGLE',
+          paymentMode,
+          transactionId,
 
           // New Fields
           parentPhone,
@@ -292,7 +294,7 @@ export const updateStudent = async (req: AuthRequest, res: Response): Promise<Re
       dateOfJoining, dateOfBirth, gender,
       parentPhone, address, qualification,
       leadSource, aadhaarNumber, panNumber,
-      selectedSoftware
+      selectedSoftware, paymentMode, transactionId, paymentAmount
     } = req.body;
 
     const existingStudent = await prisma.student.findUnique({
@@ -326,7 +328,20 @@ export const updateStudent = async (req: AuthRequest, res: Response): Promise<Re
       }
 
       // Update associated Admission record if fee info provided
-      if (feeAmount !== undefined || feePaid !== undefined || paymentPlan !== undefined) {
+      if (paymentAmount !== undefined && req.user?.role === UserRole.CHANNEL_PARTNER) {
+        await tx.feePaymentRequest.create({
+          data: {
+            studentId: id,
+            admissionId: existingStudent.admissionId,
+            amount: Number(paymentAmount),
+            paymentMode: paymentMode || 'CASH',
+            transactionId: transactionId || null,
+            requestedById: req.user.id,
+            branchId: existingStudent.branchId,
+            status: 'PENDING'
+          }
+        });
+      } else if (feeAmount !== undefined || feePaid !== undefined || paymentPlan !== undefined) {
         const updatedFeeAmount = feeAmount !== undefined ? (Number(feeAmount) || 0) : undefined;
         const updatedFeePaid = feePaid !== undefined ? (Number(feePaid) || 0) : undefined;
 
@@ -344,6 +359,8 @@ export const updateStudent = async (req: AuthRequest, res: Response): Promise<Re
             ...(updatedFeePaid !== undefined && { feePaid: updatedFeePaid }),
             ...(feeBalance !== undefined && { feeBalance }),
             ...(paymentPlan !== undefined && { paymentPlan }),
+            ...(paymentMode !== undefined && { paymentMode }),
+            ...(transactionId !== undefined && { transactionId }),
             // Also sync other personal info to admission for consistency
             ...(firstName && { firstName }),
             ...(lastName && { lastName }),
@@ -438,5 +455,181 @@ export const deleteStudent = async (req: AuthRequest, res: Response): Promise<Re
     return successResponse(res, { id }, 'Student deleted successfully');
   } catch (error) {
     return errorResponse(res, 'Failed to delete student', 500, error);
+  }
+};
+
+export const getFeeRequests = async (req: AuthRequest, res: Response): Promise<Response> => {
+  try {
+    const { status } = req.query; // PENDING, APPROVED, REJECTED
+    const whereCondition: any = {};
+
+    if (status) {
+      whereCondition.status = status;
+    }
+
+    if (req.user?.role !== UserRole.CEO) {
+      whereCondition.branchId = req.user?.branchId;
+    }
+
+    const requests = await prisma.feePaymentRequest.findMany({
+      where: whereCondition,
+      include: {
+        student: { select: { id: true, enrollmentNumber: true, user: { select: { firstName: true, lastName: true } } } },
+        requestedBy: { select: { id: true, firstName: true, lastName: true } },
+        approvedBy: { select: { id: true, firstName: true, lastName: true } },
+        branch: { select: { id: true, name: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return successResponse(res, requests, 'Fee requests fetched successfully');
+  } catch (error) {
+    console.error('getFeeRequests Error:', error);
+    return errorResponse(res, 'Failed to fetch fee requests', 500, error);
+  }
+};
+
+export const approveFeeRequest = async (req: AuthRequest, res: Response): Promise<Response> => {
+  try {
+    const { id } = req.params;
+
+    if (req.user?.role !== UserRole.CEO) {
+      return errorResponse(res, 'Access denied. Only CEO can approve fees.', 403);
+    }
+
+    const request = await prisma.feePaymentRequest.findUnique({
+      where: { id },
+      include: { admission: true }
+    });
+
+    if (!request) {
+      return errorResponse(res, 'Fee request not found', 404);
+    }
+
+    if (request.status !== 'PENDING') {
+      return errorResponse(res, 'Only pending requests can be approved', 400);
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // Mark request as approved
+      await tx.feePaymentRequest.update({
+        where: { id },
+        data: {
+          status: 'APPROVED',
+          approvedById: req.user!.id
+        }
+      });
+
+      // Update admission fee balances
+      const newFeePaid = (request.admission.feePaid || 0) + request.amount;
+      const newBalance = (request.admission.feeAmount || 0) - newFeePaid;
+
+      await tx.admission.update({
+        where: { id: request.admissionId },
+        data: {
+          feePaid: newFeePaid,
+          feeBalance: newBalance,
+          paymentMode: request.paymentMode,
+          transactionId: request.transactionId
+        }
+      });
+    });
+
+    return successResponse(res, { id }, 'Fee request approved successfully');
+  } catch (error) {
+    console.error('approveFeeRequest Error:', error);
+    return errorResponse(res, 'Failed to approve fee request', 500, error);
+  }
+};
+
+export const rejectFeeRequest = async (req: AuthRequest, res: Response): Promise<Response> => {
+  try {
+    const { id } = req.params;
+
+    if (req.user?.role !== UserRole.CEO) {
+      return errorResponse(res, 'Access denied. Only CEO can reject fees.', 403);
+    }
+
+    const request = await prisma.feePaymentRequest.update({
+      where: { id },
+      data: {
+        status: 'REJECTED',
+        approvedById: req.user!.id // We use this to track who rejected it too
+      }
+    });
+
+    return successResponse(res, { id }, 'Fee request rejected successfully');
+  } catch (error) {
+    console.error('rejectFeeRequest Error:', error);
+    return errorResponse(res, 'Failed to reject fee request', 500, error);
+  }
+};
+
+export const getFeeRequestById = async (req: AuthRequest, res: Response): Promise<Response> => {
+  try {
+    const { id } = req.params;
+
+    const request = await prisma.feePaymentRequest.findUnique({
+      where: { id },
+      include: {
+        student: {
+          include: {
+            user: { select: { firstName: true, lastName: true, email: true, phone: true } }
+          }
+        },
+        admission: {
+          include: {
+            course: { select: { name: true } }
+          }
+        },
+        requestedBy: { select: { firstName: true, lastName: true } },
+        approvedBy: { select: { firstName: true, lastName: true } },
+        branch: true
+      }
+    });
+
+    if (!request) {
+      return errorResponse(res, 'Fee request not found', 404);
+    }
+
+    if (req.user?.role !== UserRole.CEO && request.branchId !== req.user?.branchId) {
+      return errorResponse(res, 'Access denied', 403);
+    }
+
+    return successResponse(res, request, 'Fee request fetched successfully');
+  } catch (error) {
+    console.error('getFeeRequestById Error:', error);
+    return errorResponse(res, 'Failed to fetch fee request', 500, error);
+  }
+};
+
+export const sendFeeRequestToStudent = async (req: AuthRequest, res: Response): Promise<Response> => {
+  try {
+    const { id } = req.params;
+
+    const request = await prisma.feePaymentRequest.findUnique({
+      where: { id }
+    });
+
+    if (!request) {
+      return errorResponse(res, 'Fee request not found', 404);
+    }
+
+    if (request.status !== 'APPROVED') {
+      return errorResponse(res, 'Only approved fee requests can be sent to students', 400);
+    }
+
+    await prisma.feePaymentRequest.update({
+      where: { id },
+      data: {
+        isSentToStudent: true,
+        sentAt: new Date()
+      }
+    });
+
+    return successResponse(res, { id }, 'Receipt sent to student successfully');
+  } catch (error) {
+    console.error('sendFeeRequestToStudent Error:', error);
+    return errorResponse(res, 'Failed to send receipt to student', 500, error);
   }
 };
