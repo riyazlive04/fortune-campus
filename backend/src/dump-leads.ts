@@ -28,7 +28,7 @@ async function dump() {
         where: { role: 'TELECALLER' },
         select: { firstName: true, branchId: true }
     });
-    console.log('Telecallers:', telecallers.map(t => ({ name: t.firstName, branch: branchMap[t.branchId] || 'Unknown' })));
+    console.log('Telecallers:', telecallers.map(t => ({ name: t.firstName, branch: branchMap[t.branchId || ''] || 'Unknown' })));
 
     await prisma.$disconnect();
 }

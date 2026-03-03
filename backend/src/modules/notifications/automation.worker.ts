@@ -1,6 +1,5 @@
 
 import { prisma } from '../../config/database';
-import { NotificationService } from './notification.service';
 
 /**
  * AutomationWorker handles scheduled tasks and automatic notification triggers
@@ -41,7 +40,7 @@ export class AutomationWorker {
             }
         });
 
-        for (const adm of admissions) {
+        for (const _adm of admissions) {
             // await NotificationService.notifyBranchRole(adm.branchId, 'CHANNEL_PARTNER', {
             //     title: 'Google Review Reminder',
             //     message: `Student ${adm.firstName} ${adm.lastName} has reached 50 days since admission. Please request a Google Review.`,
@@ -68,7 +67,7 @@ export class AutomationWorker {
             }
         });
 
-        for (const adm of admissions) {
+        for (const _adm of admissions) {
             // await NotificationService.notifyBranchRole(adm.branchId, 'CHANNEL_PARTNER', {
             //     title: 'Conduct Exam Reminder',
             //     message: `Software module for ${adm.firstName} ${adm.lastName} is completed. Please schedule the final exam.`,
@@ -98,7 +97,7 @@ export class AutomationWorker {
             }
         });
 
-        for (const adm of admissions) {
+        for (const _adm of admissions) {
             // await NotificationService.notifyBranchRole(adm.branchId, 'ADMISSION_OFFICER', {
             //     title: 'Fee Collection Reminder',
             //     message: `Student ${adm.firstName} ${adm.lastName} has a pending balance of ₹${adm.feeBalance}.`,

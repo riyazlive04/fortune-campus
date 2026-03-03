@@ -6,6 +6,7 @@ import {
   updateStudent,
   deleteStudent,
   getFeeRequests,
+  getFeeStats,
   approveFeeRequest,
   rejectFeeRequest,
   getFeeRequestById,
@@ -21,6 +22,7 @@ router.use(enforceBranchAccess);
 
 router.get('/', getStudents);
 router.get('/fees/requests', getFeeRequests);
+router.get('/fees/stats', getFeeStats);
 router.get('/fees/requests/:id', getFeeRequestById);
 router.put('/fees/requests/:id/approve', approveFeeRequest);
 router.put('/fees/requests/:id/reject', rejectFeeRequest);

@@ -547,7 +547,8 @@ export const deleteAttendance = async (req: AuthRequest, res: Response): Promise
 
 export const getAttendanceStats = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
-    const { branchId, date } = req.query;
+    const { branchId, date, page = 1, limit = 10 } = req.query;
+    const { skip, take } = paginationHelper(Number(page), Number(limit));
 
     // Define effective branchId
     const effectiveBranchId = req.user?.role === UserRole.CEO
@@ -566,43 +567,42 @@ export const getAttendanceStats = async (req: AuthRequest, res: Response): Promi
     }
 
     // Get attendance records grouped by student and status (with optional date filter)
-    const stats = await prisma.attendance.groupBy({
-      by: ['studentId', 'status'],
-      _count: {
-        status: true
-      },
-      where: {
-        student: {
-          branchId: effectiveBranchId
-        },
-        ...dateFilter
-      }
-    });
-
-    // Get ALL students from the branch (or all branches if CEO and no branchId provided)
-    const students = await prisma.student.findMany({
-      where: {
-        branchId: effectiveBranchId
-      },
-      include: {
-        user: {
-          select: { firstName: true, lastName: true }
-        },
-        course: {
-          select: { name: true }
-        },
-        branch: {
-          select: { name: true }
-        },
-        batch: {
-          select: { name: true, code: true }
+    const [stats, totalStudents, students] = await Promise.all([
+      prisma.attendance.groupBy({
+        by: ['studentId', 'status'],
+        _count: { status: true },
+        where: {
+          student: { branchId: effectiveBranchId },
+          ...dateFilter
         }
-      }
+      }),
+      prisma.student.count({
+        where: { branchId: effectiveBranchId }
+      }),
+      prisma.student.findMany({
+        where: { branchId: effectiveBranchId },
+        skip,
+        take,
+        include: {
+          user: { select: { firstName: true, lastName: true } },
+          course: { select: { name: true } },
+          branch: { select: { name: true } },
+          batch: { select: { name: true, code: true } }
+        },
+        orderBy: { user: { firstName: 'asc' } }
+      })
+    ]);
+
+    // Create a map for O(1) lookup of stats per student
+    const statsMap = new Map<string, any[]>();
+    stats.forEach(s => {
+      if (!statsMap.has(s.studentId)) statsMap.set(s.studentId, []);
+      statsMap.get(s.studentId)!.push(s);
     });
 
-    // Process data to match frontend requirements
+    // Process data
     const summary = students.map(student => {
-      const studentStats = stats.filter(s => s.studentId === student.id);
+      const studentStats = statsMap.get(student.id) || [];
       const present = (studentStats.find(s => s.status === AttendanceStatus.PRESENT) as any)?._count?.status || 0;
       const absent = (studentStats.find(s => s.status === AttendanceStatus.ABSENT) as any)?._count?.status || 0;
       const late = (studentStats.find(s => s.status === AttendanceStatus.LATE) as any)?._count?.status || 0;
@@ -624,7 +624,9 @@ export const getAttendanceStats = async (req: AuthRequest, res: Response): Promi
       };
     });
 
-    return successResponse(res, { summary });
+    const meta = getPaginationMeta(totalStudents, Number(page), Number(limit));
+
+    return successResponse(res, { summary, meta });
   } catch (error) {
     return errorResponse(res, 'Failed to fetch attendance stats', 500, error);
   }

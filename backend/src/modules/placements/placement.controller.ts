@@ -125,26 +125,36 @@ export const createPlacement = async (req: AuthRequest, res: Response): Promise<
       return errorResponse(res, 'Access denied', 403);
     }
 
-    const placement = await prisma.placement.create({
-      data: {
-        studentId,
-        companyId,
-        position,
-        package: packageAmount,
-        joiningDate: joiningDate ? new Date(joiningDate) : undefined,
-        remarks,
-        status: PlacementStatus.APPLIED,
-      },
-      include: {
-        student: {
-          include: {
-            user: {
-              select: { firstName: true, lastName: true },
+    const placement = await prisma.$transaction(async (tx) => {
+      const newPlacement = await tx.placement.create({
+        data: {
+          studentId,
+          companyId,
+          position,
+          package: packageAmount,
+          joiningDate: joiningDate ? new Date(joiningDate) : undefined,
+          remarks,
+          status: PlacementStatus.APPLIED,
+        },
+        include: {
+          student: {
+            include: {
+              user: {
+                select: { firstName: true, lastName: true },
+              },
             },
           },
+          company: true,
         },
-        company: true,
-      },
+      });
+
+      // Increment branch totalPlacements counter
+      await (tx.branch as any).update({
+        where: { id: student.branchId },
+        data: { totalPlacements: { increment: 1 } }
+      });
+
+      return newPlacement;
     });
 
     return successResponse(res, placement, 'Placement created successfully', 201);
@@ -225,7 +235,15 @@ export const deletePlacement = async (req: AuthRequest, res: Response): Promise<
       return errorResponse(res, 'Access denied', 403);
     }
 
-    await prisma.placement.delete({ where: { id } });
+    await prisma.$transaction(async (tx) => {
+      await tx.placement.delete({ where: { id } });
+
+      // Decrement branch totalPlacements counter
+      await (tx.branch as any).update({
+        where: { id: existingPlacement.student.branchId },
+        data: { totalPlacements: { decrement: 1 } }
+      });
+    });
 
     return successResponse(res, null, 'Placement deleted successfully');
   } catch (error) {
@@ -277,18 +295,26 @@ export const updatePlacementStatus = async (req: AuthRequest, res: Response): Pr
   }
 };
 
-export const getPublicPlacementStats = async (req: any, res: Response): Promise<Response> => {
+export const getPublicPlacementStats = async (_req: any, res: Response): Promise<Response> => {
   try {
+    const stats = await (prisma.branch as any).aggregate({
+      _sum: {
+        totalPlacements: true,
+        totalStudents: true
+      }
+    });
+
+    // Actually totalPlacements in denormalization is all placements. 
+    // For "PLACED" status specifically, we might still need a count or another column.
+    // I'll stick to counts for specific status for now to avoid over-denormalizing.
     const placedCount = await prisma.placement.count({
       where: { status: PlacementStatus.PLACED },
     });
 
-    const studentsCount = await prisma.student.count();
-
     return successResponse(res, {
       placedCount: placedCount || 0,
-      studentsCount: studentsCount || 0,
-      successRate: studentsCount > 0 ? Math.round((placedCount / studentsCount) * 100) : 0
+      studentsCount: (stats._sum as any).totalStudents || 0,
+      successRate: (stats._sum as any).totalStudents > 0 ? Math.round((placedCount / (stats._sum as any).totalStudents) * 100) : 0
     });
   } catch (error) {
     return errorResponse(res, 'Failed to fetch public placement stats', 500, error);

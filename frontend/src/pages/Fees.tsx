@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { useSearchParams } from 'react-router-dom';
 import { storage, studentsApi } from '@/lib/api';
 import {
     DollarSign,
@@ -61,10 +62,19 @@ import StudentModal from '@/components/StudentModal';
 const Fees = () => {
     const [loading, setLoading] = useState(true);
     const [students, setStudents] = useState<any[]>([]);
+    const [studentMeta, setStudentMeta] = useState<any>(null);
     const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+    const [pendingMeta, setPendingMeta] = useState<any>(null);
     const [bills, setBills] = useState<any[]>([]);
+    const [billsMeta, setBillsMeta] = useState<any>(null);
+    const [feeStats, setFeeStats] = useState<any>(null);
     const [loadingRequests, setLoadingRequests] = useState(false);
-    const [activeTab, setActiveTab] = useState('records');
+    const [searchParams] = useSearchParams();
+    const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'records');
+
+    const [studentPage, setStudentPage] = useState(1);
+    const [pendingPage, setPendingPage] = useState(1);
+    const [billsPage, setBillsPage] = useState(1);
 
     const [searchTerm, setSearchTerm] = useState('');
     const [branchFilter, setBranchFilter] = useState('all');
@@ -76,12 +86,28 @@ const Fees = () => {
     const user = storage.getUser();
     const isCEO = user?.role === 'CEO';
 
-    const fetchStudents = async () => {
+    const fetchFeeStats = async () => {
+        try {
+            const res = await studentsApi.getFeeStats();
+            if (res.success) {
+                setFeeStats(res.data);
+            }
+        } catch (error) {
+            console.error("Failed to fetch fee stats", error);
+        }
+    };
+
+    const fetchStudents = async (page = 1) => {
         try {
             setLoading(true);
-            const res = await studentsApi.getStudents({ limit: 100 });
+            const res = await studentsApi.getStudents({
+                page,
+                limit: 10,
+                search: searchTerm
+            });
             if (res.success) {
-                setStudents(res.data.students || res.data);
+                setStudents(res.data.students || []);
+                setStudentMeta(res.data.meta);
             }
         } catch (error) {
             toast({
@@ -94,26 +120,55 @@ const Fees = () => {
         }
     };
 
-    const fetchRequests = async () => {
+    const fetchRequests = async (page = 1) => {
         try {
             setLoadingRequests(true);
-            const [pendingRes, approvedRes] = await Promise.all([
-                studentsApi.getFeeRequests('PENDING'),
-                studentsApi.getFeeRequests('APPROVED')
-            ]);
-            if (pendingRes.success) setPendingRequests(pendingRes.data);
-            if (approvedRes.success) setBills(approvedRes.data);
+            const res = await studentsApi.getFeeRequests('PENDING', page, 10);
+            if (res.success) {
+                setPendingRequests(res.data.requests);
+                setPendingMeta(res.data.meta);
+            }
         } catch (error) {
-            console.error("Failed to fetch fee requests", error);
+            console.error("Failed to fetch pending requests", error);
+        } finally {
+            setLoadingRequests(false);
+        }
+    };
+
+    const fetchBills = async (page = 1) => {
+        try {
+            setLoadingRequests(true);
+            const res = await studentsApi.getFeeRequests('APPROVED', page, 10);
+            if (res.success) {
+                setBills(res.data.requests);
+                setBillsMeta(res.data.meta);
+            }
+        } catch (error) {
+            console.error("Failed to fetch bills", error);
         } finally {
             setLoadingRequests(false);
         }
     };
 
     useEffect(() => {
-        fetchStudents();
-        fetchRequests();
-    }, []);
+        fetchFeeStats();
+        fetchStudents(1);
+        fetchRequests(1);
+        fetchBills(1);
+    }, [searchTerm]);
+
+    // Use separate effects for page changes to avoid resetting to page 1 on search
+    useEffect(() => {
+        fetchStudents(studentPage);
+    }, [studentPage]);
+
+    useEffect(() => {
+        fetchRequests(pendingPage);
+    }, [pendingPage]);
+
+    useEffect(() => {
+        fetchBills(billsPage);
+    }, [billsPage]);
 
     const filteredStudents = students.filter(s => {
         const studentName = `${s.user?.firstName || ''} ${s.user?.lastName || ''}`.toLowerCase();
@@ -129,7 +184,7 @@ const Fees = () => {
     const getFeeStatus = (student: any) => {
         const balance = student.admission?.feeBalance ?? 0;
         if (balance <= 0) return { label: 'Paid', class: 'bg-green-500', icon: <CheckCircle2 className="h-4 w-4" /> };
-        if (balance > 0 && (student.admission?.feePaid ?? 0) > 0) return { label: 'Partial', class: 'bg-yellow-500', icon: <Clock className="h-4 w-4" /> };
+        if (balance > 0 && (student.admission?.feePaid ?? 0) > 0) return { label: 'Partial', class: 'bg-yellow-500 text-black', icon: <Clock className="h-4 w-4" /> };
         return { label: 'Pending', class: 'bg-red-500', icon: <AlertCircle className="h-4 w-4" /> };
     };
 
@@ -246,7 +301,7 @@ const Fees = () => {
                     </div>
                     <div className="mt-2 relative z-10">
                         <h3 className="text-2xl font-black tracking-tight text-foreground">
-                            ₹{students.reduce((acc, s) => acc + (s.admission?.feeAmount || 0), 0).toLocaleString()}
+                            ₹{feeStats?.totalReceivables?.toLocaleString() || '0'}
                         </h3>
                         <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold bg-muted/50 text-muted-foreground border border-border/50 mt-1">Total revenue committed</span>
                     </div>
@@ -264,7 +319,7 @@ const Fees = () => {
                     </div>
                     <div className="mt-2 relative z-10">
                         <h3 className="text-2xl font-black tracking-tight text-foreground">
-                            ₹{students.reduce((acc, s) => acc + (s.admission?.feePaid || 0), 0).toLocaleString()}
+                            ₹{feeStats?.totalCollected?.toLocaleString() || '0'}
                         </h3>
                         <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-100/50 mt-1">Cash received</span>
                     </div>
@@ -282,7 +337,7 @@ const Fees = () => {
                     </div>
                     <div className="mt-2 relative z-10">
                         <h3 className="text-2xl font-black tracking-tight text-foreground">
-                            ₹{students.reduce((acc, s) => acc + (s.admission?.feeBalance || 0), 0).toLocaleString()}
+                            ₹{feeStats?.outstandingBalance?.toLocaleString() || '0'}
                         </h3>
                         <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold bg-red-50 text-rose-600 border border-rose-100/50 mt-1">Pending payments</span>
                     </div>
@@ -342,17 +397,18 @@ const Fees = () => {
                                         {loading ? (
                                             <TableRow>
                                                 <TableCell colSpan={7} className="text-center py-10">
+                                                    <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-primary" />
                                                     Loading records...
                                                 </TableCell>
                                             </TableRow>
-                                        ) : filteredStudents.length === 0 ? (
+                                        ) : students.length === 0 ? (
                                             <TableRow>
                                                 <TableCell colSpan={7} className="text-center py-10">
                                                     No fee records found.
                                                 </TableCell>
                                             </TableRow>
                                         ) : (
-                                            filteredStudents.map((student) => {
+                                            students.map((student) => {
                                                 const status = getFeeStatus(student);
                                                 return (
                                                     <TableRow key={student.id} className="hover:bg-muted/50 transition-colors">
@@ -401,6 +457,31 @@ const Fees = () => {
                                     </TableBody>
                                 </Table>
                             </div>
+
+                            {/* Pagination */}
+                            {studentMeta && studentMeta.totalPages > 1 && (
+                                <div className="flex items-center justify-end space-x-2 py-4">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setStudentPage(p => Math.max(1, p - 1))}
+                                        disabled={studentPage === 1}
+                                    >
+                                        Previous
+                                    </Button>
+                                    <div className="text-sm font-medium">
+                                        Page {studentPage} of {studentMeta.totalPages}
+                                    </div>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setStudentPage(p => Math.min(studentMeta.totalPages, p + 1))}
+                                        disabled={studentPage === studentMeta.totalPages}
+                                    >
+                                        Next
+                                    </Button>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </TabsContent>
@@ -428,7 +509,7 @@ const Fees = () => {
                                         </TableHeader>
                                         <TableBody>
                                             {loadingRequests ? (
-                                                <TableRow><TableCell colSpan={7} className="text-center py-10">Loading...</TableCell></TableRow>
+                                                <TableRow><TableCell colSpan={7} className="text-center py-10"><Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" /></TableCell></TableRow>
                                             ) : pendingRequests.length === 0 ? (
                                                 <TableRow><TableCell colSpan={7} className="text-center py-10">No pending requests.</TableCell></TableRow>
                                             ) : (
@@ -457,6 +538,31 @@ const Fees = () => {
                                         </TableBody>
                                     </Table>
                                 </div>
+
+                                {/* Pagination */}
+                                {pendingMeta && pendingMeta.totalPages > 1 && (
+                                    <div className="flex items-center justify-end space-x-2 py-4">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setPendingPage(p => Math.max(1, p - 1))}
+                                            disabled={pendingPage === 1}
+                                        >
+                                            Previous
+                                        </Button>
+                                        <div className="text-sm font-medium">
+                                            Page {pendingPage} of {pendingMeta.totalPages}
+                                        </div>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setPendingPage(p => Math.min(pendingMeta.totalPages, p + 1))}
+                                            disabled={pendingPage === pendingMeta.totalPages}
+                                        >
+                                            Next
+                                        </Button>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
                     </TabsContent>
@@ -484,7 +590,7 @@ const Fees = () => {
                                     </TableHeader>
                                     <TableBody>
                                         {loadingRequests ? (
-                                            <TableRow><TableCell colSpan={7} className="text-center py-10">Loading...</TableCell></TableRow>
+                                            <TableRow><TableCell colSpan={7} className="text-center py-10"><Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" /></TableCell></TableRow>
                                         ) : bills.length === 0 ? (
                                             <TableRow><TableCell colSpan={7} className="text-center py-10">No bills generated yet.</TableCell></TableRow>
                                         ) : (
@@ -535,6 +641,31 @@ const Fees = () => {
                                     </TableBody>
                                 </Table>
                             </div>
+
+                            {/* Pagination */}
+                            {billsMeta && billsMeta.totalPages > 1 && (
+                                <div className="flex items-center justify-end space-x-2 py-4">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setBillsPage(p => Math.max(1, p - 1))}
+                                        disabled={billsPage === 1}
+                                    >
+                                        Previous
+                                    </Button>
+                                    <div className="text-sm font-medium">
+                                        Page {billsPage} of {billsMeta.totalPages}
+                                    </div>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setBillsPage(p => Math.min(billsMeta.totalPages, p + 1))}
+                                        disabled={billsPage === billsMeta.totalPages}
+                                    >
+                                        Next
+                                    </Button>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </TabsContent>

@@ -4,6 +4,7 @@ import { Response } from 'express';
 import { prisma } from '../../config/database';
 import { successResponse, errorResponse } from '../../utils/response';
 import { AuthRequest } from '../../middlewares/auth.middleware';
+import { getCachedData, setCachedData } from '../../utils/cache';
 
 export const getBranchReport = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
@@ -172,26 +173,32 @@ export const getAdmissionsReport = async (req: AuthRequest, res: Response): Prom
       }),
     ]);
 
-    const courseBreakdown = await Promise.all(
-      admissions.map(async (item) => {
-        const course = await prisma.course.findUnique({
-          where: { id: item.courseId },
-          select: { name: true, code: true },
-        });
-        const branch = await prisma.branch.findUnique({
-          where: { id: item.branchId },
-          select: { name: true },
-        });
-        return {
-          branch: branch?.name,
-          course: course?.name,
-          count: item._count,
-          totalFees: item._sum.feeAmount,
-          collected: item._sum.feePaid,
-          pending: item._sum.feeBalance,
-        };
+    // Batch fetch courses and branches for names
+    const courseIds = [...new Set(admissions.map(a => a.courseId))];
+    const branchIds = [...new Set(admissions.map(a => a.branchId))];
+
+    const [courses, branchesLookup] = await Promise.all([
+      prisma.course.findMany({
+        where: { id: { in: courseIds } },
+        select: { id: true, name: true, code: true }
+      }),
+      prisma.branch.findMany({
+        where: { id: { in: branchIds } },
+        select: { id: true, name: true }
       })
-    );
+    ]);
+
+    const courseMap = Object.fromEntries(courses.map(c => [c.id, c.name]));
+    const branchMap = Object.fromEntries(branchesLookup.map(b => [b.id, b.name]));
+
+    const courseBreakdown = admissions.map((item) => ({
+      branch: branchMap[item.branchId],
+      course: courseMap[item.courseId],
+      count: item._count,
+      totalFees: item._sum.feeAmount,
+      collected: item._sum.feePaid,
+      pending: item._sum.feeBalance,
+    }));
 
     const report = {
       statusBreakdown: statusCounts.map(s => ({
@@ -328,20 +335,20 @@ export const getRevenueReport = async (req: AuthRequest, res: Response): Promise
       }),
     ]);
 
-    const courseRevenue = await Promise.all(
-      courses.map(async (item) => {
-        const course = await prisma.course.findUnique({
-          where: { id: item.courseId },
-          select: { name: true, code: true },
-        });
-        return {
-          course: course?.name,
-          admissions: item._count,
-          totalFees: item._sum.feeAmount,
-          collected: item._sum.feePaid,
-        };
-      })
-    );
+    // Batch fetch courses for names
+    const courseIds = courses.map(c => c.courseId);
+    const courseLookup = await prisma.course.findMany({
+      where: { id: { in: courseIds } },
+      select: { id: true, name: true }
+    });
+    const courseMap = Object.fromEntries(courseLookup.map(c => [c.id, c.name]));
+
+    const courseRevenue = courses.map((item) => ({
+      course: courseMap[item.courseId],
+      admissions: item._count,
+      totalFees: item._sum.feeAmount,
+      collected: item._sum.feePaid,
+    }));
 
     const report = {
       overall: {
@@ -368,6 +375,14 @@ export const getCEOOverallReport = async (req: AuthRequest, res: Response): Prom
     }
 
     const { month, year, startDate, endDate } = req.query;
+    const cacheKey = `ceo_overall_report_${month || 'no_month'}_${year || 'no_year'}_${startDate || 'no_start'}_${endDate || 'no_end'}`;
+    const cachedData = await getCachedData(cacheKey);
+
+    if (cachedData) {
+      console.log(`[Reports Cache Hit] Key: ${cacheKey}`);
+      return successResponse(res, cachedData);
+    }
+
     let dateFilter: any = {};
 
     const parseLocalDate = (dateStr: string, endOfDay = false): Date => {
@@ -414,7 +429,8 @@ export const getCEOOverallReport = async (req: AuthRequest, res: Response): Prom
       leadStatuses,
       admissionSummary,
       branchRevenue,
-      performanceGaps
+      performanceGaps,
+      leadsByBranchAndStatus
     ] = await Promise.all([
       prisma.branch.findMany({ select: { id: true, name: true } }),
       prisma.lead.groupBy({
@@ -458,34 +474,39 @@ export const getCEOOverallReport = async (req: AuthRequest, res: Response): Prom
         },
         orderBy: { createdAt: 'desc' },
         take: 50
+      }),
+      prisma.lead.groupBy({
+        by: ['branchId', 'status'],
+        where: dateFilter,
+        _count: true,
       })
     ]);
 
-    // Map branch revenue to names
-    const branchComparison = await Promise.all(branches.map(async (branch) => {
+    // Process leads by branch and status into a lookup map
+    const branchLeadStats: Record<string, { total: number; converted: number }> = {};
+    leadsByBranchAndStatus.forEach(item => {
+      if (!branchLeadStats[item.branchId]) {
+        branchLeadStats[item.branchId] = { total: 0, converted: 0 };
+      }
+      branchLeadStats[item.branchId].total += item._count;
+      if (item.status === LeadStatus.CONVERTED) {
+        branchLeadStats[item.branchId].converted += item._count;
+      }
+    });
+
+    // Map branch revenue and stats to names
+    const branchComparison = branches.map((branch) => {
       const revenue = branchRevenue.find(r => r.branchId === branch.id);
-      const leadsCount = await prisma.lead.count({
-        where: {
-          branchId: branch.id,
-          ...dateFilter
-        }
-      });
-      const convertedCount = await prisma.lead.count({
-        where: {
-          branchId: branch.id,
-          status: LeadStatus.CONVERTED,
-          ...dateFilter
-        }
-      });
+      const stats = branchLeadStats[branch.id] || { total: 0, converted: 0 };
 
       return {
         branch: branch.name,
         revenue: Number(revenue?._sum.feeAmount || 0),
         collected: Number(revenue?._sum.feePaid || 0),
-        leads: leadsCount,
-        conversions: convertedCount,
+        leads: stats.total,
+        conversions: stats.converted,
       };
-    }));
+    });
 
     const report = {
       overall: {
@@ -509,6 +530,9 @@ export const getCEOOverallReport = async (req: AuthRequest, res: Response): Prom
         telecallers: performanceGaps.filter(g => g.category === 'TELECALLER'),
       }
     };
+
+    // Cache for 10 minutes
+    await setCachedData(cacheKey, report, 600);
 
     return successResponse(res, report);
   } catch (error) {

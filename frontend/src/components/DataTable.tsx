@@ -15,6 +15,12 @@ interface DataTableProps<T> {
   searchPlaceholder?: string;
   pageSize?: number;
   isLoading?: boolean;
+  // Server-side pagination props
+  serverSide?: boolean;
+  totalItems?: number;
+  currentPage?: number;
+  onPageChange?: (page: number) => void;
+  onSearchChange?: (search: string) => void;
 }
 
 function DataTable<T extends Record<string, any>>({
@@ -22,19 +28,47 @@ function DataTable<T extends Record<string, any>>({
   data,
   searchPlaceholder = "Search...",
   pageSize = 10,
-  isLoading = false
+  isLoading = false,
+  serverSide = false,
+  totalItems = 0,
+  currentPage = 1,
+  onPageChange,
+  onSearchChange
 }: DataTableProps<T>) {
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(0);
+  const [localSearch, setLocalSearch] = useState("");
+  const [localPage, setLocalPage] = useState(0);
 
-  const filtered = data.filter((item) =>
+  // If serverSide is true, use external state, otherwise use local filtered data
+  const search = serverSide ? "" : localSearch;
+  const filtered = serverSide ? data : data.filter((item) =>
     Object.values(item).some((v) =>
-      String(v).toLowerCase().includes(search.toLowerCase())
+      String(v).toLowerCase().includes(localSearch.toLowerCase())
     )
   );
 
-  const totalPages = Math.ceil(filtered.length / pageSize);
-  const paged = filtered.slice(page * pageSize, (page + 1) * pageSize);
+  const effectivePage = serverSide ? (currentPage - 1) : localPage;
+  const effectiveTotalPages = serverSide
+    ? Math.ceil(totalItems / pageSize)
+    : Math.ceil(filtered.length / pageSize);
+
+  const paged = serverSide ? data : filtered.slice(localPage * pageSize, (localPage + 1) * pageSize);
+
+  const handleSearchChange = (val: string) => {
+    if (serverSide) {
+      onSearchChange?.(val);
+    } else {
+      setLocalSearch(val);
+      setLocalPage(0);
+    }
+  };
+
+  const handlePageChange = (newPage: number) => {
+    if (serverSide) {
+      onPageChange?.(newPage + 1); // External pages are 1-indexed usually
+    } else {
+      setLocalPage(newPage);
+    }
+  };
 
   return (
     <div className="rounded-lg border border-border bg-card">
@@ -43,12 +77,14 @@ function DataTable<T extends Record<string, any>>({
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder={searchPlaceholder}
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(0); }}
+            value={serverSide ? undefined : localSearch}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-9"
           />
         </div>
-        <span className="text-sm text-muted-foreground">{filtered.length} records</span>
+        <span className="text-sm text-muted-foreground">
+          {serverSide ? totalItems : filtered.length} records
+        </span>
       </div>
 
       <div className="overflow-x-auto min-h-[400px] relative">
@@ -87,16 +123,16 @@ function DataTable<T extends Record<string, any>>({
         </table>
       </div>
 
-      {totalPages > 1 && (
+      {effectiveTotalPages > 1 && (
         <div className="flex items-center justify-between border-t border-border p-4">
           <span className="text-sm text-muted-foreground">
-            Page {page + 1} of {totalPages}
+            Page {effectivePage + 1} of {effectiveTotalPages}
           </span>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}>
+            <Button variant="outline" size="sm" onClick={() => handlePageChange(effectivePage - 1)} disabled={effectivePage === 0}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}>
+            <Button variant="outline" size="sm" onClick={() => handlePageChange(effectivePage + 1)} disabled={effectivePage >= effectiveTotalPages - 1}>
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>

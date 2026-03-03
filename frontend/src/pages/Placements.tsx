@@ -14,33 +14,30 @@ const Placements = () => {
   const [companies, setCompanies] = useState<any[]>([]);
   const [alumni, setAlumni] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [placementPage, setPlacementPage] = useState(1);
+  const [placementSearch, setPlacementSearch] = useState("");
+  const [placementMeta, setPlacementMeta] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState("placements");
   const { toast } = useToast();
 
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [placementsRes, companiesRes] = await Promise.all([
-        placementApi.getPlacements({ limit: 100 }),
-        companyApi.getCompanies({ limit: 100 })
-      ]);
-
-      const fetchedPlacements = placementsRes.data?.placements || placementsRes.data || [];
-      const fetchedCompanies = companiesRes.data?.companies || companiesRes.data || [];
-
-      setPlacements(fetchedPlacements);
-      setCompanies(fetchedCompanies);
-
-      // Filter alumni (Status = PLACED)
-      const placedStudents = fetchedPlacements.filter((p: any) => p.status === 'PLACED');
-      setAlumni(placedStudents);
-
+      if (activeTab === "placements") {
+        const placementsRes = await placementApi.getPlacements({ page: placementPage, search: placementSearch, limit: 10 });
+        const fetchedPlacements = placementsRes.data?.placements || placementsRes.data || [];
+        setPlacements(fetchedPlacements);
+        setPlacementMeta(placementsRes.data?.meta);
+      } else if (activeTab === "companies") {
+        const companiesRes = await companyApi.getCompanies({ limit: 100 });
+        setCompanies(companiesRes.data?.companies || companiesRes.data || []);
+      } else if (activeTab === "alumni") {
+        const alumniRes = await placementApi.getPlacements({ status: 'PLACED', limit: 100 });
+        setAlumni(alumniRes.data?.placements || alumniRes.data || []);
+      }
     } catch (error) {
       console.error("Failed to fetch placement data", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to fetch placement data",
-      });
+      toast({ variant: "destructive", title: "Error", description: "Failed to fetch placement data" });
     } finally {
       setLoading(false);
     }
@@ -48,7 +45,7 @@ const Placements = () => {
 
   useEffect(() => {
     fetchData();
-  }, [toast]);
+  }, [placementPage, placementSearch, activeTab, toast]);
 
   const pCols = [
     { key: "studentName", label: "Student", render: (r: any) => <span className="font-medium">{r.student?.user?.firstName} {r.student?.user?.lastName}</span> },
@@ -64,7 +61,7 @@ const Placements = () => {
       <PageHeader title="Placements & Alumni" description="Track placement progress and alumni network">
         {/* Future: Add 'Add Placement' button here */}
       </PageHeader>
-      <Tabs defaultValue="placements">
+      <Tabs defaultValue="placements" onValueChange={setActiveTab}>
         <TabsList><TabsTrigger value="placements">Placements</TabsTrigger><TabsTrigger value="companies">Companies</TabsTrigger><TabsTrigger value="alumni">Alumni</TabsTrigger></TabsList>
 
         <TabsContent value="placements" className="mt-4">
@@ -72,6 +69,11 @@ const Placements = () => {
             columns={pCols}
             data={placements}
             searchPlaceholder="Search placements..."
+            serverSide
+            totalItems={placementMeta?.totalItems || 0}
+            currentPage={placementPage}
+            onPageChange={setPlacementPage}
+            onSearchChange={setPlacementSearch}
             isLoading={loading}
           />
         </TabsContent>
@@ -92,30 +94,12 @@ const Placements = () => {
         </TabsContent>
 
         <TabsContent value="alumni" className="mt-4">
-          <div className="rounded-xl border border-border bg-card">
-            {loading ? <div className="p-4">Loading alumni...</div> : alumni.length === 0 ? <div className="p-4 text-muted-foreground">No alumni records found</div> : (
-              <table className="w-full text-sm text-left">
-                <thead className="text-xs text-muted-foreground uppercase bg-muted/50">
-                  <tr>
-                    <th className="px-6 py-3">Name</th>
-                    <th className="px-6 py-3">Course</th>
-                    <th className="px-6 py-3">Company</th>
-                    <th className="px-6 py-3">Role</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {alumni.map((a: any, i: number) => (
-                    <tr key={i} className="border-b border-border hover:bg-muted/50">
-                      <td className="px-6 py-4 font-medium">{a.student?.user?.firstName} {a.student?.user?.lastName}</td>
-                      <td className="px-6 py-4">{a.student?.course?.name}</td>
-                      <td className="px-6 py-4">{a.company?.name || '-'}</td>
-                      <td className="px-6 py-4">{a.position}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+          <DataTable
+            columns={pCols}
+            data={alumni}
+            searchPlaceholder="Search alumni..."
+            isLoading={loading}
+          />
         </TabsContent>
       </Tabs>
     </div>

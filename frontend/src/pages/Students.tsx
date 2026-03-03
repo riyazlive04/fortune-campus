@@ -26,13 +26,17 @@ const Students = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [studentToDelete, setStudentToDelete] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [search, setSearch] = useState("");
+  const [meta, setMeta] = useState<any>(null);
   const { toast } = useToast();
 
   const fetchStudents = async () => {
     try {
       setLoading(true);
-      const response = await studentsApi.getStudents();
+      const response = await studentsApi.getStudents({ page, search, limit: 10 });
       setStudents(response.data?.students || response.data || []);
+      setMeta(response.data?.meta);
     } catch (error) {
       console.error("Failed to fetch students", error);
       toast({
@@ -47,7 +51,7 @@ const Students = () => {
 
   useEffect(() => {
     fetchStudents();
-  }, []);
+  }, [page, search]);
 
   const handleEdit = (student: any) => {
     setSelectedStudent(student);
@@ -184,7 +188,17 @@ const Students = () => {
         title="Students"
         description="View and manage all student records"
       />
-      <DataTable columns={columns} data={students} searchPlaceholder="Search students..." />
+      <DataTable
+        columns={columns}
+        data={students}
+        searchPlaceholder="Search students..."
+        serverSide
+        totalItems={meta?.totalItems || 0}
+        currentPage={page}
+        onPageChange={setPage}
+        onSearchChange={setSearch}
+        isLoading={loading}
+      />
 
       <StudentModal
         isOpen={isModalOpen}

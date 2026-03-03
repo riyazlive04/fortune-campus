@@ -171,31 +171,48 @@ export const getAttendanceStats = async (req: AuthRequest, res: Response): Promi
         const branchId = req.user?.branchId;
         const where = branchId ? { branchId } : {};
 
-        // 1. Get students and their attendance count
+        // 1. Efficiently aggregate attendance using groupBy
+        const attendanceStats = await prisma.attendance.groupBy({
+            by: ['studentId', 'status'],
+            where: {
+                student: {
+                    branchId: branchId || undefined,
+                    isActive: true
+                }
+            },
+            _count: { _all: true }
+        });
+
+        // Fetch students in the branch
         const students = await prisma.student.findMany({
             where: { ...where, isActive: true },
             include: {
-                user: true,
-                course: true,
-                _count: { select: { attendances: true } },
-                attendances: {
-                    select: { status: true }
-                }
+                user: { select: { firstName: true, lastName: true } },
+                course: { select: { name: true } }
             }
+        });
+
+        // Group attendance by student
+        const studentAttendanceMap: Record<string, Record<string, number>> = {};
+        attendanceStats.forEach(stat => {
+            if (!studentAttendanceMap[stat.studentId]) {
+                studentAttendanceMap[stat.studentId] = { PRESENT: 0, ABSENT: 0, LATE: 0 };
+            }
+            studentAttendanceMap[stat.studentId][stat.status] = stat._count._all;
         });
 
         let totalPresent = 0;
         let totalRecords = 0;
 
         const summary = students.map((s: any) => {
-            const studentName = s.user ? `${s.user.firstName} ${s.user.lastName}` : 'Unknown';
+            const studentName = `${s.user?.firstName || ''} ${s.user?.lastName || ''}`.trim() || 'Unknown';
             const courseName = s.course?.name || 'N/A';
-            const atts = s.attendances || [];
+            const atts = studentAttendanceMap[s.id] || { PRESENT: 0, ABSENT: 0, LATE: 0 };
 
-            const presentCount = atts.filter((a: any) => a.status === 'PRESENT').length;
-            const lateCount = atts.filter((a: any) => a.status === 'LATE').length;
-            const absentCount = atts.filter((a: any) => a.status === 'ABSENT').length;
-            const totalClasses = atts.length;
+            const presentCount = atts.PRESENT || 0;
+            const lateCount = atts.LATE || 0;
+            const absentCount = atts.ABSENT || 0;
+            const totalClasses = presentCount + lateCount + absentCount;
 
             const effectivePresent = presentCount + (lateCount * 0.5);
             totalPresent += effectivePresent;
@@ -212,7 +229,7 @@ export const getAttendanceStats = async (req: AuthRequest, res: Response): Promi
                 absent: absentCount,
                 total: totalClasses,
                 percentage: `${percentage}%`,
-                _rawPercent: percentage // used for sorting below
+                _rawPercent: percentage
             };
         });
 
@@ -262,31 +279,47 @@ export const getBranchAttendance = async (req: AuthRequest, res: Response): Prom
             select: { studentId: true, date: true }
         });
 
-        // 2. Hydrate these groups with full data
-        const attendance = await Promise.all(distinctGroups.map(async (group) => {
-            const records = await prisma.attendance.findMany({
-                where: {
-                    studentId: group.studentId,
-                    date: group.date
-                },
-                include: {
-                    student: { include: { user: true } },
-                    course: true,
-                    batch: true
-                },
-                orderBy: { period: 'asc' }
-            });
+        // 2. Hydrate these groups with a single batched query
+        const studentIds = distinctGroups.map(g => g.studentId);
+        const dates = distinctGroups.map(g => g.date);
+
+        const allRecords = await prisma.attendance.findMany({
+            where: {
+                studentId: { in: studentIds },
+                date: { in: dates },
+                ...(branchId ? { student: { branchId } } : {})
+            },
+            include: {
+                student: { include: { user: { select: { firstName: true, lastName: true } } } },
+                course: { select: { id: true, name: true } },
+                batch: { select: { id: true, name: true } }
+            },
+            orderBy: [{ date: 'desc' }, { period: 'asc' }]
+        });
+
+        // Group by studentId and date in memory
+        const attendanceMap: Record<string, any[]> = {};
+        allRecords.forEach(r => {
+            const key = `${r.studentId}_${r.date.toISOString()}`;
+            if (!attendanceMap[key]) attendanceMap[key] = [];
+            attendanceMap[key].push(r);
+        });
+
+        const attendance = distinctGroups.map(group => {
+            const key = `${group.studentId}_${group.date.toISOString()}`;
+            const records = attendanceMap[key] || [];
+            if (records.length === 0) return null;
 
             const first = records[0];
             return {
-                id: first.id, // Use the first ID as key
+                id: first.id,
                 date: first.date,
                 student: first.student,
                 course: first.course,
                 batch: first.batch,
                 periods: records.map(r => ({ period: r.period, status: r.status }))
             };
-        }));
+        }).filter(Boolean);
 
         // 3. Get accurate count of groups
         const uniqueCount = await prisma.attendance.groupBy({

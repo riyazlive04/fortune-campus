@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '../../config/database';
 import { successResponse, errorResponse, paginationHelper, getPaginationMeta } from '../../utils/response';
 import { AuthRequest } from '../../middlewares/auth.middleware';
+import { NotificationService } from '../notifications/notification.service';
 
 export const getStudents = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
@@ -300,7 +301,7 @@ export const updateStudent = async (req: AuthRequest, res: Response): Promise<Re
     const existingStudent = await prisma.student.findUnique({
       where: { id },
       include: {
-        user: { select: { id: true } },
+        user: { select: { id: true, firstName: true, lastName: true } },
         admission: { select: { id: true, feeAmount: true, feePaid: true } },
         placements: { orderBy: { createdAt: 'desc' }, take: 1 }
       }
@@ -340,6 +341,22 @@ export const updateStudent = async (req: AuthRequest, res: Response): Promise<Re
             branchId: existingStudent.branchId,
             status: 'PENDING'
           }
+        });
+
+        // Notify CEO of the new fee approval request
+        const requestingUser = await prisma.user.findUnique({
+          where: { id: req.user!.id },
+          select: { firstName: true, lastName: true }
+        });
+        const requestingName = requestingUser ? `${requestingUser.firstName} ${requestingUser.lastName}` : 'A Channel Partner';
+        const studentName = `${existingStudent.user.firstName} ${existingStudent.user.lastName}`;
+
+        const modeLabel = (paymentMode || 'CASH').toUpperCase();
+        await NotificationService.notifyRole(UserRole.CEO, {
+          title: 'New Fee Approval Request',
+          message: `Channel Partner ${requestingName} has requested a fee update of ₹${paymentAmount} via ${modeLabel} for student ${studentName}.`,
+          type: 'INFO',
+          link: `/students/${id}`
         });
       } else if (feeAmount !== undefined || feePaid !== undefined || paymentPlan !== undefined) {
         const updatedFeeAmount = feeAmount !== undefined ? (Number(feeAmount) || 0) : undefined;
@@ -437,6 +454,37 @@ export const updateStudent = async (req: AuthRequest, res: Response): Promise<Re
   }
 };
 
+export const getFeeStats = async (req: AuthRequest, res: Response): Promise<Response> => {
+  try {
+    const { branchId } = req.query;
+    const where: any = {};
+
+    if (req.user?.role !== UserRole.CEO) {
+      where.branchId = req.user?.branchId;
+    } else if (branchId) {
+      where.branchId = branchId as string;
+    }
+
+    const stats = await prisma.admission.aggregate({
+      where,
+      _sum: {
+        feeAmount: true,
+        feePaid: true,
+        feeBalance: true
+      }
+    });
+
+    return successResponse(res, {
+      totalReceivables: stats._sum.feeAmount || 0,
+      totalCollected: stats._sum.feePaid || 0,
+      outstandingBalance: stats._sum.feeBalance || 0
+    }, 'Fee statistics fetched successfully');
+  } catch (error) {
+    console.error('getFeeStats Error:', error);
+    return errorResponse(res, 'Failed to fetch fee statistics', 500, error);
+  }
+};
+
 export const deleteStudent = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
     const { id } = req.params;
@@ -460,7 +508,8 @@ export const deleteStudent = async (req: AuthRequest, res: Response): Promise<Re
 
 export const getFeeRequests = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
-    const { status } = req.query; // PENDING, APPROVED, REJECTED
+    const { status, page = 1, limit = 10 } = req.query; // PENDING, APPROVED, REJECTED
+    const { skip, take } = paginationHelper(Number(page), Number(limit));
     const whereCondition: any = {};
 
     if (status) {
@@ -471,18 +520,25 @@ export const getFeeRequests = async (req: AuthRequest, res: Response): Promise<R
       whereCondition.branchId = req.user?.branchId;
     }
 
-    const requests = await prisma.feePaymentRequest.findMany({
-      where: whereCondition,
-      include: {
-        student: { select: { id: true, enrollmentNumber: true, user: { select: { firstName: true, lastName: true } } } },
-        requestedBy: { select: { id: true, firstName: true, lastName: true } },
-        approvedBy: { select: { id: true, firstName: true, lastName: true } },
-        branch: { select: { id: true, name: true } }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
+    const [requests, total] = await Promise.all([
+      prisma.feePaymentRequest.findMany({
+        where: whereCondition,
+        skip,
+        take,
+        include: {
+          student: { select: { id: true, enrollmentNumber: true, user: { select: { firstName: true, lastName: true } } } },
+          requestedBy: { select: { id: true, firstName: true, lastName: true } },
+          approvedBy: { select: { id: true, firstName: true, lastName: true } },
+          branch: { select: { id: true, name: true } }
+        },
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.feePaymentRequest.count({ where: whereCondition }),
+    ]);
 
-    return successResponse(res, requests, 'Fee requests fetched successfully');
+    const meta = getPaginationMeta(total, Number(page), Number(limit));
+
+    return successResponse(res, { requests, meta }, 'Fee requests fetched successfully');
   } catch (error) {
     console.error('getFeeRequests Error:', error);
     return errorResponse(res, 'Failed to fetch fee requests', 500, error);
@@ -550,7 +606,7 @@ export const rejectFeeRequest = async (req: AuthRequest, res: Response): Promise
       return errorResponse(res, 'Access denied. Only CEO can reject fees.', 403);
     }
 
-    const request = await prisma.feePaymentRequest.update({
+    await prisma.feePaymentRequest.update({
       where: { id },
       data: {
         status: 'REJECTED',

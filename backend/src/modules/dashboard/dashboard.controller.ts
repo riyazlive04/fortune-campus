@@ -4,11 +4,20 @@ import { prisma } from '../../config/database';
 import { successResponse, errorResponse } from '../../utils/response';
 import { AuthRequest } from '../../middlewares/auth.middleware';
 import { UserRole, PlacementStatus } from '../../types/enums';
+import { getCachedData, setCachedData } from '../../utils/cache';
 
 export const getDashboardStats = async (req: AuthRequest, res: Response): Promise<Response> => {
     try {
         const isCEO = req.user?.role === UserRole.CEO;
         const branchId = isCEO ? undefined : req.user?.branchId;
+
+        const cacheKey = `dashboard_stats_${branchId || 'global'}`;
+        const cachedStats = await getCachedData(cacheKey);
+
+        if (cachedStats) {
+            console.log(`[Dashboard Cache Hit] Key: ${cacheKey}`);
+            return successResponse(res, cachedStats);
+        }
 
         console.log('Dashboard Stats Debug:', { role: req.user?.role, isCEO, branchId });
 
@@ -17,25 +26,27 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
         const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
-        // Revenue: sum of all approved/paid fee payment requests
-        const revenueWhere: any = branchId
-            ? { status: 'APPROVED', student: { branchId } }
-            : { status: 'APPROVED' };
+        // Revenue filter for last month
         const lastMonthRevenueWhere: any = branchId
             ? { status: 'APPROVED', student: { branchId }, updatedAt: { gte: startOfLastMonth, lte: endOfLastMonth } }
             : { status: 'APPROVED', updatedAt: { gte: startOfLastMonth, lte: endOfLastMonth } };
 
+        // Fetch Denormalized Totals (Instant)
+        const branchStats = branchId
+            ? await (prisma.branch as any).findUnique({
+                where: { id: branchId },
+                select: { totalLeads: true, totalAdmissions: true, totalStudents: true, totalRevenue: true, totalPlacements: true }
+            })
+            : await (prisma.branch as any).aggregate({
+                _sum: { totalLeads: true, totalAdmissions: true, totalStudents: true, totalRevenue: true, totalPlacements: true }
+            });
+
+        const totals = branchId ? branchStats : branchStats._sum;
+
         const kpiPromises = [
-            prisma.lead.count({ where }),
+            // Trend data still needs live counts based on dates
             prisma.lead.count({ where: { ...where, createdAt: { gte: startOfLastMonth, lte: endOfLastMonth } } }),
-            prisma.user.count({ where: { ...where, role: UserRole.STUDENT, isActive: true } }),
             prisma.user.count({ where: { ...where, role: UserRole.STUDENT, isActive: true, createdAt: { lte: endOfLastMonth } } }),
-            prisma.placement.count({
-                where: {
-                    ...(branchId ? { student: { branchId } } : {}),
-                    status: { notIn: [PlacementStatus.REJECTED, PlacementStatus.NOT_ELIGIBLE] }
-                }
-            }),
             prisma.placement.count({
                 where: {
                     ...(branchId ? { student: { branchId } } : {}),
@@ -43,13 +54,8 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
                     createdAt: { gte: startOfLastMonth, lte: endOfLastMonth }
                 }
             }),
-        ];
-
-        // Revenue queries (kept separate to avoid mixed-type Promise.all inference issues)
-        const revenuePromises = Promise.all([
-            prisma.feePaymentRequest.aggregate({ where: revenueWhere, _sum: { amount: true } }),
             prisma.feePaymentRequest.aggregate({ where: lastMonthRevenueWhere, _sum: { amount: true } }),
-        ]);
+        ];
 
         const placementTrendPromises = [];
         for (let i = 5; i >= 0; i--) {
@@ -73,9 +79,7 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
             placementTrend,
             courseDistribution,
             trainers,
-            branches,
-            allPlacements,
-            [revenueResult, lastMonthRevenueResult]
+            branches
         ] = await Promise.all([
             Promise.all(kpiPromises),
             Promise.all(placementTrendPromises),
@@ -94,25 +98,22 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
             }),
             isCEO ? prisma.branch.findMany({
                 where: { isActive: true },
-                include: {
-                    _count: { select: { leads: true, admissions: true, students: true, trainers: true } }
-                }
+                // Denormalized fields are already here!
             }) : Promise.resolve([]),
-            isCEO ? prisma.placement.findMany({
-                where: { status: { notIn: [PlacementStatus.REJECTED, PlacementStatus.NOT_ELIGIBLE] } },
-                select: { student: { select: { branchId: true } } }
-            }) : Promise.resolve([]),
-            revenuePromises,
         ]);
 
         // Process KPI stats
         const [
-            totalLeads, lastMonthLeads,
-            activeStudents, lastMonthActiveStudents,
-            totalPlacements, lastMonthPlacements
-        ] = kpiResults;
+            lastMonthLeads,
+            lastMonthActiveStudents,
+            lastMonthPlacements,
+            lastMonthRevenueResult
+        ] = kpiResults as any[];
 
-        const totalRevenue = Number(revenueResult._sum?.amount || 0);
+        const totalLeads = totals?.totalLeads || 0;
+        const totalRevenue = totals?.totalRevenue || 0;
+        const activeStudents = totals?.totalStudents || 0;
+        const totalPlacements = totals?.totalPlacements || 0;
         const lastMonthRevenue = Number(lastMonthRevenueResult._sum?.amount || 0);
 
         const calculateChange = (current: number, last: number) => {
@@ -127,7 +128,7 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
             placements: { value: totalPlacements, change: calculateChange(totalPlacements, lastMonthPlacements) },
         };
 
-        // Batch fetch courses for distribution (avoiding N+1)
+        // Course distribution names
         const courseIds = courseDistribution.map(item => item.courseId);
         const courses = await prisma.course.findMany({
             where: { id: { in: courseIds } },
@@ -142,19 +143,13 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
         // Process Branch Performance (CEO only)
         let branchPerformance: any[] = [];
         if (isCEO) {
-            // Count placements per branch from the batch query
-            const placementCounts: Record<string, number> = {};
-            allPlacements.forEach(p => {
-                const bId = p.student.branchId;
-                placementCounts[bId] = (placementCounts[bId] || 0) + 1;
-            });
-
-            branchPerformance = branches.map(b => ({
+            branchPerformance = branches.map((b: any) => ({
                 branch: b.name,
-                leads: b._count.leads,
-                admissions: b._count.admissions,
-                students: b._count.students,
-                placements: placementCounts[b.id] || 0,
+                leads: b.totalLeads,
+                admissions: b.totalAdmissions,
+                students: b.totalStudents,
+                placements: b.totalPlacements,
+                revenue: b.totalRevenue
             }));
         }
 
@@ -162,11 +157,11 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
             name: `${t.user.firstName} ${t.user.lastName}`,
             course: t.specialization || 'General',
             students: t._count.attendances,
-            rating: 4.5 + (Math.random() * 0.5),
+            rating: 4.5,
             status: 'Active'
         }));
 
-        return successResponse(res, {
+        const responseData = {
             stats: {
                 kpis,
                 placementTrend,
@@ -174,8 +169,13 @@ export const getDashboardStats = async (req: AuthRequest, res: Response): Promis
                 branchPerformance,
                 trainerPerformance: trainerPerformanceData,
             }
-        });
+        };
+
+        await setCachedData(cacheKey, responseData, 300);
+
+        return successResponse(res, responseData);
     } catch (error) {
+        console.error('[Dashboard Error]:', error);
         return errorResponse(res, 'Failed to fetch dashboard stats', 500, error);
     }
 };

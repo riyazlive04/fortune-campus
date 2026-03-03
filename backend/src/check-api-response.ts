@@ -1,4 +1,3 @@
-import axios from 'axios';
 
 // Note: This script runs in the backend context but tries to simulate an API call
 // Since I don't have the token, I'll simulate the response object the controller sends.

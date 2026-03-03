@@ -6,12 +6,15 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, CheckCircle2, Trophy, Users, Building2, Star, Target, GraduationCap, MapPin } from "lucide-react";
 import Footer from "@/components/Footer";
-import { authApi, storage, placementApi, companyApi } from "@/lib/api";
+import { authApi, storage, placementApi, companyApi, dashboardApi } from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 import { motion, Variants, AnimatePresence } from "framer-motion";
 import logo from "@/assets/logo.jpg";
 
 const Login = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +76,16 @@ const Login = () => {
       if (result.success && result.data) {
         storage.setToken(result.data.token);
         storage.setUser(result.data.user);
+
+        // Pre-fetch core data
+        queryClient.prefetchQuery({
+          queryKey: ['dashboardStats'],
+          queryFn: async () => {
+            const res = await dashboardApi.getStats();
+            return res.data.stats || res.data;
+          }
+        });
+
         setIsSuccess(true);
         setLoading(false);
         await new Promise(resolve => setTimeout(resolve, 800));

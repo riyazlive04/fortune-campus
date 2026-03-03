@@ -166,8 +166,8 @@ const BranchHeadDashboard = () => {
     return (
         <div className="animate-fade-in space-y-6 pb-10">
             <PageHeader
-                title="Branch Dashboard"
-                description={`Welcome back! Here's what's happening at your branch.`}
+                title="Channel Partner"
+                description={`Welcome back !`}
             />
 
             {/* KPI Overview */}

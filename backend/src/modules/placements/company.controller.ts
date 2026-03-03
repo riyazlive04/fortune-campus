@@ -154,7 +154,7 @@ export const deleteCompany = async (req: AuthRequest, res: Response): Promise<Re
   }
 };
 
-export const getPublicCompanyList = async (req: any, res: Response): Promise<Response> => {
+export const getPublicCompanyList = async (_req: any, res: Response): Promise<Response> => {
   try {
     const companies = await prisma.company.findMany({
       where: { isActive: true },

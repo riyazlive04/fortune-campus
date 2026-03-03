@@ -10,47 +10,45 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
-
 // Models
 model User {
-  id            String   @id @default(uuid())
-  email         String   @unique
-  password      String
-  firstName     String
-  lastName      String
-  phone         String?
-  role          String
-  isActive      Boolean  @default(true)
-  photo         String?
-  branchId      String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  firstName String
+  lastName  String
+  phone     String?
+  role      String
+  isActive  Boolean  @default(true)
+  photo     String?
+  branchId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  branch        Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
-  
+  branch Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
   // Role-specific relations
-  leadsCreated  Lead[]   @relation("LeadCreator")
-  leadsAssigned Lead[]   @relation("LeadAssignee")
-  callLogs      CallLog[]
-  followUps     FollowUp[]
-  statusChanges LeadStatusHistory[]
-  conversions   LeadConversionLog[]
-  studentProfile Student? @relation("StudentUser")
-  trainerProfile Trainer?
-  incentives    Incentive[]
-  notifications Notification[]
-  uploadedReports BranchReport[]
-  performanceGapsTarget PerformanceGap[] @relation("GapTarget")
-  performanceGapsCreated PerformanceGap[] @relation("GapCreator")
-  recordedAttendances Attendance[] @relation("AttendanceRecorder")
-  feeRequestsCreated FeePaymentRequest[] @relation("FeeRequestedBy")
-  feeRequestsApproved FeePaymentRequest[] @relation("FeeApprovedBy")
-  
+  leadsCreated           Lead[]              @relation("LeadCreator")
+  leadsAssigned          Lead[]              @relation("LeadAssignee")
+  callLogs               CallLog[]
+  followUps              FollowUp[]
+  statusChanges          LeadStatusHistory[]
+  conversions            LeadConversionLog[]
+  studentProfile         Student?            @relation("StudentUser")
+  trainerProfile         Trainer?
+  incentives             Incentive[]
+  notifications          Notification[]
+  uploadedReports        BranchReport[]
+  performanceGapsTarget  PerformanceGap[]    @relation("GapTarget")
+  performanceGapsCreated PerformanceGap[]    @relation("GapCreator")
+  recordedAttendances    Attendance[]        @relation("AttendanceRecorder")
+  feeRequestsCreated     FeePaymentRequest[] @relation("FeeRequestedBy")
+  feeRequestsApproved    FeePaymentRequest[] @relation("FeeApprovedBy")
+
   // Custom multi-branch assignment for Telecallers
   assignedBranches Branch[] @relation("TelecallerAssignments")
-  
+
   @@index([email])
   @@index([branchId])
   @@index([createdAt])
@@ -58,58 +56,65 @@ model User {
 }
 
 model Branch {
-  id          String   @id @default(uuid())
-  name        String
-  code        String   @unique
-  address     String?
-  city        String?
-  state       String?
-  phone       String?
-  email       String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(uuid())
+  name      String
+  code      String   @unique
+  address   String?
+  city      String?
+  state     String?
+  phone     String?
+  email     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  users       User[]
-  leads       Lead[]
-  admissions  Admission[]
-  students    Student[]
-  trainers    Trainer[]
-  courses     Course[]
-  batches     Batch[]
-  awards      TrainerAward[]
+  users              User[]
+  leads              Lead[]
+  admissions         Admission[]
+  students           Student[]
+  trainers           Trainer[]
+  courses            Course[]
+  batches            Batch[]
+  awards             TrainerAward[]
   trainerAttendances TrainerAttendance[]
-  expenses    Expense[]
-  socialMedia SocialMediaEngagement[]
-  eventPlans  EventPlan[]
-  branchReports BranchReport[]
-  performanceGaps PerformanceGap[]
-  feeRequests     FeePaymentRequest[]
-  
+  expenses           Expense[]
+  socialMedia        SocialMediaEngagement[]
+  eventPlans         EventPlan[]
+  branchReports      BranchReport[]
+  performanceGaps    PerformanceGap[]
+  feeRequests        FeePaymentRequest[]
+
   // Telecallers assigned to this branch
   telecallers User[] @relation("TelecallerAssignments")
-  
+
+  // Denormalized Counters
+  totalLeads      Int @default(0)
+  totalAdmissions Int @default(0)
+  totalStudents   Int @default(0)
+  totalRevenue    Float @default(0)
+  totalPlacements Int @default(0)
+
   @@map("branches")
 }
 
 model PerformanceGap {
-  id              String   @id @default(uuid())
+  id              String  @id @default(uuid())
   targetUserId    String
-  category        String   // "STUDENT", "TRAINER", "TELECALLER"
+  category        String // "STUDENT", "TRAINER", "TELECALLER"
   weakness        String
   improvementPlan String?
-  status          String   @default("IDENTIFIED") // IDENTIFIED, IMPROVING, RESOLVED
-  
-  createdById     String
-  branchId        String
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  status          String  @default("IDENTIFIED") // IDENTIFIED, IMPROVING, RESOLVED
 
-  targetUser      User     @relation("GapTarget", fields: [targetUserId], references: [id])
-  createdBy       User     @relation("GapCreator", fields: [createdById], references: [id])
-  branch          Branch   @relation(fields: [branchId], references: [id])
+  createdById String
+  branchId    String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  targetUser User   @relation("GapTarget", fields: [targetUserId], references: [id])
+  createdBy  User   @relation("GapCreator", fields: [createdById], references: [id])
+  branch     Branch @relation(fields: [branchId], references: [id])
 
   @@index([targetUserId])
   @@index([branchId])
@@ -118,59 +123,62 @@ model PerformanceGap {
 }
 
 model Lead {
-  id              String     @id @default(uuid())
-  firstName       String
-  lastName        String
-  email           String?
-  phone           String
-  location        String?
-  source          String     @default("OTHER")
-  status          String     @default("NEW")
+  id               String  @id @default(uuid())
+  firstName        String
+  lastName         String
+  email            String?
+  phone            String
+  location         String?
+  source           String  @default("OTHER")
+  status           String  @default("NEW")
   interestedCourse String?
-  
-  branchId        String
-  createdById     String?
-  assignedToId    String?    // Nullable initially for system leads before auto-assignment
-  
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+
+  branchId     String
+  createdById  String?
+  assignedToId String? // Nullable initially for system leads before auto-assignment
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  branch          Branch     @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  createdBy       User?      @relation("LeadCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  assignedTo      User?      @relation("LeadAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
-  admission       Admission? @relation("LeadConversion")
-  
-  callLogs        CallLog[]
-  followUps       FollowUp[]
-  statusHistory   LeadStatusHistory[]
-  conversionLogs  LeadConversionLog[]
-  whatsappLogs    WhatsAppLog[]
-  
+  branch     Branch     @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  createdBy  User?      @relation("LeadCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  assignedTo User?      @relation("LeadAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  admission  Admission? @relation("LeadConversion")
+
+  callLogs       CallLog[]
+  followUps      FollowUp[]
+  statusHistory  LeadStatusHistory[]
+  conversionLogs LeadConversionLog[]
+  whatsappLogs   WhatsAppLog[]
+
   @@index([branchId])
   @@index([createdById])
   @@index([assignedToId])
   @@index([status])
   @@index([createdAt])
+  @@index([branchId, status, createdAt])
+  @@index([branchId, status])
+  @@index([branchId, createdAt])
   @@map("leads")
 }
 
 model CallLog {
-  id              String     @id @default(uuid())
-  leadId          String
-  telecallerId    String
-  
-  callDate        DateTime   @default(now())
-  callStatus      String     // Connected, Not Picked, Switched Off, etc.
-  notes           String?
-  
+  id           String @id @default(uuid())
+  leadId       String
+  telecallerId String
+
+  callDate   DateTime @default(now())
+  callStatus String // Connected, Not Picked, Switched Off, etc.
+  notes      String?
+
   nextFollowUpDate DateTime?
-  
-  createdAt       DateTime   @default(now())
+
+  createdAt DateTime @default(now())
 
   // Relations
-  lead            Lead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  telecaller      User       @relation(fields: [telecallerId], references: [id], onDelete: Cascade)
+  lead       Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  telecaller User @relation(fields: [telecallerId], references: [id], onDelete: Cascade)
 
   @@index([leadId])
   @@index([telecallerId])
@@ -178,21 +186,21 @@ model CallLog {
 }
 
 model FollowUp {
-  id              String     @id @default(uuid())
-  leadId          String
-  telecallerId    String
-  
-  scheduledDate   DateTime
-  status          String     @default("PENDING") // PENDING, COMPLETED, OVERDUE, CANCELLED
-  type            String?    // CALL, DEMO, VISIT
-  notes           String?
-  
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+  id           String @id @default(uuid())
+  leadId       String
+  telecallerId String
+
+  scheduledDate DateTime
+  status        String   @default("PENDING") // PENDING, COMPLETED, OVERDUE, CANCELLED
+  type          String? // CALL, DEMO, VISIT
+  notes         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  lead            Lead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  telecaller      User       @relation(fields: [telecallerId], references: [id], onDelete: Cascade)
+  lead       Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  telecaller User @relation(fields: [telecallerId], references: [id], onDelete: Cascade)
 
   @@index([leadId])
   @@index([telecallerId])
@@ -202,236 +210,239 @@ model FollowUp {
 }
 
 model LeadStatusHistory {
-  id              String     @id @default(uuid())
-  leadId          String
-  oldStatus       String?
-  newStatus       String
-  changedById     String
-  notes           String?
-  
-  createdAt       DateTime   @default(now())
+  id          String  @id @default(uuid())
+  leadId      String
+  oldStatus   String?
+  newStatus   String
+  changedById String
+  notes       String?
+
+  createdAt DateTime @default(now())
 
   // Relations
-  lead            Lead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  changedBy       User       @relation(fields: [changedById], references: [id], onDelete: Cascade)
+  lead      Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  changedBy User @relation(fields: [changedById], references: [id], onDelete: Cascade)
 
   @@index([leadId])
   @@map("lead_status_history")
 }
 
 model LeadConversionLog {
-  id              String     @id @default(uuid())
-  leadId          String
-  admissionId     String     @unique
-  convertedById   String
-  
-  createdAt       DateTime   @default(now())
+  id            String @id @default(uuid())
+  leadId        String
+  admissionId   String @unique
+  convertedById String
+
+  createdAt DateTime @default(now())
 
   // Relations
-  lead            Lead       @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  admission       Admission  @relation(fields: [admissionId], references: [id], onDelete: Cascade)
-  convertedBy     User       @relation(fields: [convertedById], references: [id], onDelete: Cascade)
+  lead        Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  admission   Admission @relation(fields: [admissionId], references: [id], onDelete: Cascade)
+  convertedBy User      @relation(fields: [convertedById], references: [id], onDelete: Cascade)
 
   @@index([leadId])
   @@map("lead_conversion_logs")
 }
 
 model Admission {
-  id              String          @id @default(uuid())
-  admissionNumber String          @unique
-  
-  firstName       String
-  lastName        String
-  email           String?
-  phone           String
-  dateOfBirth     DateTime?
-  gender          String?
-  address         String?
-  
-  courseId        String
-  batchName       String?
-  feeAmount       Float
-  feePaid         Float         @default(0)
-  feeBalance      Float         @default(0)
+  id              String @id @default(uuid())
+  admissionNumber String @unique
+
+  firstName   String
+  lastName    String
+  email       String?
+  phone       String
+  dateOfBirth DateTime?
+  gender      String?
+  address     String?
+
+  courseId   String
+  batchName  String?
+  feeAmount  Float
+  feePaid    Float   @default(0)
+  feeBalance Float   @default(0)
   // paymentPlan     String?
-  
-  status          String @default("PENDING") // PENDING, DROPOUT, etc.
-  admissionDate   DateTime        @default(now())
+
+  status        String   @default("PENDING") // PENDING, DROPOUT, etc.
+  admissionDate DateTime @default(now())
 
   // New Fields matching Student model for history
-  dateOfJoining   DateTime?
-  parentPhone     String?
-  qualification   String?
-  leadSource      String?
-  aadhaarNumber   String?
-  panNumber       String?
+  dateOfJoining    DateTime?
+  parentPhone      String?
+  qualification    String?
+  leadSource       String?
+  aadhaarNumber    String?
+  panNumber        String?
   selectedSoftware String?
-  paymentPlan     String?
-  paymentMode     String?         // CASH or UPI
-  transactionId   String?         // Number for UPI
+  paymentPlan      String?
+  paymentMode      String? // CASH or UPI
+  transactionId    String? // Number for UPI
 
-  softwareFinishedAt DateTime?    // To trigger conduct exam reminders
-  
-  branchId        String
-  leadId          String?         @unique
-  
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  softwareFinishedAt DateTime? // To trigger conduct exam reminders
+
+  branchId String
+  leadId   String? @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  branch          Branch          @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  course          Course          @relation(fields: [courseId], references: [id])
-  lead            Lead?           @relation("LeadConversion", fields: [leadId], references: [id])
-  student         Student?
-  conversionLog   LeadConversionLog?
-  whatsappLogs    WhatsAppLog[]
+  branch             Branch              @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  course             Course              @relation(fields: [courseId], references: [id])
+  lead               Lead?               @relation("LeadConversion", fields: [leadId], references: [id])
+  student            Student?
+  conversionLog      LeadConversionLog?
+  whatsappLogs       WhatsAppLog[]
   feePaymentRequests FeePaymentRequest[]
-  
+
   @@index([branchId])
   @@index([courseId])
   @@index([status])
   @@index([createdAt])
+  @@index([branchId, status, admissionDate])
   @@map("admissions")
 }
 
 model FeePaymentRequest {
-  id              String   @id @default(uuid())
-  studentId       String
-  admissionId     String
-  amount          Float
-  paymentMode     String   // CASH, UPI
-  transactionId   String?  // Number for UPI
-  
-  status          String   @default("PENDING") // PENDING, APPROVED, REJECTED
-  
-  requestedById   String
-  branchId        String
-  approvedById    String?
-  
-  isSentToStudent Boolean  @default(false)
+  id            String  @id @default(uuid())
+  studentId     String
+  admissionId   String
+  amount        Float
+  paymentMode   String // CASH, UPI
+  transactionId String? // Number for UPI
+
+  status String @default("PENDING") // PENDING, APPROVED, REJECTED
+
+  requestedById String
+  branchId      String
+  approvedById  String?
+
+  isSentToStudent Boolean   @default(false)
   sentAt          DateTime?
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  admission       Admission @relation(fields: [admissionId], references: [id], onDelete: Cascade)
-  requestedBy     User     @relation("FeeRequestedBy", fields: [requestedById], references: [id])
-  approvedBy      User?    @relation("FeeApprovedBy", fields: [approvedById], references: [id])
-  branch          Branch   @relation(fields: [branchId], references: [id])
+  student     Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  admission   Admission @relation(fields: [admissionId], references: [id], onDelete: Cascade)
+  requestedBy User      @relation("FeeRequestedBy", fields: [requestedById], references: [id])
+  approvedBy  User?     @relation("FeeApprovedBy", fields: [approvedById], references: [id])
+  branch      Branch    @relation(fields: [branchId], references: [id])
 
   @@index([status])
+  @@index([status, updatedAt])
   @@index([requestedById])
   @@index([branchId])
   @@map("fee_payment_requests")
 }
 
 model Student {
-  id              String   @id @default(uuid())
-  userId          String   @unique
-  admissionId     String   @unique
-  enrollmentNumber String  @unique
-  
+  id               String @id @default(uuid())
+  userId           String @unique
+  admissionId      String @unique
+  enrollmentNumber String @unique
+
   currentSemester Int?
   cgpa            Float?
-  
-  branchId        String
-  courseId        String
-  batchId         String?
-  
+
+  branchId String
+  courseId String
+  batchId  String?
+
   // New Fields (Enabled)
-  dateOfJoining   DateTime?
-  dateOfBirth     DateTime?
-  gender          String?
-  parentPhone     String?
-  address         String?
-  qualification   String?
-  leadSource      String?
-  aadhaarNumber   String?   @unique
-  panNumber       String?
+  dateOfJoining    DateTime?
+  dateOfBirth      DateTime?
+  gender           String?
+  parentPhone      String?
+  address          String?
+  qualification    String?
+  leadSource       String?
+  aadhaarNumber    String?   @unique
+  panNumber        String?
   selectedSoftware String?
-  
-  isActive        Boolean  @default(true)
+
+  isActive          Boolean @default(true)
   placementEligible Boolean @default(false)
   certificateLocked Boolean @default(true)
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  user            User     @relation("StudentUser", fields: [userId], references: [id], onDelete: Cascade)
-  admission       Admission @relation(fields: [admissionId], references: [id], onDelete: Cascade)
-  branch          Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  course          Course   @relation(fields: [courseId], references: [id])
-  batch           Batch?   @relation(fields: [batchId], references: [id], onDelete: SetNull)
-  
-  attendances     Attendance[]
-  portfolios      Portfolio[] // Legacy portfolio
+  user      User      @relation("StudentUser", fields: [userId], references: [id], onDelete: Cascade)
+  admission Admission @relation(fields: [admissionId], references: [id], onDelete: Cascade)
+  branch    Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  course    Course    @relation(fields: [courseId], references: [id])
+  batch     Batch?    @relation(fields: [batchId], references: [id], onDelete: SetNull)
+
+  attendances          Attendance[]
+  portfolios           Portfolio[] // Legacy portfolio
   portfolioSubmissions PortfolioSubmission[]
-  softwareProgress SoftwareProgress[]
-  testScores       TestScore[]
-  placements      Placement[]
-  growthReports   StudentGrowthReport[]
-  feedbacks       StudentFeedback[]
-  batchEnrollments StudentBatch[] // Many-to-many enrollment tracking
-  trainerRatings  TrainerRating[]
-  feePaymentRequests FeePaymentRequest[]
-  
+  softwareProgress     SoftwareProgress[]
+  testScores           TestScore[]
+  placements           Placement[]
+  growthReports        StudentGrowthReport[]
+  feedbacks            StudentFeedback[]
+  batchEnrollments     StudentBatch[] // Many-to-many enrollment tracking
+  trainerRatings       TrainerRating[]
+  feePaymentRequests   FeePaymentRequest[]
+
   @@index([branchId])
   @@index([courseId])
   @@index([batchId])
+  @@index([branchId, isActive])
   @@map("students")
 }
 
 model Trainer {
-  id              String   @id @default(uuid())
-  userId          String   @unique
-  employeeId      String   @unique
-  
-  specialization  String?
-  experience      Int?     // years
-  qualification   String?
-  
-  branchId        String
-  
-  isActive        Boolean  @default(true)
-  joiningDate     DateTime @default(now())
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id         String @id @default(uuid())
+  userId     String @unique
+  employeeId String @unique
+
+  specialization String?
+  experience     Int? // years
+  qualification  String?
+
+  branchId String
+
+  isActive    Boolean  @default(true)
+  joiningDate DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Relations
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  branch          Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  
-  courses           CourseTrainer[]
-  batches           Batch[]
-  attendances       Attendance[]
-  trainerAttendances TrainerAttendance[]
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  courses              CourseTrainer[]
+  batches              Batch[]
+  attendances          Attendance[]
+  trainerAttendances   TrainerAttendance[]
   portfolioSubmissions PortfolioSubmission[]
-  incentives        Incentive[]
-  growthReports     StudentGrowthReport[]
-  fileReports       ClassAndPortfolioReport[]
-  awards            TrainerAward[]
-  ratings           TrainerRating[]
-  
+  incentives           Incentive[]
+  growthReports        StudentGrowthReport[]
+  fileReports          ClassAndPortfolioReport[]
+  awards               TrainerAward[]
+  ratings              TrainerRating[]
+
   @@index([branchId])
   @@map("trainers")
 }
 
 model TrainerRating {
-  id          String   @id @default(uuid())
-  trainerId   String
-  studentId   String
-  rating      Float    // 1.0 – 5.0
-  comment     String?
-  month       Int      // 1-12
-  year        Int
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(uuid())
+  trainerId String
+  studentId String
+  rating    Float // 1.0 – 5.0
+  comment   String?
+  month     Int // 1-12
+  year      Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  trainer     Trainer  @relation(fields: [trainerId], references: [id], onDelete: Cascade)
-  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  trainer Trainer @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([trainerId, studentId, month, year])
   @@index([trainerId])
@@ -440,49 +451,49 @@ model TrainerRating {
 }
 
 model Course {
-  id              String   @id @default(uuid())
-  name            String
-  code            String   @unique
-  description     String?
-  duration        Int      // in months
-  fees            Float
-  
-  syllabus        String?  // JSON or text
-  prerequisites   String?
-  
-  branchId        String?
-  
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id          String  @id @default(uuid())
+  name        String
+  code        String  @unique
+  description String?
+  duration    Int // in months
+  fees        Float
+
+  syllabus      String? // JSON or text
+  prerequisites String?
+
+  branchId String?
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  branch          Branch?  @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  
-  trainers        CourseTrainer[]
-  batches         Batch[]
-  portfolioTasks  PortfolioTask[]
-  admissions      Admission[]
-  students        Student[]
-  attendances     Attendance[]
-  growthReports   StudentGrowthReport[]
-  
+  branch Branch? @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  trainers       CourseTrainer[]
+  batches        Batch[]
+  portfolioTasks PortfolioTask[]
+  admissions     Admission[]
+  students       Student[]
+  attendances    Attendance[]
+  growthReports  StudentGrowthReport[]
+
   @@index([branchId])
   @@map("courses")
 }
 
 model CourseTrainer {
-  id              String   @id @default(uuid())
-  courseId        String
-  trainerId       String
-  
-  assignedAt      DateTime @default(now())
-  isActive        Boolean  @default(true)
+  id        String @id @default(uuid())
+  courseId  String
+  trainerId String
+
+  assignedAt DateTime @default(now())
+  isActive   Boolean  @default(true)
 
   // Relations
-  course          Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  trainer         Trainer  @relation(fields: [trainerId], references: [id], onDelete: Cascade)
-  
+  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  trainer Trainer @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+
   @@unique([courseId, trainerId])
   @@index([courseId])
   @@index([trainerId])
@@ -490,69 +501,72 @@ model CourseTrainer {
 }
 
 model Attendance {
-  id              String           @id @default(uuid())
-  date            DateTime
-  status          String           // PRESENT, ABSENT, LATE
-  remarks         String?
-  
-  inTime          DateTime?
-  outTime         DateTime?
-  latitude        Float?
-  longitude       Float?
-  period          Int              @default(1)
-  isVerified      Boolean          @default(false)
-  
-  // Substitute Tracking
-  isSubstitute    Boolean          @default(false)
-  recordedById    String?          // The trainer who actually marked it
+  id      String   @id @default(uuid())
+  date    DateTime
+  status  String // PRESENT, ABSENT, LATE
+  remarks String?
 
-  studentId       String
-  courseId        String
-  batchId         String?
-  trainerId       String?
-  
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  inTime     DateTime?
+  outTime    DateTime?
+  latitude   Float?
+  longitude  Float?
+  period     Int       @default(1)
+  isVerified Boolean   @default(false)
+
+  // Substitute Tracking
+  isSubstitute Boolean @default(false)
+  recordedById String? // The trainer who actually marked it
+
+  studentId String
+  courseId  String
+  batchId   String?
+  trainerId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  student         Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  course          Course           @relation(fields: [courseId], references: [id])
-  batch           Batch?           @relation(fields: [batchId], references: [id], onDelete: SetNull)
-  trainer         Trainer?         @relation(fields: [trainerId], references: [id], onDelete: SetNull)
-  recordedBy      User?            @relation("AttendanceRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
-  
+  student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course     Course   @relation(fields: [courseId], references: [id])
+  batch      Batch?   @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  trainer    Trainer? @relation(fields: [trainerId], references: [id], onDelete: SetNull)
+  recordedBy User?    @relation("AttendanceRecorder", fields: [recordedById], references: [id], onDelete: SetNull)
+
   @@unique([studentId, courseId, date, period])
   @@index([studentId])
   @@index([courseId])
   @@index([batchId])
   @@index([date])
+  @@index([studentId, date])
+  @@index([batchId, date])
+  @@index([courseId, date])
   @@map("attendances")
 }
 
 model TrainerAttendance {
-  id              String           @id @default(uuid())
-  date            DateTime
-  status          String           // PRESENT, ABSENT, LATE, HALFDAY
-  remarks         String?
-  
-  inTime          DateTime?
-  outTime         DateTime?
-  
-  isSubstitute    Boolean          @default(false)
-  originalTrainerId String?        // If this is a substitution, who was the original?
+  id      String   @id @default(uuid())
+  date    DateTime
+  status  String // PRESENT, ABSENT, LATE, HALFDAY
+  remarks String?
 
-  trainerId       String
-  branchId        String
-  batchId         String?
-  
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  inTime  DateTime?
+  outTime DateTime?
+
+  isSubstitute      Boolean @default(false)
+  originalTrainerId String? // If this is a substitution, who was the original?
+
+  trainerId String
+  branchId  String
+  batchId   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  trainer         Trainer          @relation(fields: [trainerId], references: [id], onDelete: Cascade)
-  branch          Branch           @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  batch           Batch?           @relation(fields: [batchId], references: [id], onDelete: SetNull)
-  
+  trainer Trainer @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  branch  Branch  @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  batch   Batch?  @relation(fields: [batchId], references: [id], onDelete: SetNull)
+
   @@unique([trainerId, batchId, date])
   @@index([trainerId])
   @@index([branchId])
@@ -562,46 +576,47 @@ model TrainerAttendance {
 }
 
 model Batch {
-  id              String   @id @default(uuid())
-  name            String
-  code            String
-  
-  branchId        String
-  courseId        String
-  trainerId       String?
-  
-  startTime       String?  // e.g. "10:00 AM"
-  endTime         String?
-  
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id   String @id @default(uuid())
+  name String
+  code String
+
+  branchId  String
+  courseId  String
+  trainerId String?
+
+  startTime String? // e.g. "10:00 AM"
+  endTime   String?
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  branch          Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  course          Course   @relation(fields: [courseId], references: [id])
-  trainer         Trainer? @relation(fields: [trainerId], references: [id], onDelete: SetNull)
-  students        Student[]
-  attendances     Attendance[]
+  branch             Branch              @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  course             Course              @relation(fields: [courseId], references: [id])
+  trainer            Trainer?            @relation(fields: [trainerId], references: [id], onDelete: SetNull)
+  students           Student[]
+  attendances        Attendance[]
   trainerAttendances TrainerAttendance[]
-  tests           Test[]
-  enrollments     StudentBatch[] // Many-to-many enrollment tracking
-  
+  tests              Test[]
+  enrollments        StudentBatch[] // Many-to-many enrollment tracking
+
   @@index([branchId])
   @@index([courseId])
   @@index([trainerId])
+  @@index([branchId, isActive])
   @@map("batches")
 }
 
 model StudentBatch {
-  id          String   @id @default(uuid())
-  studentId   String
-  batchId     String
-  enrolledAt  DateTime @default(now())
-  isActive    Boolean  @default(true)
+  id         String   @id @default(uuid())
+  studentId  String
+  batchId    String
+  enrolledAt DateTime @default(now())
+  isActive   Boolean  @default(true)
 
-  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  batch       Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  batch   Batch   @relation(fields: [batchId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, batchId])
   @@index([studentId])
@@ -610,206 +625,207 @@ model StudentBatch {
 }
 
 model PortfolioTask {
-  id              String   @id @default(uuid())
-  courseId        String
-  title           String
-  description     String?
-  order           Int      @default(0)
-  isMandatory     Boolean  @default(true)
-  deadlineDays    Int?     // Number of days after enrollment for deadline
-  expectedFormat  String?  // e.g. "PDF", "Link", "ZIP"
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String  @id @default(uuid())
+  courseId       String
+  title          String
+  description    String?
+  order          Int     @default(0)
+  isMandatory    Boolean @default(true)
+  deadlineDays   Int? // Number of days after enrollment for deadline
+  expectedFormat String? // e.g. "PDF", "Link", "ZIP"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  course          Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  submissions     PortfolioSubmission[]
-  
+  course      Course                @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  submissions PortfolioSubmission[]
+
   @@index([courseId])
   @@map("portfolio_tasks")
 }
 
 model PortfolioSubmission {
-  id              String   @id @default(uuid())
-  studentId       String
-  taskId          String
-  trainerId       String?
-  
-  workUrl         String?
-  behanceUrl      String?
-  remarks         String?
-  status          String   @default("PENDING") // PENDING, APPROVED, REJECTED
-  rejectionCount  Int      @default(0)
-  
-  submittedAt     DateTime @default(now())
-  reviewedAt      DateTime?
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id        String  @id @default(uuid())
+  studentId String
+  taskId    String
+  trainerId String?
+
+  workUrl        String?
+  behanceUrl     String?
+  remarks        String?
+  status         String  @default("PENDING") // PENDING, APPROVED, REJECTED
+  rejectionCount Int     @default(0)
+
+  submittedAt DateTime  @default(now())
+  reviewedAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  task            PortfolioTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  trainer         Trainer? @relation(fields: [trainerId], references: [id], onDelete: SetNull)
-  
+  student Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  task    PortfolioTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  trainer Trainer?      @relation(fields: [trainerId], references: [id], onDelete: SetNull)
+
   @@index([studentId])
   @@index([taskId])
   @@map("portfolio_submissions")
 }
 
-
 model Test {
-  id              String   @id @default(uuid())
-  batchId         String
-  title           String
-  date            DateTime
-  totalMarks      Float
-  passMarks       Float
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id         String   @id @default(uuid())
+  batchId    String
+  title      String
+  date       DateTime
+  totalMarks Float
+  passMarks  Float
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  batch           Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
-  scores          TestScore[]
-  
+  batch  Batch       @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  scores TestScore[]
+
   @@index([batchId])
   @@map("tests")
 }
 
 model TestScore {
-  id              String   @id @default(uuid())
-  testId          String
-  studentId       String
-  
-  marksObtained   Float
-  isPass          Boolean
-  remarks         String?
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id        String @id @default(uuid())
+  testId    String
+  studentId String
+
+  marksObtained Float
+  isPass        Boolean
+  remarks       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  test            Test     @relation(fields: [testId], references: [id], onDelete: Cascade)
-  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  
+  test    Test    @relation(fields: [testId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([testId, studentId])
   @@index([testId])
   @@index([studentId])
-  @@unique([testId, studentId])
   @@map("test_scores")
 }
 
 model Portfolio {
-  id              String   @id @default(uuid())
-  studentId       String
-  
-  title           String
-  description     String?
-  projectUrl      String?
-  githubUrl       String?
-  technologies    String? // Array of tech stack
-  
-  completedAt     DateTime?
-  isVerified      Boolean  @default(false)
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id        String @id @default(uuid())
+  studentId String
+
+  title        String
+  description  String?
+  projectUrl   String?
+  githubUrl    String?
+  technologies String? // Array of tech stack
+
+  completedAt DateTime?
+  isVerified  Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
   @@index([studentId])
   @@map("portfolios")
 }
 
 model Company {
-  id              String   @id @default(uuid())
-  name            String
-  industry        String?
-  website         String?
-  contactPerson   String?
-  contactEmail    String?
-  contactPhone    String?
-  address         String?
-  
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id            String  @id @default(uuid())
+  name          String
+  industry      String?
+  website       String?
+  contactPerson String?
+  contactEmail  String?
+  contactPhone  String?
+  address       String?
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  placements      Placement[]
-  
+  placements Placement[]
+
   @@map("companies")
 }
 
 model Placement {
-  id              String          @id @default(uuid())
-  studentId       String
-  companyId       String
-  
-  position        String
-  package         Float?
-  joiningDate     DateTime?
-  
-  status          String @default("ELIGIBLE")
-  remarks         String?
-  
-  appliedAt       DateTime        @default(now())
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  id        String @id @default(uuid())
+  studentId String
+  companyId String
+
+  position    String
+  package     Float?
+  joiningDate DateTime?
+
+  status  String  @default("ELIGIBLE")
+  remarks String?
+
+  appliedAt DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  student         Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  company         Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
   @@index([studentId])
   @@index([companyId])
   @@index([status])
   @@index([createdAt])
+  @@index([status, createdAt])
+  @@index([studentId, status])
   @@map("placements")
 }
 
 model SoftwareProgress {
-  id              String   @id @default(uuid())
-  studentId       String   @unique // One progress record per student for now
-  
-  completedTopics String   // JSON string or comma-separated list
+  id        String @id @default(uuid())
+  studentId String @unique // One progress record per student for now
+
+  completedTopics String // JSON string or comma-separated list
   currentTopic    String?
-  progress        Int      @default(0) // Percentage 0-100
-  
-  lastUpdated     DateTime @default(now())
-  
-  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  
+  progress        Int     @default(0) // Percentage 0-100
+
+  lastUpdated DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
   @@map("software_progress")
 }
 
 model Incentive {
-  id              String        @id @default(uuid())
-  type            String
-  amount          Float
-  description     String?
-  
-  userId          String
-  trainerId       String?
-  
-  referenceId     String?       // Can link to admission, placement, etc.
-  referenceType   String?       // "ADMISSION", "PLACEMENT", etc.
-  
-  month           Int
-  year            Int
-  
-  isPaid          Boolean       @default(false)
-  paidAt          DateTime?
-  
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id          String  @id @default(uuid())
+  type        String
+  amount      Float
+  description String?
+
+  userId    String
+  trainerId String?
+
+  referenceId   String? // Can link to admission, placement, etc.
+  referenceType String? // "ADMISSION", "PLACEMENT", etc.
+
+  month Int
+  year  Int
+
+  isPaid Boolean   @default(false)
+  paidAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  trainer         Trainer?      @relation(fields: [trainerId], references: [id], onDelete: SetNull)
-  
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trainer Trainer? @relation(fields: [trainerId], references: [id], onDelete: SetNull)
+
   @@index([userId])
   @@index([trainerId])
   @@index([month, year])
@@ -817,24 +833,24 @@ model Incentive {
 }
 
 model WhatsAppLog {
-  id              String   @id @default(uuid())
-  to              String
-  message         String
-  messageType     String   // "text", "template", etc.
-  
-  leadId          String?
-  admissionId     String?
-  
-  status          String   // "sent", "delivered", "failed"
-  errorMessage    String?
-  
-  sentAt          DateTime @default(now())
-  deliveredAt     DateTime?
+  id          String @id @default(uuid())
+  to          String
+  message     String
+  messageType String // "text", "template", etc.
+
+  leadId      String?
+  admissionId String?
+
+  status       String // "sent", "delivered", "failed"
+  errorMessage String?
+
+  sentAt      DateTime  @default(now())
+  deliveredAt DateTime?
 
   // Relations
-  lead            Lead?    @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  admission       Admission? @relation(fields: [admissionId], references: [id], onDelete: SetNull)
-  
+  lead      Lead?      @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  admission Admission? @relation(fields: [admissionId], references: [id], onDelete: SetNull)
+
   @@index([leadId])
   @@index([admissionId])
   @@index([sentAt])
@@ -842,19 +858,19 @@ model WhatsAppLog {
 }
 
 model Notification {
-  id              String   @id @default(uuid())
-  recipientId     String   // User ID who receives the notification
-  title           String
-  message         String
-  type            String   // "INFO", "WARNING", "SUCCESS", "ERROR"
-  link            String?  // Optional link to navigate to
-  
-  isRead          Boolean  @default(false)
-  createdAt       DateTime @default(now())
-  
+  id          String  @id @default(uuid())
+  recipientId String // User ID who receives the notification
+  title       String
+  message     String
+  type        String // "INFO", "WARNING", "SUCCESS", "ERROR"
+  link        String? // Optional link to navigate to
+
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
   // Relations
-  recipient       User     @relation(fields: [recipientId], references: [id], onDelete: Cascade)
-  
+  recipient User @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+
   @@index([recipientId])
   @@index([isRead])
   @@map("notifications")
@@ -862,25 +878,25 @@ model Notification {
 
 model StudentGrowthReport {
   id                String   @id @default(uuid())
-  qualityTeaching   Int      // Score 1-10
-  doubtClearance    Int      // Score 1-10
+  qualityTeaching   Int // Score 1-10
+  doubtClearance    Int // Score 1-10
   testScore         Float?
-  aiUpdate          String?  // Details about AI/Other updates
+  aiUpdate          String? // Details about AI/Other updates
   portfolioFollowUp Boolean  @default(false)
   classFollowUp     Boolean  @default(false)
   reportDate        DateTime @default(now())
-  
-  studentId         String
-  trainerId         String
-  courseId          String
-  
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+
+  studentId String
+  trainerId String
+  courseId  String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  student           Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  trainer           Trainer  @relation(fields: [trainerId], references: [id], onDelete: Cascade)
-  course            Course   @relation(fields: [courseId], references: [id])
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  trainer Trainer @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  course  Course  @relation(fields: [courseId], references: [id])
 
   @@index([studentId])
   @@index([trainerId])
@@ -889,59 +905,59 @@ model StudentGrowthReport {
 }
 
 model ClassAndPortfolioReport {
-  id              String   @id @default(uuid())
-  title           String
-  description     String?
-  fileUrl         String?
-  reportType      String   // "CLASS", "PORTFOLIO"
-  status          String   @default("PENDING") // PENDING, CHECKED, REJECTED
-  
-  trainerId       String
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id          String  @id @default(uuid())
+  title       String
+  description String?
+  fileUrl     String?
+  reportType  String // "CLASS", "PORTFOLIO"
+  status      String  @default("PENDING") // PENDING, CHECKED, REJECTED
+
+  trainerId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  trainer         Trainer  @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  trainer Trainer @relation(fields: [trainerId], references: [id], onDelete: Cascade)
 
   @@index([trainerId])
   @@map("class_portfolio_reports")
 }
 
 model StudentFeedback {
-  id              String   @id @default(uuid())
-  rating          Int      // 1-5
+  id              String  @id @default(uuid())
+  rating          Int // 1-5
   testimonial     String?
   googleReviewUrl String?
-  
-  studentId       String
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+
+  studentId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@index([studentId])
   @@map("student_feedbacks")
 }
 
 model TrainerAward {
-  id              String   @id @default(uuid())
-  awardName       String   // e.g., "Best Performer"
-  month           Int
-  year            Int
-  metrics         String?  // JSON string of performance metrics at time of award
-  
-  trainerId       String
-  branchId        String
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id        String  @id @default(uuid())
+  awardName String // e.g., "Best Performer"
+  month     Int
+  year      Int
+  metrics   String? // JSON string of performance metrics at time of award
+
+  trainerId String
+  branchId  String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  trainer         Trainer  @relation(fields: [trainerId], references: [id], onDelete: Cascade)
-  branch          Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  trainer Trainer @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  branch  Branch  @relation(fields: [branchId], references: [id], onDelete: Cascade)
 
   @@unique([trainerId, month, year, awardName])
   @@index([trainerId])
@@ -952,15 +968,15 @@ model TrainerAward {
 model Expense {
   id          String   @id @default(uuid())
   amount      Float
-  category    String   // e.g., "MARKETING", "UTILITIES", "SALARY"
+  category    String // e.g., "MARKETING", "UTILITIES", "SALARY"
   description String?
   date        DateTime @default(now())
-  
-  branchId    String
-  branch      Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([branchId])
   @@index([date])
@@ -968,18 +984,18 @@ model Expense {
 }
 
 model SocialMediaEngagement {
-  id            String   @id @default(uuid())
-  platform      String   // e.g., "INSTAGRAM", "FACEBOOK", "LINKEDIN"
-  likes         Int      @default(0)
-  shares        Int      @default(0)
-  leadsGenerated Int     @default(0)
-  date          DateTime @default(now())
-  
-  branchId      String
-  branch        Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  id             String   @id @default(uuid())
+  platform       String // e.g., "INSTAGRAM", "FACEBOOK", "LINKEDIN"
+  likes          Int      @default(0)
+  shares         Int      @default(0)
+  leadsGenerated Int      @default(0)
+  date           DateTime @default(now())
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([branchId])
   @@index([date])
@@ -988,35 +1004,36 @@ model SocialMediaEngagement {
 
 model EventPlan {
   id          String   @id @default(uuid())
-  type        String   // "IV", "SEMINAR"
+  type        String // "IV", "SEMINAR"
   title       String
   description String?
   date        DateTime
   status      String   @default("PLANNED") // PLANNED, COMPLETED, CANCELLED
-  
-  branchId    String
-  branch      Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([branchId])
   @@index([date])
   @@map("event_plans")
 }
-model BranchReport {
-  id          String   @id @default(uuid())
-  title       String
-  description String?
-  fileUrl     String
-  type        String   // 'Daily Admission', 'Student Discipline', etc.
-  branchId    String
-  uploadedById String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
 
-  branch      Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  uploadedBy  User     @relation(fields: [uploadedById], references: [id])
+model BranchReport {
+  id           String   @id @default(uuid())
+  title        String
+  description  String?
+  fileUrl      String
+  type         String // 'Daily Admission', 'Student Discipline', etc.
+  branchId     String
+  uploadedById String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  branch     Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  uploadedBy User   @relation(fields: [uploadedById], references: [id])
 
   @@map("branch_reports")
 }

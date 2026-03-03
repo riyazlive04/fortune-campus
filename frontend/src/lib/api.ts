@@ -977,9 +977,9 @@ export const admissionsApi = {
 
 // Students API Service
 export const studentsApi = {
-  getStudents: async (params?: any) => {
+  getStudents: async (params: any = {}) => {
     const token = storage.getToken();
-    const queryString = params ? new URLSearchParams(params).toString() : '';
+    const queryString = new URLSearchParams(params).toString();
     const response = await fetch(`${API_BASE_URL}/students?${queryString}`, {
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -1070,17 +1070,27 @@ export const studentsApi = {
     return result;
   },
 
-  getFeeRequests: async (status?: string) => {
+  getFeeRequests: async (status?: string, page = 1, limit = 10) => {
     const token = storage.getToken();
-    const url = status
-      ? `${API_BASE_URL}/students/fees/requests?status=${status}`
-      : `${API_BASE_URL}/students/fees/requests`;
+    const queryParams = new URLSearchParams({ page: page.toString(), limit: limit.toString() });
+    if (status) queryParams.append('status', status);
 
-    const response = await fetch(url, {
+    const response = await fetch(`${API_BASE_URL}/students/fees/requests?${queryParams.toString()}`, {
       headers: { 'Authorization': `Bearer ${token}` },
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || 'Failed to fetch fee requests');
+    return result;
+  },
+
+  getFeeStats: async (branchId?: string) => {
+    const token = storage.getToken();
+    const url = branchId ? `${API_BASE_URL}/students/fees/stats?branchId=${branchId}` : `${API_BASE_URL}/students/fees/stats`;
+    const response = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || 'Failed to fetch fee stats');
     return result;
   },
 
@@ -1212,7 +1222,14 @@ export const attendanceApi = {
     return result;
   },
 
-  markBatchAttendance: async (data: { courseId: string; date: string; trainerId?: string; attendanceRecords: { studentId: string; status: string; remarks?: string }[] }) => {
+  markBatchAttendance: async (data: {
+    courseId: string;
+    date: string;
+    trainerId?: string;
+    isSubstitute?: boolean;
+    originalTrainerId?: string;
+    attendanceRecords: { studentId: string; status: string; remarks?: string }[]
+  }) => {
     const token = storage.getToken();
     const response = await fetch(`${API_BASE_URL}/attendance/bulk`, {
       method: 'POST',

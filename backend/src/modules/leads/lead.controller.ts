@@ -4,6 +4,7 @@ import { prisma } from '../../config/database';
 import { successResponse, errorResponse, paginationHelper, getPaginationMeta } from '../../utils/response';
 import { AuthRequest } from '../../middlewares/auth.middleware';
 import { whatsappService } from '../../services/whatsapp.service';
+import { getCachedData, setCachedData } from '../../utils/cache';
 
 const parseDateString = (dateStr: string) => {
   if (!dateStr) return null;
@@ -243,6 +244,12 @@ export const createLead = async (req: AuthRequest, res: Response): Promise<Respo
       }
     });
 
+    // Increment branch totalLeads counter
+    await (prisma.branch as any).update({
+      where: { id: leadBranchId },
+      data: { totalLeads: { increment: 1 } }
+    });
+
     // Send WhatsApp notification (async, don't wait)
     whatsappService.sendNewLeadNotification(lead).catch(err => {
       console.error('Failed to send WhatsApp notification:', err);
@@ -398,6 +405,14 @@ export const deleteLead = async (req: AuthRequest, res: Response): Promise<Respo
 
     await prisma.lead.delete({ where: { id } });
 
+    // Decrement branch totalLeads counter
+    if (existingLead.branchId) {
+      await (prisma.branch as any).update({
+        where: { id: existingLead.branchId },
+        data: { totalLeads: { decrement: 1 } }
+      });
+    }
+
     return successResponse(res, { id }, 'Lead deleted successfully');
   } catch (error) {
     return errorResponse(res, 'Failed to delete lead', 500, error);
@@ -482,6 +497,11 @@ export const convertLeadToAdmission = async (req: AuthRequest, res: Response): P
         }
       });
 
+      await (tx.branch as any).update({
+        where: { id: effectiveBranchId },
+        data: { totalAdmissions: { increment: 1 } }
+      });
+
       return admission;
     });
 
@@ -550,6 +570,12 @@ export const createPublicLead = async (req: Request, res: Response): Promise<Res
         location,
         status: LeadStatus.NEW,
       },
+    });
+
+    // Increment branch totalLeads counter
+    await (prisma.branch as any).update({
+      where: { id: branch.id },
+      data: { totalLeads: { increment: 1 } }
     });
     console.log('createPublicLead: Lead created', lead.id);
 
@@ -761,6 +787,13 @@ export const getTelecallerDashboard = async (req: AuthRequest, res: Response): P
 export const getCPTelecallerAnalytics = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
     const branchId = req.user!.branchId!;
+    const cacheKey = `cp_analytics_${branchId}`;
+    const cachedData = await getCachedData(cacheKey);
+
+    if (cachedData) {
+      return successResponse(res, cachedData);
+    }
+
     const telecallers = await prisma.user.findMany({
       where: {
         role: UserRole.TELECALLER,
@@ -773,6 +806,7 @@ export const getCPTelecallerAnalytics = async (req: AuthRequest, res: Response):
       }
     });
 
+    await setCachedData(cacheKey, telecallers, 300); // 5 mins
     return successResponse(res, telecallers);
   } catch (error) {
     return errorResponse(res, 'Failed to fetch CP analytics', 500, error);
@@ -781,6 +815,13 @@ export const getCPTelecallerAnalytics = async (req: AuthRequest, res: Response):
 
 export const getCEOTelecallerAnalytics = async (_req: AuthRequest, res: Response): Promise<Response> => {
   try {
+    const cacheKey = `ceo_analytics_global`;
+    const cachedData = getCachedData(cacheKey);
+
+    if (cachedData) {
+      return successResponse(res, cachedData);
+    }
+
     const branchStats = await prisma.branch.findMany({
       include: {
         _count: { select: { leads: true } },
@@ -801,6 +842,7 @@ export const getCEOTelecallerAnalytics = async (_req: AuthRequest, res: Response
       leads: undefined // Remove the array of ids from the final response
     }));
 
+    setCachedData(cacheKey, formattedStats, 300); // 5 mins
     return successResponse(res, formattedStats);
   } catch (error) {
     return errorResponse(res, 'Failed to fetch CEO analytics', 500, error);

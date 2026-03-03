@@ -180,6 +180,15 @@ export const createAdmission = async (req: AuthRequest, res: Response): Promise<
                 });
             }
 
+            // Increment branch totalAdmissions and totalRevenue (Type cast bypass)
+            await (tx.branch as any).update({
+                where: { id: effectiveBranchId },
+                data: {
+                    totalAdmissions: { increment: 1 },
+                    // initial feePaid is 0 per code above, but if it were different we'd add it
+                }
+            });
+
             return newAdmission;
         });
 
@@ -221,30 +230,43 @@ export const updateAdmission = async (req: AuthRequest, res: Response): Promise<
             ? Number(feeAmount) - Number(feePaid)
             : undefined;
 
-        const admission = await prisma.admission.update({
-            where: { id },
-            data: {
-                firstName,
-                lastName,
-                email,
-                phone,
-                dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
-                gender,
-                address,
-                batchName,
-                feeAmount: feeAmount !== undefined ? Number(feeAmount) : undefined,
-                feePaid: feePaid !== undefined ? Number(feePaid) : undefined,
-                feeBalance,
-                status,
-            },
-            include: {
-                branch: {
-                    select: { id: true, name: true },
+        const admission = await prisma.$transaction(async (tx) => {
+            const updated = await tx.admission.update({
+                where: { id },
+                data: {
+                    firstName,
+                    lastName,
+                    email,
+                    phone,
+                    dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
+                    gender,
+                    address,
+                    batchName,
+                    feeAmount: feeAmount !== undefined ? Number(feeAmount) : undefined,
+                    feePaid: feePaid !== undefined ? Number(feePaid) : undefined,
+                    feeBalance,
+                    status,
                 },
-                course: {
-                    select: { id: true, name: true },
+                include: {
+                    branch: {
+                        select: { id: true, name: true },
+                    },
+                    course: {
+                        select: { id: true, name: true },
+                    },
                 },
-            },
+            });
+
+            // Adjust branch totalRevenue if feePaid changed
+            if (feePaid !== undefined && Number(feePaid) !== existingAdmission.feePaid) {
+                const diff = Number(feePaid) - existingAdmission.feePaid;
+                await (tx.branch as any).update({
+                    where: { id: existingAdmission.branchId },
+                    data: { totalRevenue: { increment: diff } }
+                });
+            }
+
+            return updated;
         });
 
         return successResponse(res, admission, 'Admission updated successfully');
@@ -274,7 +296,18 @@ export const deleteAdmission = async (req: AuthRequest, res: Response): Promise<
             return errorResponse(res, 'Cannot delete admission with associated student record', 400);
         }
 
-        await prisma.admission.delete({ where: { id } });
+        await prisma.$transaction(async (tx) => {
+            await tx.admission.delete({ where: { id } });
+
+            // Decrement branch totalAdmissions and totalRevenue
+            await (tx.branch as any).update({
+                where: { id: existingAdmission.branchId },
+                data: {
+                    totalAdmissions: { decrement: 1 },
+                    totalRevenue: { decrement: existingAdmission.feePaid }
+                }
+            });
+        });
         return successResponse(res, { id }, 'Admission deleted successfully');
     } catch (error) {
         return errorResponse(res, 'Failed to delete admission', 500, error);
@@ -359,6 +392,12 @@ export const approveAdmission = async (req: AuthRequest, res: Response): Promise
                     courseId: updated.courseId,
                     isActive: true,
                 },
+            });
+
+            // Increment branch totalStudents counter
+            await (tx.branch as any).update({
+                where: { id: updated.branchId },
+                data: { totalStudents: { increment: 1 } }
             });
 
             return { updated, userEmail: user.email, plainPassword: 'Student@123' };

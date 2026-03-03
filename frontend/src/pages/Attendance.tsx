@@ -50,6 +50,8 @@ const Attendance = () => {
   const [selectedHistoryStudent, setSelectedHistoryStudent] = useState<any | null>(null);
   const [summaryCourseFilter, setSummaryCourseFilter] = useState("all");
   const [summaryStudentFilter, setSummaryStudentFilter] = useState("");
+  const [summaryPage, setSummaryPage] = useState(1);
+  const [summaryMeta, setSummaryMeta] = useState<any>(null);
 
   // ── Global Student Dropdown State ───────────────────────────
   const [isStudentDropdownOpen, setIsStudentDropdownOpen] = useState(false);
@@ -120,19 +122,20 @@ const Attendance = () => {
   }, [selectedBatchId, isSubstituteMode]);
 
   // ── Fetch attendance summary ─────────────────────────────────
-  const fetchSummary = useCallback(async () => {
+  const fetchSummary = useCallback(async (page = 1) => {
     setLoadingSummary(true);
     try {
-      const params: any = {};
+      const params: any = { page, limit: 10 };
       if (selectedBranch && selectedBranch !== "all") params.branchId = selectedBranch;
       if (selectedDate) params.date = selectedDate.toISOString();
       const r = await attendanceApi.getStats(params);
       setAttendanceData(r.data?.summary || (Array.isArray(r.data) ? r.data : []));
+      setSummaryMeta(r.data?.meta);
     } catch { setAttendanceData([]); }
     finally { setLoadingSummary(false); }
   }, [selectedBranch, selectedDate]);
 
-  useEffect(() => { fetchSummary(); }, [fetchSummary]);
+  useEffect(() => { fetchSummary(summaryPage); }, [fetchSummary, summaryPage]);
 
   // ── Fetch all students for dropdown ──────────────────────────
   useEffect(() => {
@@ -435,10 +438,10 @@ const Attendance = () => {
                     <div
                       key={student.id}
                       className={`flex items-center justify-between px-6 py-3.5 transition-colors ${attendanceMap[student.id] === "PRESENT"
-                          ? "hover:bg-emerald-50/30"
-                          : attendanceMap[student.id] === "LATE"
-                            ? "hover:bg-amber-50/30 bg-amber-50/10"
-                            : "hover:bg-red-50/30 bg-red-50/10"
+                        ? "hover:bg-emerald-50/30"
+                        : attendanceMap[student.id] === "LATE"
+                          ? "hover:bg-amber-50/30 bg-amber-50/10"
+                          : "hover:bg-red-50/30 bg-red-50/10"
                         }`}
                     >
                       <div className="flex items-center gap-3">
@@ -657,6 +660,31 @@ const Attendance = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Controls */}
+        {summaryMeta && summaryMeta.totalPages > 1 && (
+          <div className="flex items-center justify-end space-x-2 py-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSummaryPage(p => Math.max(1, p - 1))}
+              disabled={summaryPage === 1}
+            >
+              Previous
+            </Button>
+            <div className="text-sm font-medium">
+              Page {summaryPage} of {summaryMeta.totalPages}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSummaryPage(p => Math.min(summaryMeta.totalPages, p + 1))}
+              disabled={summaryPage === summaryMeta.totalPages}
+            >
+              Next
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Render the generic StudentHistoryModal passing the whole student object */}

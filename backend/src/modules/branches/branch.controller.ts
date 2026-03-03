@@ -2,8 +2,7 @@ import { Response } from 'express';
 import { prisma } from '../../config/database';
 import { successResponse, errorResponse, paginationHelper, getPaginationMeta } from '../../utils/response';
 import { AuthRequest } from '../../middlewares/auth.middleware';
-
-export const getPublicBranches = async (req: AuthRequest, res: Response): Promise<Response> => {
+export const getPublicBranches = async (_req: AuthRequest, res: Response): Promise<Response> => {
   try {
     const branches = await prisma.branch.findMany({
       where: { isActive: true },

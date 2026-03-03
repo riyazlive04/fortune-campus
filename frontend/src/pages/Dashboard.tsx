@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Users, UserPlus, GraduationCap, Briefcase, Award, Zap, X, Loader2, Clock, Calendar } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import KPICard from "@/components/KPICard";
 import PageHeader from "@/components/PageHeader";
 import StatusBadge from "@/components/StatusBadge";
@@ -10,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import TrainerDashboard from "./TrainerDashboard";
 import StudentDashboard from "./StudentDashboard";
 import BranchHeadDashboard from "./BranchHeadDashboard";
-import { motion, Variants } from "framer-motion";
+import { motion, Variants, AnimatePresence } from "framer-motion";
 import {
   Dialog,
   DialogContent,
@@ -27,19 +28,15 @@ const Dashboard = () => {
 
   // 1. ALL HOOKS MUST BE DECLARED FIRST
   const [viewingTrainerId, setViewingTrainerId] = useState<string | null>(null);
-  const [data, setData] = useState<any>(null);
-  const [performance, setPerformance] = useState<any[]>([]);
-  const [trainerAttendance, setTrainerAttendance] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
-  const [modalType, setModalType] = useState<'leads' | 'students' | 'placements' | 'admissions' | null>(null);
+  const [modalType, setModalType] = useState<'leads' | 'students' | 'placements' | 'admissions' | 'revenue' | null>(null);
   const [modalData, setModalData] = useState<any[]>([]);
   const [modalLoading, setModalLoading] = useState(false);
   const [isTopPerformerModalOpen, setIsTopPerformerModalOpen] = useState(false);
   const [selectedHistoryTrainer, setSelectedHistoryTrainer] = useState<{ id: string, name: string } | null>(null);
 
-  const openModal = async (type: 'leads' | 'students' | 'placements' | 'admissions') => {
+  const openModal = async (type: 'leads' | 'students' | 'placements' | 'admissions' | 'revenue') => {
     setModalType(type);
 
     // For CEO, we use the branchPerformance data already fetched, no need for separate API calls
@@ -67,6 +64,10 @@ const Dashboard = () => {
         const res = await admissionsApi.getAdmissions({ limit: 100, status: 'all' });
         const admissions = res.data?.admissions || res.data || [];
         setModalData(Array.isArray(admissions) ? admissions : []);
+      } else if (type === 'revenue') {
+        const res = await admissionsApi.getAdmissions({ limit: 100 });
+        const admissions = res.data?.admissions || res.data || [];
+        setModalData(Array.isArray(admissions) ? admissions : []);
       }
     } catch (e) {
       toast({ variant: 'destructive', title: 'Error', description: `Failed to load ${type}` });
@@ -75,75 +76,49 @@ const Dashboard = () => {
     }
   };
 
-  const fetchStats = async () => {
-    console.log("🚀 Starting fetchStats...");
-    try {
-      setLoading(true);
+  const isMainDashboardRole = !['TRAINER', 'STUDENT', 'CHANNEL_PARTNER', 'TELECALLER'].includes(user?.role || '');
 
-      // Add a timeout to the fetch requests
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // Increased to 15s
+  const { data: statsData, isLoading: statsLoading } = useQuery({
+    queryKey: ['dashboardStats'],
+    queryFn: async () => {
+      const res = await dashboardApi.getStats();
+      if (!res.success) throw new Error(res.message || "Failed to fetch stats");
+      return res.data.stats || res.data;
+    },
+    enabled: isMainDashboardRole,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 
-      const [statsRes, perfRes, attendanceRes] = await Promise.all([
-        dashboardApi.getStats().then(res => {
-          console.log("✅ getStats resolved");
-          return res;
-        }),
-        reportsApi.getTrainerPerformance({
-          month: new Date().getMonth() + 1,
-          year: new Date().getFullYear()
-        }).catch((err) => {
-          console.warn("⚠️ getTrainerPerformance failed:", err);
-          return { success: true, data: [] };
-        }),
-        trainerAttendanceApi.getHistory({
-          startDate: new Date().toISOString().split('T')[0],
-          endDate: new Date().toISOString().split('T')[0]
-        }).catch((err) => {
-          console.warn("⚠️ getTrainerAttendance failed:", err);
-          return { success: true, data: [] };
-        })
-      ]);
-
-      clearTimeout(timeoutId);
-
-      if (statsRes.success) {
-        console.log("📊 Dashboard Stats Content:", statsRes.data);
-        setData(statsRes.data.stats || statsRes.data);
-      } else {
-        console.error("❌ Dashboard Stats Failed:", statsRes);
-      }
-
-      if (perfRes.success) {
-        setPerformance(perfRes.data);
-      }
-
-      if (attendanceRes?.data) {
-        setTrainerAttendance(Array.isArray(attendanceRes.data) ? attendanceRes.data : []);
-      }
-
-    } catch (error: any) {
-      console.error("🔥 Dashboard Fetch Error:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "Failed to fetch dashboard stats",
+  const { data: perfData, isLoading: perfLoading } = useQuery({
+    queryKey: ['trainerPerformance'],
+    queryFn: async () => {
+      const res = await reportsApi.getTrainerPerformance({
+        month: new Date().getMonth() + 1,
+        year: new Date().getFullYear()
       });
-    } finally {
-      console.log("🏁 fetchStats finished");
-      setLoading(false);
-    }
-  };
+      return res.data || [];
+    },
+    enabled: isMainDashboardRole,
+    staleTime: 10 * 60 * 1000,
+  });
 
-  useEffect(() => {
-    const isMainDashboardRole = !['TRAINER', 'STUDENT', 'CHANNEL_PARTNER', 'TELECALLER'].includes(user?.role || '');
-    if (isMainDashboardRole) {
-      fetchStats();
-    } else {
-      setLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const { data: attendanceData, isLoading: attendanceLoading } = useQuery({
+    queryKey: ['trainerAttendanceHistory'],
+    queryFn: async () => {
+      const res = await trainerAttendanceApi.getHistory({
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: new Date().toISOString().split('T')[0]
+      });
+      return res.data || [];
+    },
+    enabled: isMainDashboardRole,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  const data = statsData;
+  const performance = perfData || [];
+  const trainerAttendance = attendanceData || [];
+  const loading = statsLoading || perfLoading || attendanceLoading;
 
   // 2. EARLY RETURNS
   if (user?.role === 'TRAINER') {
@@ -262,10 +237,11 @@ const Dashboard = () => {
         <KPICard
           title="Overall Revenue"
           value={`₹${(data?.kpis?.revenue?.value || 0).toLocaleString('en-IN')}`}
-          change={`${data?.kpis?.revenue?.change >= 0 ? '+' : ''}${data?.kpis?.revenue?.change || 0}% from last month`}
-          changeType={data?.kpis?.revenue?.change >= 0 ? "positive" : "negative"}
+          change="Click to view details"
+          changeType="neutral"
           icon={Briefcase}
           accentColor="bg-emerald-500"
+          onClick={() => openModal('revenue')}
         />
         <KPICard
           title="Active Students"
@@ -384,7 +360,7 @@ const Dashboard = () => {
                           <div className="h-2 w-full rounded-full bg-muted overflow-hidden border border-border/50">
                             <div
                               className="h-full bg-primary transition-all duration-1000"
-                              style={{ width: `${Math.min(Number(t.score), 100)}%` }}
+                              style={{ width: `${Math.min(Number(t.score), 100)}% ` }}
                             />
                           </div>
                         </div>
@@ -447,7 +423,7 @@ const Dashboard = () => {
                           <button
                             onClick={() => setSelectedHistoryTrainer({
                               id: att.trainer?.id,
-                              name: `${att.trainer?.user?.firstName} ${att.trainer?.user?.lastName}`
+                              name: `${att.trainer?.user?.firstName} ${att.trainer?.user?.lastName} `
                             })}
                             className="font-bold text-foreground hover:text-primary transition-colors text-left"
                           >
@@ -484,7 +460,7 @@ const Dashboard = () => {
           <div className="flex items-center justify-between p-6 border-b border-border bg-card">
             <div>
               <DialogTitle className="text-xl font-black text-foreground capitalize">
-                {modalType === 'leads' ? 'Total Leads' : modalType === 'students' ? 'Active Students' : modalType === 'admissions' ? 'Admissions' : 'Placements'} Breakdown
+                {modalType === 'leads' ? 'Total Leads' : modalType === 'students' ? 'Active Students' : modalType === 'admissions' ? 'Admissions' : modalType === 'revenue' ? 'Overall Revenue' : 'Placements'} Breakdown
               </DialogTitle>
               <p className="text-[12px] text-muted-foreground mt-1 font-medium">
                 {modalLoading ? 'Loading statistics...' : user?.role === 'CEO' ? 'Detailed performance metrics across all branches' : `${modalData.length} records found`}
@@ -515,7 +491,8 @@ const Dashboard = () => {
                           {modalType === 'leads' ? branch.leads :
                             modalType === 'admissions' ? branch.admissions :
                               modalType === 'students' ? branch.students :
-                                branch.placements}
+                                modalType === 'revenue' ? `₹${(branch.revenue || 0).toLocaleString('en-IN')}` :
+                                  branch.placements}
                         </td>
                       </tr>
                     ))}
@@ -555,7 +532,7 @@ const Dashboard = () => {
                                 lead.status === 'HOT' ? 'bg-red-100/50 text-red-700 border border-red-200/50' :
                                   lead.status === 'WARM' ? 'bg-orange-100/50 text-orange-700 border border-orange-200/50' :
                                     'bg-slate-100/50 text-slate-700 border border-slate-200/50'
-                            }`}>{lead.status || '—'}</span>
+                            } `}>{lead.status || '—'}</span>
                         </td>
                       </tr>
                     ))}
@@ -587,7 +564,7 @@ const Dashboard = () => {
                   </tbody>
                 </table>
               </div>
-            ) : modalType === 'admissions' ? (
+            ) : (modalType === 'admissions' || modalType === 'revenue') ? (
               <div className="border rounded-xl overflow-hidden shadow-sm bg-card">
                 <table className="w-full text-[13px]">
                   <thead className="bg-muted/40 border-b border-border/60">
@@ -613,7 +590,7 @@ const Dashboard = () => {
                             admission.status === 'PENDING' || admission.status === 'NEW' ? 'bg-amber-100/50 text-amber-700 border border-amber-200/50' :
                               admission.status === 'DROPOUT' ? 'bg-red-100/50 text-red-700 border border-red-200/50' :
                                 'bg-slate-100/50 text-slate-700 border border-slate-200/50'
-                            }`}>{admission.status || '—'}</span>
+                            } `}>{admission.status || '—'}</span>
                         </td>
                       </tr>
                     ))}
@@ -640,12 +617,12 @@ const Dashboard = () => {
                         </td>
                         <td className="p-4 text-muted-foreground font-semibold">{p.company?.name || p.companyName || '—'}</td>
                         <td className="p-4 text-muted-foreground font-medium">{p.role || p.jobTitle || '—'}</td>
-                        <td className="p-4 text-muted-foreground font-black">{p.package || p.salary ? `₹${p.package || p.salary}` : '—'}</td>
+                        <td className="p-4 text-muted-foreground font-black">{p.package || p.salary ? `₹${p.package || p.salary} ` : '—'}</td>
                         <td className="p-4">
                           <span className={`inline-flex items-center rounded-xl px-2.5 py-1 text-[10px] font-black tracking-wider shadow-sm ${p.status === 'PLACED' ? 'bg-emerald-100/50 text-emerald-700 border border-emerald-200/50' :
                             p.status === 'PENDING' ? 'bg-amber-100/50 text-amber-700 border border-amber-200/50' :
                               'bg-slate-100/50 text-slate-700 border border-slate-200/50'
-                            }`}>{p.status || '—'}</span>
+                            } `}>{p.status || '—'}</span>
                         </td>
                       </tr>
                     ))}

@@ -1,7 +1,3 @@
-import axios from 'axios';
-
-const API_BASE_URL = 'http://localhost:5000/api'; // Assuming backend port is 5000
-
 async function testApi() {
     console.log('--- Testing /leads API for Telecaller ---');
 
