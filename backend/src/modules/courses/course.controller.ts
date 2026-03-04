@@ -12,26 +12,40 @@ export const getCourses = async (req: AuthRequest, res: Response): Promise<Respo
 
     const { skip, take } = paginationHelper(Number(page), Number(limit));
 
-    const where: any = {};
+    const where: any = { AND: [] };
 
+    // ─── Visibility filter ──────────────────────────────────────────────────
+    // CEO & ADMIN: see all courses (optionally filtered by branchId query param)
+    // Others: see their own branch courses + global courses (branchId = null)
     if (req.user?.role !== UserRole.ADMIN && req.user?.role !== UserRole.CEO) {
-      where.OR = [
-        { branchId: req.user?.branchId },
-        { branchId: null }
-      ];
+      where.AND.push({
+        OR: [
+          { branchId: req.user?.branchId },
+          { branchId: null },
+        ],
+      });
     } else if (branchId) {
-      where.branchId = branchId as string;
+      where.AND.push({ branchId: branchId as string });
     }
 
+    // ─── isActive filter ────────────────────────────────────────────────────
     if (isActive !== undefined) {
-      where.isActive = isActive === 'true';
+      where.AND.push({ isActive: isActive === 'true' });
     }
 
+    // ─── Search filter ──────────────────────────────────────────────────────
     if (search) {
-      where.OR = [
-        { name: { contains: search as string, mode: 'insensitive' } },
-        { code: { contains: search as string, mode: 'insensitive' } },
-      ];
+      where.AND.push({
+        OR: [
+          { name: { contains: search as string, mode: 'insensitive' } },
+          { code: { contains: search as string, mode: 'insensitive' } },
+        ],
+      });
+    }
+
+    // Simplify: if AND is empty, remove it so Prisma doesn't complain
+    if (where.AND.length === 0) {
+      delete where.AND;
     }
 
     const [courses, total] = await Promise.all([
@@ -128,7 +142,15 @@ export const getCourseById = async (req: AuthRequest, res: Response): Promise<Re
       return errorResponse(res, 'Course not found', 404);
     }
 
-    if (req.user?.role !== UserRole.ADMIN && req.user?.role !== UserRole.CEO && course.branchId !== req.user?.branchId) {
+    // CEO and ADMIN can access any course.
+    // Other users can access:
+    //   - their own branch's courses
+    //   - global courses (branchId = null) created by CEO
+    const isCeoOrAdmin = req.user?.role === UserRole.ADMIN || req.user?.role === UserRole.CEO;
+    const isGlobalCourse = course.branchId === null;
+    const isSameBranch = course.branchId === req.user?.branchId;
+
+    if (!isCeoOrAdmin && !isGlobalCourse && !isSameBranch) {
       return errorResponse(res, 'Access denied', 403);
     }
 
@@ -140,15 +162,26 @@ export const getCourseById = async (req: AuthRequest, res: Response): Promise<Re
 
 export const createCourse = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
-    const { name, code, description, duration, fees, syllabus, prerequisites, branchId } = req.body;
+    const { name, code, description, duration, fees, syllabus, prerequisites } = req.body;
 
     console.log('--- Course Creation Attempt ---');
     console.log('User Role:', req.user?.role);
     console.log('User ID:', req.user?.id);
     console.log('User BranchID:', req.user?.branchId);
-    console.log('Incoming branchId:', branchId);
 
-    const targetBranchId = branchId || (req.user?.role === UserRole.CEO ? null : req.user?.branchId!);
+    // ─── Branch assignment rules ────────────────────────────────────────────
+    // CEO → global course (visible to ALL branches) → branchId = null
+    // Channel Partner / Admin → scoped to their own branch
+    let targetBranchId: string | null;
+
+    if (req.user?.role === UserRole.CEO) {
+      // CEO courses are ALWAYS global
+      targetBranchId = null;
+    } else {
+      // Channel Partner / Admin courses are scoped to their branch
+      targetBranchId = req.user?.branchId ?? null;
+    }
+
     console.log('Final targetBranchId:', targetBranchId);
 
     const courseData: any = {
@@ -173,16 +206,19 @@ export const createCourse = async (req: AuthRequest, res: Response): Promise<Res
 
     console.log('Course created successfully in DB:', course.id);
 
-    try {
-      await NotificationService.notifyRole(UserRole.CEO, {
-        title: 'New Course Added',
-        message: `${course.name} (${course.code}) is now available.`,
-        type: 'INFO',
-        link: '/courses'
-      });
-      console.log('Notification sent for new course');
-    } catch (notifError: any) {
-      console.error('Notification failed (non-blocking):', notifError.message);
+    // Notify CEO only if a Channel Partner created the course
+    if (req.user?.role !== UserRole.CEO) {
+      try {
+        await NotificationService.notifyRole(UserRole.CEO, {
+          title: 'New Course Added',
+          message: `${course.name} (${course.code}) is now available.`,
+          type: 'INFO',
+          link: '/courses'
+        });
+        console.log('Notification sent for new course');
+      } catch (notifError: any) {
+        console.error('Notification failed (non-blocking):', notifError.message);
+      }
     }
 
     return successResponse(res, course, 'Course created successfully', 201);
@@ -198,29 +234,58 @@ export const createCourse = async (req: AuthRequest, res: Response): Promise<Res
 export const updateCourse = async (req: AuthRequest, res: Response): Promise<Response> => {
   try {
     const { id } = req.params;
-    const { name, code, description, duration, fees, syllabus, prerequisites, isActive } = req.body;
+    const { name, code, description, duration, fees, syllabus, prerequisites, isActive, branchId: rawBranchId } = req.body;
 
     const existingCourse = await prisma.course.findUnique({ where: { id } });
     if (!existingCourse) {
       return errorResponse(res, 'Course not found', 404);
     }
 
-    if (req.user?.role !== UserRole.ADMIN && req.user?.role !== UserRole.CEO && existingCourse.branchId !== req.user?.branchId) {
+    const isCeoOrAdmin = req.user?.role === UserRole.ADMIN || req.user?.role === UserRole.CEO;
+    const isGlobalCourse = existingCourse.branchId === null;
+    const isSameBranch = existingCourse.branchId === req.user?.branchId;
+
+    // CEO/Admin can edit any course.
+    // Channel Partners can only edit courses belonging to their own branch.
+    // Nobody (except CEO/Admin) can edit global (CEO-created) courses.
+    if (!isCeoOrAdmin && (!isSameBranch || isGlobalCourse)) {
       return errorResponse(res, 'Access denied', 403);
+    }
+
+    // ─── Resolve branchId for update ────────────────────────────────────────
+    // CEO/Admin can reassign the course branch:
+    //   empty string "" or undefined → null (All Branches / Global)
+    //   any other value → that branch id
+    // Channel Partners: keep the existing branchId (they cannot change it)
+    let resolvedBranchId: string | null | undefined;
+    if (isCeoOrAdmin) {
+      resolvedBranchId = (rawBranchId === '' || rawBranchId === undefined || rawBranchId === null)
+        ? null
+        : rawBranchId;
+    } else {
+      // Channel Partner: branchId stays unchanged
+      resolvedBranchId = undefined; // undefined = don't touch this field in prisma
+    }
+
+    const updateData: any = {
+      name,
+      code,
+      description,
+      duration,
+      fees,
+      syllabus,
+      prerequisites,
+      isActive,
+    };
+
+    // Only include branchId in the update when CEO/Admin explicitly set it
+    if (isCeoOrAdmin) {
+      updateData.branchId = resolvedBranchId;
     }
 
     const course = await prisma.course.update({
       where: { id },
-      data: {
-        name,
-        code,
-        description,
-        duration,
-        fees,
-        syllabus,
-        prerequisites,
-        isActive,
-      },
+      data: updateData,
       include: {
         branch: {
           select: { id: true, name: true },
@@ -251,7 +316,11 @@ export const deleteCourse = async (req: AuthRequest, res: Response): Promise<Res
       return errorResponse(res, 'Course not found', 404);
     }
 
-    if (req.user?.role !== UserRole.ADMIN && req.user?.role !== UserRole.CEO && existingCourse.branchId !== req.user?.branchId) {
+    const isCeoOrAdmin = req.user?.role === UserRole.ADMIN || req.user?.role === UserRole.CEO;
+    const isGlobalCourse = existingCourse.branchId === null;
+    const isSameBranch = existingCourse.branchId === req.user?.branchId;
+
+    if (!isCeoOrAdmin && (!isSameBranch || isGlobalCourse)) {
       return errorResponse(res, 'Access denied', 403);
     }
 
@@ -277,7 +346,11 @@ export const assignTrainerToCourse = async (req: AuthRequest, res: Response): Pr
       return errorResponse(res, 'Course not found', 404);
     }
 
-    if (req.user?.role !== UserRole.ADMIN && req.user?.role !== UserRole.CEO && course.branchId !== req.user?.branchId) {
+    const isCeoOrAdmin = req.user?.role === UserRole.ADMIN || req.user?.role === UserRole.CEO;
+    const isGlobalCourse = course.branchId === null;
+    const isSameBranch = course.branchId === req.user?.branchId;
+
+    if (!isCeoOrAdmin && !isGlobalCourse && !isSameBranch) {
       return errorResponse(res, 'Access denied', 403);
     }
 
@@ -286,7 +359,8 @@ export const assignTrainerToCourse = async (req: AuthRequest, res: Response): Pr
       return errorResponse(res, 'Trainer not found', 404);
     }
 
-    if (trainer.branchId !== course.branchId) {
+    // For branch-scoped courses, trainer must be from same branch
+    if (!isGlobalCourse && trainer.branchId !== course.branchId) {
       return errorResponse(res, 'Trainer must be from the same branch as course', 400);
     }
 
@@ -321,7 +395,11 @@ export const removeTrainerFromCourse = async (req: AuthRequest, res: Response): 
       return errorResponse(res, 'Course not found', 404);
     }
 
-    if (req.user?.role !== UserRole.ADMIN && req.user?.role !== UserRole.CEO && course.branchId !== req.user?.branchId) {
+    const isCeoOrAdmin = req.user?.role === UserRole.ADMIN || req.user?.role === UserRole.CEO;
+    const isGlobalCourse = course.branchId === null;
+    const isSameBranch = course.branchId === req.user?.branchId;
+
+    if (!isCeoOrAdmin && !isGlobalCourse && !isSameBranch) {
       return errorResponse(res, 'Access denied', 403);
     }
 

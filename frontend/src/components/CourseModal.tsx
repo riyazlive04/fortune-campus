@@ -20,9 +20,10 @@ import {
 } from "@/components/ui/select";
 import { coursesApi, branchesApi, storage } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Download, FileText, Upload } from "lucide-react";
+import { Loader2, Download, Upload, Globe } from "lucide-react";
 import { downloadSyllabusReport } from "@/lib/reportUtils";
 import { extractTextFromPDF } from "@/lib/pdfUtils";
+
 interface CourseModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -31,6 +32,9 @@ interface CourseModalProps {
     readonly?: boolean;
 }
 
+// Sentinel value meaning "All Branches (Global)" — maps to branchId = null on backend
+const GLOBAL_BRANCH_VALUE = "__GLOBAL__";
+
 const CourseModal = ({ isOpen, onClose, onSuccess, courseId, readonly = false }: CourseModalProps) => {
     const [loading, setLoading] = useState(false);
     const [fetching, setFetching] = useState(false);
@@ -38,7 +42,11 @@ const CourseModal = ({ isOpen, onClose, onSuccess, courseId, readonly = false }:
     const [parsingPdf, setParsingPdf] = useState(false);
     const { toast } = useToast();
     const user = storage.getUser();
-    const isAdmin = user?.role === 'ADMIN' || user?.role === 'CEO';
+
+    // Show branch selector only for CEO and ADMIN
+    const isCeo = user?.role === 'CEO';
+    const isAdmin = user?.role === 'ADMIN';
+    const showBranchSelector = isCeo || isAdmin;
 
     const [formData, setFormData] = useState({
         name: "",
@@ -48,7 +56,9 @@ const CourseModal = ({ isOpen, onClose, onSuccess, courseId, readonly = false }:
         fees: "",
         syllabus: "",
         prerequisites: "",
-        branchId: "",
+        // For CEO: GLOBAL_BRANCH_VALUE means "All Branches"
+        // For Admin/CP: their assigned branchId (auto-set)
+        branchId: isCeo ? GLOBAL_BRANCH_VALUE : "",
         isActive: true,
     });
 
@@ -65,10 +75,10 @@ const CourseModal = ({ isOpen, onClose, onSuccess, courseId, readonly = false }:
             }
         };
 
-        if (isOpen && isAdmin) {
+        if (isOpen && showBranchSelector) {
             fetchBranches();
         }
-    }, [isOpen, isAdmin]);
+    }, [isOpen, showBranchSelector]);
 
     useEffect(() => {
         const fetchCourseDetails = async (id: string) => {
@@ -86,7 +96,10 @@ const CourseModal = ({ isOpen, onClose, onSuccess, courseId, readonly = false }:
                         fees: course.fees.toString(),
                         syllabus: course.syllabus || "",
                         prerequisites: course.prerequisites || "",
-                        branchId: course.branchId,
+                        // branchId === null means global; represent with sentinel
+                        branchId: course.branchId === null || course.branchId === undefined
+                            ? GLOBAL_BRANCH_VALUE
+                            : course.branchId,
                         isActive: course.isActive,
                     });
                 }
@@ -114,7 +127,8 @@ const CourseModal = ({ isOpen, onClose, onSuccess, courseId, readonly = false }:
                     fees: "",
                     syllabus: "",
                     prerequisites: "",
-                    branchId: "",
+                    // CEO defaults to "All Branches (Global)"
+                    branchId: isCeo ? GLOBAL_BRANCH_VALUE : "",
                     isActive: true,
                 });
             }
@@ -125,10 +139,14 @@ const CourseModal = ({ isOpen, onClose, onSuccess, courseId, readonly = false }:
         e.preventDefault();
         try {
             setLoading(true);
+
+            // Convert sentinel value back to empty string (backend maps "" / undefined → null for CEO)
             const payload = {
                 ...formData,
                 duration: Number(formData.duration),
                 fees: Number(formData.fees),
+                // Send empty string for global; backend will set branchId=null for CEO
+                branchId: formData.branchId === GLOBAL_BRANCH_VALUE ? "" : formData.branchId,
             };
 
             if (isEditMode && courseId) {
@@ -180,7 +198,6 @@ const CourseModal = ({ isOpen, onClose, onSuccess, courseId, readonly = false }:
             });
         } finally {
             setParsingPdf(false);
-            // Reset input
             e.target.value = "";
         }
     };
@@ -257,9 +274,17 @@ const CourseModal = ({ isOpen, onClose, onSuccess, courseId, readonly = false }:
                             </div>
                         </div>
 
-                        {isAdmin && branches.length > 0 && (
+                        {/* Branch selector — only visible for CEO and Admin */}
+                        {showBranchSelector && branches.length > 0 && (
                             <div className="space-y-2">
-                                <Label htmlFor="branch">Branch</Label>
+                                <Label htmlFor="branch">
+                                    Branch Visibility
+                                    {isCeo && (
+                                        <span className="ml-2 text-xs text-muted-foreground font-normal">
+                                            (Select "All Branches" to make course visible to everyone)
+                                        </span>
+                                    )}
+                                </Label>
                                 <Select
                                     value={formData.branchId}
                                     onValueChange={(v) => setFormData({ ...formData, branchId: v })}
@@ -269,11 +294,28 @@ const CourseModal = ({ isOpen, onClose, onSuccess, courseId, readonly = false }:
                                         <SelectValue placeholder="Select Branch" />
                                     </SelectTrigger>
                                     <SelectContent>
+                                        {/* CEO gets "All Branches (Global)" as default option */}
+                                        {isCeo && (
+                                            <SelectItem value={GLOBAL_BRANCH_VALUE}>
+                                                <span className="flex items-center gap-2">
+                                                    <Globe className="h-3.5 w-3.5 text-blue-500" />
+                                                    All Branches (Global)
+                                                </span>
+                                            </SelectItem>
+                                        )}
                                         {branches.map((b) => (
                                             <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
+                            </div>
+                        )}
+
+                        {/* For Channel Partners: show a read-only info strip instead */}
+                        {!showBranchSelector && !readonly && (
+                            <div className="rounded-lg border border-border bg-muted/30 px-4 py-2.5 text-sm text-muted-foreground flex items-center gap-2">
+                                <Globe className="h-4 w-4 shrink-0" />
+                                This course will be visible only to your branch.
                             </div>
                         )}
 

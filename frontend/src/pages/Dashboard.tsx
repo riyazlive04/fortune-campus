@@ -215,8 +215,8 @@ const Dashboard = () => {
         <div className="absolute -top-10 -left-10 w-32 h-32 bg-primary/5 rounded-3xl -z-10 blur-2xl group-hover:bg-primary/10 transition-colors duration-700" />
         <div className="absolute top-0 right-0 w-20 h-20 border border-primary/10 rounded-2xl -z-10 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-700" />
 
-        <h1 className="text-5xl font-black tracking-tight text-foreground bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/60">
-          Campus Analytics
+        <h1 className="text-4xl font-bold tracking-tight text-foreground bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/60">
+          CEO DASHBOARD_CEO
         </h1>
         <p className="text-[14px] text-muted-foreground font-medium max-w-2xl leading-relaxed">
           Monitor your institution's pulse with real-time tracking of academic performance, student success, and faculty excellence.

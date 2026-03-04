@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Edit, Trash2, BookOpen, Users, Calendar, DollarSign } from "lucide-react";
+import { Plus, Edit, Trash2, BookOpen, Users, Calendar, DollarSign, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import PageHeader from "@/components/PageHeader";
@@ -18,7 +18,8 @@ interface Course {
   syllabus?: string;
   prerequisites?: string;
   isActive: boolean;
-  branch: { id: string; name: string };
+  branchId?: string | null;
+  branch: { id: string; name: string } | null;
   trainers: any[];
   _count: { students: number; admissions: number };
 }
@@ -32,6 +33,16 @@ const Courses = () => {
   const { toast } = useToast();
   const user = storage.getUser();
   const canManage = user?.role === 'ADMIN' || user?.role === 'CHANNEL_PARTNER' || user?.role === 'CEO';
+
+  // CEO & Admin can toggle any course; Channel Partners can only toggle their own branch courses
+  const canToggleCourse = (course: Course) => {
+    if (user?.role === 'CEO' || user?.role === 'ADMIN') return true;
+    if (user?.role === 'CHANNEL_PARTNER') {
+      // Channel Partners can only toggle non-global courses belonging to their branch
+      return course.branchId != null && course.branchId === (user as any).branchId;
+    }
+    return false;
+  };
 
   const fetchCourses = async () => {
     try {
@@ -55,7 +66,7 @@ const Courses = () => {
   }, []);
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation(); // Prevent card click
+    e.stopPropagation();
     if (!confirm("Are you sure you want to delete this course?")) return;
 
     try {
@@ -89,7 +100,8 @@ const Courses = () => {
     }
   };
 
-  const handleToggleStatus = async (id: string, newStatus: boolean) => {
+  const handleToggleStatus = async (e: React.MouseEvent, id: string, newStatus: boolean) => {
+    e.stopPropagation();
     try {
       const token = storage.getToken();
       const response = await fetch(`${API_BASE_URL}/courses/${id}`, {
@@ -184,20 +196,36 @@ const Courses = () => {
               onClick={() => handleOpenModal(course.id, true)}
             >
               <div className="mb-3 flex items-start justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-foreground mb-1">{course.name}</h3>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <h3 className="text-sm font-semibold text-foreground">{course.name}</h3>
+                    {/* Global badge — visible to all, created by CEO */}
+                    {course.branchId === null || course.branchId === undefined ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 dark:bg-blue-900/30 px-2 py-0.5 text-[10px] font-medium text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                        <Globe className="h-2.5 w-2.5" />
+                        All Branches
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                        {course.branch?.name ?? 'Branch'}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-xs text-muted-foreground">{course.code}</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 ml-2 shrink-0">
                   <StatusBadge
                     status={course.isActive ? "Active" : "Inactive"}
                     variant={course.isActive ? "success" : "danger"}
                   />
-                  {user?.role === 'CHANNEL_PARTNER' && (
+                  {canToggleCourse(course) && (
                     <div onClick={(e) => e.stopPropagation()}>
                       <Switch
                         checked={course.isActive}
-                        onCheckedChange={(checked) => handleToggleStatus(course.id, checked)}
+                        onCheckedChange={(checked) => {
+                          const fakeEvent = { stopPropagation: () => { } } as React.MouseEvent;
+                          handleToggleStatus(fakeEvent, course.id, checked);
+                        }}
                         title={course.isActive ? "Make Inactive" : "Make Active"}
                         className="data-[state=unchecked]:bg-destructive"
                       />
@@ -249,6 +277,11 @@ const Courses = () => {
                       e.stopPropagation();
                       handleOpenModal(course.id, false);
                     }}
+                    // Channel Partners cannot edit global (CEO) courses
+                    disabled={
+                      user?.role === 'CHANNEL_PARTNER' &&
+                      (course.branchId === null || course.branchId === undefined)
+                    }
                   >
                     <Edit className="h-3 w-3" /> Edit
                   </Button>
@@ -257,7 +290,12 @@ const Courses = () => {
                     size="sm"
                     className="gap-1 text-destructive hover:text-destructive"
                     onClick={(e) => handleDelete(e, course.id)}
-                    disabled={course._count.students > 0}
+                    disabled={
+                      course._count.students > 0 ||
+                      // Channel Partners cannot delete global (CEO) courses
+                      (user?.role === 'CHANNEL_PARTNER' &&
+                        (course.branchId === null || course.branchId === undefined))
+                    }
                   >
                     <Trash2 className="h-3 w-3" />
                   </Button>
@@ -280,4 +318,3 @@ const Courses = () => {
 };
 
 export default Courses;
-

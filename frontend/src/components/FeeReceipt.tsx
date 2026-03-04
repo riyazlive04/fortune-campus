@@ -1,6 +1,6 @@
 import React from 'react';
 import { format } from 'date-fns';
-import { Building2, User, CreditCard, Calendar, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { User, CreditCard, CheckCircle2, ShieldCheck } from 'lucide-react';
 
 interface FeeReceiptProps {
     data: {
@@ -50,9 +50,11 @@ const FeeReceipt: React.FC<FeeReceiptProps> = ({ data }) => {
             {/* Header */}
             <div className="flex justify-between items-start border-b-2 border-primary/20 pb-8 mb-8">
                 <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 bg-primary rounded-xl flex items-center justify-center shadow-lg">
-                        <Building2 className="w-10 h-10 text-white" />
-                    </div>
+                    <img
+                        src="/src/assets/logo.jpg"
+                        alt="Fortune Innovatives Logo"
+                        className="h-16 w-auto object-contain"
+                    />
                     <div>
                         <h1 className="text-2xl font-black text-slate-900 tracking-tight">FORTUNE CAMPUS</h1>
                         <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Excellence in Innovation</p>
