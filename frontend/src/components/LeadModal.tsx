@@ -22,6 +22,7 @@ import { leadsApi, coursesApi, branchesApi, storage } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Phone, History, GraduationCap } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { usersApi } from "@/lib/api";
 
 interface LeadModalProps {
     isOpen: boolean;
@@ -36,6 +37,7 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId, defaultBranchId }: Lead
     const [fetching, setFetching] = useState(false);
     const [courses, setCourses] = useState<any[]>([]);
     const [branches, setBranches] = useState<any[]>([]);
+    const [trainers, setTrainers] = useState<any[]>([]);
     const { toast } = useToast();
 
     const [formData, setFormData] = useState({
@@ -47,6 +49,7 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId, defaultBranchId }: Lead
         status: "NEW",
         interestedCourse: "",
         branchId: "",
+        assignedTrainerId: "",
         notes: "",
         followUpDate: "",
     });
@@ -79,47 +82,19 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId, defaultBranchId }: Lead
         }
     };
 
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const [coursesData, branchesData] = await Promise.all([
-                    coursesApi.getCourses(),
-                    branchesApi.getBranches()
-                ]);
+    const fetchSupportData = async () => {
+        try {
+            const [coursesRes, branchesRes] = await Promise.all([
+                coursesApi.getCourses(),
+                branchesApi.getBranches(),
+            ]);
 
-                // Use .success instead of .status for response validation
-                setCourses(coursesData.success ? (coursesData.data.courses || coursesData.data) : []);
-                setBranches(branchesData.success ? (branchesData.data.branches || branchesData.data) : []);
-            } catch (error) {
-                console.error("Failed to fetch support data", error);
-            }
-        };
-
-        if (isOpen) {
-            fetchData();
-            if (leadId) {
-                fetchLeadDetails(leadId);
-                fetchActivity(leadId);
-            } else {
-                // Reset form for new lead
-                setFormData({
-                    firstName: "",
-                    lastName: "",
-                    email: "",
-                    phone: "",
-                    source: "WEBSITE",
-                    status: "NEW",
-                    interestedCourse: "",
-                    branchId: defaultBranchId || (isTelecaller ? user?.branchId : ""),
-                    notes: "",
-                    followUpDate: "",
-                });
-                setCallLogs([]);
-                setHistory([]);
-                setActiveTab("details");
-            }
+            if (coursesRes.success) setCourses(coursesRes.data.courses || coursesRes.data);
+            if (branchesRes.success) setBranches(branchesRes.data.branches || branchesRes.data);
+        } catch (error) {
+            console.error("Failed to fetch support data", error);
         }
-    }, [isOpen, leadId]);
+    };
 
     const fetchLeadDetails = async (id: string) => {
         try {
@@ -137,6 +112,7 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId, defaultBranchId }: Lead
                     status: lead.status,
                     interestedCourse: lead.interestedCourse || "",
                     branchId: lead.branchId,
+                    assignedTrainerId: lead.assignedTrainerId || "",
                     notes: lead.notes || "",
                     followUpDate: lead.followUpDate ? new Date(lead.followUpDate).toISOString().split('T')[0] : "",
                 });
@@ -152,6 +128,65 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId, defaultBranchId }: Lead
             setFetching(false);
         }
     };
+
+    useEffect(() => {
+        if (isOpen) {
+            fetchSupportData();
+            if (leadId) {
+                fetchLeadDetails(leadId);
+                fetchActivity(leadId);
+            } else {
+                // Reset form for new lead
+                setFormData({
+                    firstName: "",
+                    lastName: "",
+                    email: "",
+                    phone: "",
+                    source: "WEBSITE",
+                    status: "NEW",
+                    interestedCourse: "",
+                    branchId: defaultBranchId || (isTelecaller ? user?.branchId : ""),
+                    assignedTrainerId: "",
+                    notes: "",
+                    followUpDate: "",
+                });
+                setCallLogs([]);
+                setHistory([]);
+                setActiveTab("details");
+            }
+        }
+    }, [isOpen, leadId]);
+
+    // Separate effect for trainers to handle branch changes
+    useEffect(() => {
+        const fetchTrainersData = async () => {
+            if (!isOpen) return;
+            try {
+                const branchToFetch = formData.branchId || user?.branchId || "";
+
+                const res = await usersApi.getUsers({
+                    role: "TRAINER",
+                    branchId: (branchToFetch && branchToFetch !== "all") ? branchToFetch : undefined,
+                    limit: 1000
+                });
+
+                let trainersData = res.success ? (res.data.users || res.data) : [];
+
+                // Fallback to all trainers if branch-specific fetch is empty or if no branch specified
+                if (trainersData.length === 0) {
+                    const allRes = await usersApi.getUsers({ role: "TRAINER", limit: 1000 });
+                    if (allRes.success) {
+                        trainersData = allRes.data.users || allRes.data;
+                    }
+                }
+                setTrainers(trainersData);
+            } catch (error) {
+                console.error("Failed to fetch trainers", error);
+            }
+        };
+
+        fetchTrainersData();
+    }, [isOpen, formData.branchId]);
 
     const handleLogCall = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -199,10 +234,14 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId, defaultBranchId }: Lead
         try {
             setLoading(true);
             if (isEditMode && leadId) {
-                await leadsApi.updateLead(leadId, formData);
+                const payload: any = { ...formData };
+                if (payload.assignedTrainerId === "unassigned") payload.assignedTrainerId = null;
+                await leadsApi.updateLead(leadId, payload);
                 toast({ title: "Success", description: "Lead updated successfully" });
             } else {
-                await leadsApi.createLead(formData);
+                const payload: any = { ...formData };
+                if (payload.assignedTrainerId === "unassigned") payload.assignedTrainerId = null;
+                await leadsApi.createLead(payload);
                 toast({ title: "Success", description: "Lead created successfully" });
             }
             onSuccess();
@@ -310,6 +349,7 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId, defaultBranchId }: Lead
                                                     <SelectItem value="WALK_IN">Walk-in</SelectItem>
                                                     <SelectItem value="REFERRAL">Referral</SelectItem>
                                                     <SelectItem value="SOCIAL_MEDIA">Social Media</SelectItem>
+                                                    <SelectItem value="ONLINE_DEMO">Online Demo</SelectItem>
                                                     <SelectItem value="OTHER">Other</SelectItem>
                                                 </SelectContent>
                                             </Select>
@@ -336,6 +376,7 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId, defaultBranchId }: Lead
                                                     <SelectItem value="NOT_INTERESTED">Not Interested</SelectItem>
                                                     <SelectItem value="CALL_BACK_LATER">Call Back Later</SelectItem>
                                                     <SelectItem value="DEMO_SCHEDULED">Demo Scheduled</SelectItem>
+                                                    <SelectItem value="ONLINE_DEMO_SCHEDULED">Online Demo Scheduled</SelectItem>
                                                     <SelectItem value="READY_FOR_ADMISSION">Ready</SelectItem>
                                                     <SelectItem value="CONVERTED">Converted</SelectItem>
                                                 </SelectContent>
@@ -372,6 +413,26 @@ const LeadModal = ({ isOpen, onClose, onSuccess, leadId, defaultBranchId }: Lead
                                             </SelectContent>
                                         </Select>
                                     </div>
+
+                                    {(formData.status === "DEMO_SCHEDULED" || formData.status === "ONLINE_DEMO_SCHEDULED") && (
+                                        <div className="space-y-2">
+                                            <Label htmlFor="trainer">Assign Trainer</Label>
+                                            <Select
+                                                value={formData.assignedTrainerId}
+                                                onValueChange={(v) => setFormData({ ...formData, assignedTrainerId: v })}
+                                            >
+                                                <SelectTrigger className="bg-blue-50/50 border-blue-200">
+                                                    <SelectValue placeholder="Select Trainer (Optional)" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="unassigned">No Trainer</SelectItem>
+                                                    {trainers.map((t) => (
+                                                        <SelectItem key={t.id} value={t.id}>{t.firstName} {t.lastName}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="flex justify-end gap-3 pt-4 border-t">

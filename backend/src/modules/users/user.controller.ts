@@ -248,9 +248,12 @@ export const getUsers = async (req: AuthRequest, res: Response): Promise<Respons
     const where: any = {};
 
     // Branch filtering based on user role
-    if (req.user?.role !== UserRole.ADMIN && req.user?.role !== UserRole.CEO) {
+    // ADMIN, CEO, and TELECALLER can filter by branchId or view all branches
+    const isCentralUser = req.user?.role === UserRole.ADMIN || req.user?.role === UserRole.CEO || req.user?.role === UserRole.TELECALLER;
+
+    if (!isCentralUser) {
       where.branchId = req.user?.branchId;
-    } else if (branchId) {
+    } else if (branchId && branchId !== 'all') {
       where.branchId = branchId as string;
     }
 

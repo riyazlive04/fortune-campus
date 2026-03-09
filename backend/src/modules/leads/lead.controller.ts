@@ -5,6 +5,7 @@ import { successResponse, errorResponse, paginationHelper, getPaginationMeta } f
 import { AuthRequest } from '../../middlewares/auth.middleware';
 import { whatsappService } from '../../services/whatsapp.service';
 import { getCachedData, setCachedData } from '../../utils/cache';
+import { NotificationService } from '../notifications/notification.service';
 
 const parseDateString = (dateStr: string) => {
   if (!dateStr) return null;
@@ -95,6 +96,9 @@ export const getLeads = async (req: AuthRequest, res: Response): Promise<Respons
           assignedTo: {
             select: { id: true, firstName: true, lastName: true, email: true, role: true },
           },
+          assignedTrainer: {
+            select: { id: true, firstName: true, lastName: true, email: true, role: true },
+          },
         },
         orderBy: { createdAt: 'desc' },
       }),
@@ -124,6 +128,9 @@ export const getLeadById = async (req: AuthRequest, res: Response): Promise<Resp
           select: { id: true, firstName: true, lastName: true, email: true },
         },
         assignedTo: {
+          select: { id: true, firstName: true, lastName: true, email: true, role: true },
+        },
+        assignedTrainer: {
           select: { id: true, firstName: true, lastName: true, email: true, role: true },
         },
         admission: true,
@@ -168,6 +175,7 @@ export const createLead = async (req: AuthRequest, res: Response): Promise<Respo
       followUpDate,
       branchId,
       assignedToId,
+      assignedTrainerId,
       location,
     } = req.body;
 
@@ -218,6 +226,7 @@ export const createLead = async (req: AuthRequest, res: Response): Promise<Respo
         branchId: leadBranchId,
         createdById: req.user.id,
         assignedToId: finalAssignedToId,
+        assignedTrainerId,
         location,
         status: LeadStatus.NEW,
       },
@@ -229,6 +238,9 @@ export const createLead = async (req: AuthRequest, res: Response): Promise<Respo
           select: { id: true, firstName: true, lastName: true },
         },
         assignedTo: {
+          select: { id: true, firstName: true, lastName: true },
+        },
+        assignedTrainer: {
           select: { id: true, firstName: true, lastName: true },
         },
       },
@@ -289,6 +301,7 @@ export const updateLead = async (req: AuthRequest, res: Response): Promise<Respo
       notes,
       followUpDate,
       assignedToId,
+      assignedTrainerId,
       location,
     } = req.body;
 
@@ -320,6 +333,7 @@ export const updateLead = async (req: AuthRequest, res: Response): Promise<Respo
         interestedCourse,
         branchId,
         assignedToId,
+        assignedTrainerId,
         location,
       },
       include: {
@@ -329,8 +343,26 @@ export const updateLead = async (req: AuthRequest, res: Response): Promise<Respo
         assignedTo: {
           select: { id: true, firstName: true, lastName: true },
         },
+        assignedTrainer: {
+          select: { id: true, firstName: true, lastName: true },
+        },
       },
     });
+
+    // Notify trainer if assigned
+    if (assignedTrainerId && assignedTrainerId !== existingLead.assignedTrainerId) {
+      try {
+        await NotificationService.createNotification({
+          recipientId: assignedTrainerId,
+          title: 'New Lead Assigned',
+          message: `You have been assigned to lead ${lead.firstName} ${lead.lastName} for ${lead.status}.`,
+          type: 'INFO',
+          link: `/trainer/leads/${lead.id}`
+        });
+      } catch (notifyError) {
+        console.error('Failed to send assignment notification:', notifyError);
+      }
+    }
 
     // Log status change if status updated
     if (status && status !== existingLead.status) {
@@ -780,6 +812,7 @@ export const getTelecallerDashboard = async (req: AuthRequest, res: Response): P
       followUpsOverdue
     });
   } catch (error) {
+    console.error('Error fetching telecaller dashboard:', error);
     return errorResponse(res, 'Failed to fetch telecaller dashboard', 500, error);
   }
 };

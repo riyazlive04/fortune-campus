@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { coursesApi, branchesApi, storage } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Download, Upload, Globe } from "lucide-react";
+import { Loader2, Download, Upload, Globe, FileSpreadsheet } from "lucide-react";
 import { downloadSyllabusReport } from "@/lib/reportUtils";
 import { extractTextFromPDF } from "@/lib/pdfUtils";
 
@@ -134,6 +134,52 @@ const CourseModal = ({ isOpen, onClose, onSuccess, courseId, readonly = false }:
             }
         }
     }, [isOpen, courseId]);
+
+    const handleCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const text = event.target?.result as string;
+            // Simple CSV parsing: split by new lines and filter empty rows
+            const topics = text.split(/\r?\n/).map(row => row.trim()).filter(row => row.length > 0);
+
+            if (topics.length > 0) {
+                setFormData(prev => ({ ...prev, syllabus: JSON.stringify(topics) }));
+                toast({
+                    title: "CSV Processed",
+                    description: `${topics.length} topics extracted to syllabus.`,
+                });
+            } else {
+                toast({
+                    variant: "destructive",
+                    title: "Empty CSV",
+                    description: "No valid topics found in the CSV file.",
+                });
+            }
+        };
+        reader.onerror = () => {
+            toast({
+                variant: "destructive",
+                title: "Read Error",
+                description: "Failed to read the CSV file.",
+            });
+        };
+        reader.readAsText(file);
+        e.target.value = "";
+    };
+
+    const downloadTemplate = () => {
+        const content = "Topic Name\nIntroduction to Course\nBasic Concepts\nAdvanced Techniques\nPractical Session\nFinal Review";
+        const blob = new Blob([content], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'course_topics_template.csv';
+        a.click();
+        window.URL.revokeObjectURL(url);
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -352,7 +398,36 @@ const CourseModal = ({ isOpen, onClose, onSuccess, courseId, readonly = false }:
                                                 disabled={parsingPdf}
                                             >
                                                 {parsingPdf ? <Loader2 className="h-3 w-3 animate-spin" /> : <Upload className="h-3 w-3" />}
-                                                Upload PDF
+                                                PDF
+                                            </Button>
+
+                                            <input
+                                                type="file"
+                                                id="csv-upload"
+                                                accept=".csv"
+                                                className="hidden"
+                                                onChange={handleCsvUpload}
+                                            />
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-7 text-[10px] gap-1 px-2 border-primary/20 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/10"
+                                                onClick={() => document.getElementById('csv-upload')?.click()}
+                                            >
+                                                <FileSpreadsheet className="h-3 w-3" />
+                                                Topics CSV
+                                            </Button>
+
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-7 text-muted-foreground hover:text-primary p-0"
+                                                title="Download CSV Template"
+                                                onClick={downloadTemplate}
+                                            >
+                                                <Download className="h-3 w-3" />
                                             </Button>
                                         </>
                                     )}

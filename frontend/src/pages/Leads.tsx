@@ -28,6 +28,7 @@ const Leads = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [telecallers, setTelecallers] = useState<any[]>([]);
+  const [trainers, setTrainers] = useState<any[]>([]);
   const [searchParams] = useSearchParams();
   const [filters, setFilters] = useState({
     status: "all",
@@ -73,6 +74,19 @@ const Leads = () => {
     }
   };
 
+  const fetchTrainers = async () => {
+    try {
+      const params: any = { role: "TRAINER", limit: 100 };
+      if (filters.branchId !== "all") params.branchId = filters.branchId;
+      const data = await usersApi.getUsers(params);
+      if (data.success) {
+        setTrainers(data.data.users || data.data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch trainers", error);
+    }
+  };
+
   const fetchLeads = async (showToast = false) => {
     try {
       setLoading(true);
@@ -97,6 +111,8 @@ const Leads = () => {
         date: new Date(l.createdAt).toLocaleDateString(),
         assignedTo: (l.assignedTo && l.assignedTo.role === 'TELECALLER') ? `${l.assignedTo.firstName} ${l.assignedTo.lastName}` : "Unassigned",
         assignedToId: (l.assignedTo && l.assignedTo.role === 'TELECALLER') ? l.assignedTo.id : null,
+        assignedTrainer: (l.assignedTrainer) ? `${l.assignedTrainer.firstName} ${l.assignedTrainer.lastName}` : "Unassigned",
+        assignedTrainerId: l.assignedTrainerId || null,
       }));
 
       // If source filter is set and not handled by backend, filter locally
@@ -133,6 +149,7 @@ const Leads = () => {
 
   useEffect(() => {
     fetchTelecallers();
+    fetchTrainers();
   }, [filters.branchId]);
 
   const handleOpenModal = (id?: string) => {
@@ -175,6 +192,16 @@ const Leads = () => {
     }
   };
 
+  const handleAssignTrainer = async (leadId: string, trainerId: string) => {
+    try {
+      await leadsApi.updateLead(leadId, { assignedTrainerId: trainerId === "unassigned" ? null : trainerId });
+      toast({ title: "Success", description: "Trainer assigned successfully" });
+      fetchLeads();
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Error", description: error.message || "Failed to assign trainer" });
+    }
+  };
+
   const statusVariant = (s: string) => {
     const map: Record<string, "success" | "warning" | "danger" | "info" | "neutral"> = {
       NEW: "info",
@@ -183,6 +210,7 @@ const Leads = () => {
       QUALIFIED: "success",
       NEGOTIATING: "warning",
       DEMO_SCHEDULED: "success",
+      ONLINE_DEMO_SCHEDULED: "success",
       CONVERTED: "success",
       LOST: "danger",
     };
@@ -210,13 +238,32 @@ const Leads = () => {
                 if (val !== r.assignedToId) handleAssignLead(r.id, val);
               }}
             >
-              <SelectTrigger className="w-32 h-8 text-xs bg-background">
-                <SelectValue placeholder="Unassigned" />
+              <SelectTrigger className="w-28 h-8 text-xs bg-background" title="Assign Telecaller">
+                <SelectValue placeholder="Telecaller" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="unassigned">Unassigned</SelectItem>
+                <SelectItem value="unassigned">No Telecaller</SelectItem>
                 {telecallers.map(t => (
-                  <SelectItem key={t.id} value={t.id}>{t.firstName} {t.lastName}</SelectItem>
+                  <SelectItem key={t.id} value={t.id}>{t.firstName}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {(r.status === "DEMO_SCHEDULED" || r.status === "ONLINE_DEMO_SCHEDULED") && trainers.length > 0 && (
+            <Select
+              value={trainers.some(t => t.id === r.assignedTrainerId) ? r.assignedTrainerId : "unassigned"}
+              onValueChange={(val) => {
+                if (val !== r.assignedTrainerId) handleAssignTrainer(r.id, val);
+              }}
+            >
+              <SelectTrigger className="w-28 h-8 text-xs bg-blue-50 border-blue-200" title="Assign Trainer">
+                <SelectValue placeholder="Trainer" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unassigned">No Trainer</SelectItem>
+                {trainers.map(t => (
+                  <SelectItem key={t.id} value={t.id}>{t.firstName}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -277,6 +324,7 @@ const Leads = () => {
             <SelectItem value="WALK_IN">Walk-in</SelectItem>
             <SelectItem value="REFERRAL">Referral</SelectItem>
             <SelectItem value="SOCIAL_MEDIA">Social Media</SelectItem>
+            <SelectItem value="ONLINE_DEMO">Online Demo</SelectItem>
           </SelectContent>
         </Select>
 
@@ -299,6 +347,7 @@ const Leads = () => {
             <SelectItem value="INTERESTED">Interested</SelectItem>
             <SelectItem value="NEGOTIATING">Negotiating</SelectItem>
             <SelectItem value="DEMO_SCHEDULED">Demo Scheduled</SelectItem>
+            <SelectItem value="ONLINE_DEMO_SCHEDULED">Online Demo</SelectItem>
             <SelectItem value="CONVERTED">Converted</SelectItem>
             <SelectItem value="LOST">Lost</SelectItem>
           </SelectContent>

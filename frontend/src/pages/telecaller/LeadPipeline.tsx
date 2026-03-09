@@ -4,7 +4,7 @@ import PageHeader from "@/components/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { leadsApi, branchesApi, coursesApi, storage } from "@/lib/api";
+import { leadsApi, branchesApi, coursesApi, usersApi, storage } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import LeadModal from "@/components/LeadModal";
@@ -37,6 +37,7 @@ const PIPELINE_STATUSES = [
     { id: "INTERESTED", label: "Interested", color: "bg-purple-500/10 text-purple-500 border-purple-500/20" },
     { id: "NEGOTIATING", label: "Negotiating", color: "bg-orange-500/10 text-orange-500 border-orange-500/20" },
     { id: "DEMO_SCHEDULED", label: "Demo", color: "bg-teal-500/10 text-teal-500 border-teal-500/20" },
+    { id: "ONLINE_DEMO_SCHEDULED", label: "Online Demo", color: "bg-cyan-500/10 text-cyan-500 border-cyan-500/20" },
     { id: "CONVERTED", label: "Converted", color: "bg-green-500/10 text-green-500 border-green-500/20" },
 ];
 
@@ -46,7 +47,7 @@ const WhatsAppIcon = ({ className }: { className?: string }) => (
     </svg>
 );
 
-const SortableLeadCard = ({ lead, status, onEdit }: { lead: any; status: any; onEdit: (id: string) => void }) => {
+const SortableLeadCard = ({ lead, status, trainers, onEdit, onAssignTrainer }: { lead: any; status: any; trainers: any[]; onEdit: (id: string) => void; onAssignTrainer: (leadId: string, trainerId: string | null) => void }) => {
     const {
         attributes,
         listeners,
@@ -81,6 +82,8 @@ const SortableLeadCard = ({ lead, status, onEdit }: { lead: any; status: any; on
         window.location.href = `tel:${lead.phone}`;
     };
 
+    const isDemoStatus = lead.status === "DEMO_SCHEDULED" || lead.status === "ONLINE_DEMO_SCHEDULED";
+
     return (
         <Card
             ref={setNodeRef}
@@ -101,7 +104,7 @@ const SortableLeadCard = ({ lead, status, onEdit }: { lead: any; status: any; on
                 </div>
 
                 <div className="flex flex-wrap gap-1">
-                    <Badge variant="outline" className={`text-[10px] py-0 px-1 ${status.color}`}>
+                    <Badge variant="outline" className={`text-[10px] py-0 px-1 ${status?.color || "bg-slate-100 text-slate-600"}`}>
                         {lead.interestedCourse || "General"}
                     </Badge>
                     {lead.source && (
@@ -114,6 +117,36 @@ const SortableLeadCard = ({ lead, status, onEdit }: { lead: any; status: any; on
                             {lead.branch.name}
                         </Badge>
                     )}
+                </div>
+
+                {/* Trainer Section */}
+                <div className="pt-2 border-t border-muted/30">
+                    <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Trainer</span>
+                        {(isDemoStatus || lead.assignedTrainerId) && (
+                            <div onClick={(e) => e.stopPropagation()} className="relative z-10">
+                                <Select
+                                    value={lead.assignedTrainerId || "unassigned"}
+                                    onValueChange={(val) => onAssignTrainer(lead.id, val === "unassigned" ? null : val)}
+                                >
+                                    <SelectTrigger className="h-7 text-[10px] py-0 px-2 min-w-[100px] border-none bg-muted/50 focus:ring-0">
+                                        <SelectValue placeholder="Assign Trainer" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="unassigned" className="text-[10px]">Unassigned</SelectItem>
+                                        {trainers.map((t) => (
+                                            <SelectItem key={t.id} value={t.id} className="text-[10px]">
+                                                {t.firstName} {t.lastName}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+                        {!isDemoStatus && !lead.assignedTrainerId && (
+                            <span className="text-[10px] text-muted-foreground italic">N/A</span>
+                        )}
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 pt-1 border-t border-muted/50">
@@ -182,6 +215,7 @@ const Lane = ({ id, label, count, loading, children }: any) => {
 
 const LeadPipeline = () => {
     const [leads, setLeads] = useState<any[]>([]);
+    const [trainers, setTrainers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);
     const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
@@ -230,6 +264,56 @@ const LeadPipeline = () => {
             }
         } catch (error) {
             console.error("Failed to fetch courses", error);
+        }
+    };
+
+    const fetchTrainers = async () => {
+        try {
+            const params: any = { role: 'TRAINER', limit: 1000 };
+            let targetBranchId: string | undefined = undefined;
+            if (isCEO || user?.role === "TELECALLER") {
+                targetBranchId = selectedBranchId;
+            } else {
+                targetBranchId = user?.branchId;
+            }
+
+            if (targetBranchId && targetBranchId !== "all") {
+                params.branchId = targetBranchId;
+            }
+
+            const res = await usersApi.getUsers(params);
+            if (res.success) {
+                let trainersData = res.data?.users || res.data || [];
+                // Fallback to all trainers if branch-specific fetch is empty
+                if (trainersData.length === 0 && params.branchId) {
+                    const allRes = await usersApi.getUsers({ role: 'TRAINER', limit: 1000 });
+                    if (allRes.success) {
+                        trainersData = allRes.data?.users || allRes.data || [];
+                    }
+                }
+                setTrainers(trainersData);
+            }
+        } catch (error) {
+            console.error("Failed to fetch trainers", error);
+        }
+    };
+
+    const handleAssignTrainer = async (leadId: string, trainerId: string | null) => {
+        try {
+            const res = await leadsApi.updateLead(leadId, { assignedTrainerId: trainerId });
+            if (res.success) {
+                setLeads(prev => prev.map(l => l.id === leadId ? { ...l, assignedTrainerId: trainerId, assignedTrainer: res.data.assignedTrainer } : l));
+                toast({
+                    title: "Trainer Assigned",
+                    description: "Lead trainer assignment updated successfully.",
+                });
+            }
+        } catch (error: any) {
+            toast({
+                variant: "destructive",
+                title: "Error",
+                description: error.message || "Failed to assign trainer",
+            });
         }
     };
 
@@ -295,10 +379,14 @@ const LeadPipeline = () => {
     }, []);
 
     useEffect(() => {
+        fetchTrainers();
+    }, [selectedBranchId]);
+
+    useEffect(() => {
         if (isCEO || user?.role === 'TELECALLER' || (user?.branchId)) {
             fetchLeads();
         }
-    }, [selectedBranchId, selectedSource, selectedCourse, user?.branchId, user?.role]);
+    }, [selectedBranchId, selectedSource, selectedCourse, searchTerm]);
 
     // Debounced search effect
     useEffect(() => {
@@ -314,13 +402,14 @@ const LeadPipeline = () => {
         return leads.filter(l => l.status === status);
     };
 
-    const handleOpenModal = (id?: string) => {
-        setSelectedLeadId(id || null);
+    const handleOpenModal = (id: string | null) => {
+        setSelectedLeadId(id);
         setModalOpen(true);
     };
 
     const handleDragStart = (event: any) => {
         setActiveId(event.active.id);
+
     };
 
     const handleDragEnd = async (event: any) => {
@@ -465,7 +554,7 @@ const LeadPipeline = () => {
                             </Button>
                             <Button
                                 className="h-9 rounded-lg gap-2"
-                                onClick={() => handleOpenModal()}
+                                onClick={() => handleOpenModal(null)}
                             >
                                 <Plus className="h-4 w-4" />
                                 <span className="hidden sm:inline">New Lead</span>
@@ -528,7 +617,9 @@ const LeadPipeline = () => {
                                                     key={lead.id}
                                                     lead={lead}
                                                     status={status}
+                                                    trainers={trainers}
                                                     onEdit={handleOpenModal}
+                                                    onAssignTrainer={handleAssignTrainer}
                                                 />
                                             ))
                                         )}
@@ -557,7 +648,9 @@ const LeadPipeline = () => {
                             <SortableLeadCard
                                 lead={activeLead}
                                 status={activeStatus}
+                                trainers={trainers}
                                 onEdit={() => { }}
+                                onAssignTrainer={() => { }}
                             />
                         ) : null}
                     </DragOverlay>

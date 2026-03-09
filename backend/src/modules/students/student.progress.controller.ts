@@ -28,6 +28,9 @@ export const getBranchProgress = async (req: AuthRequest, res: Response): Promis
                 },
                 softwareProgress: {
                     take: 1
+                },
+                course: {
+                    select: { syllabus: true }
                 }
             }
         });
@@ -37,9 +40,40 @@ export const getBranchProgress = async (req: AuthRequest, res: Response): Promis
             studentId: s.id,
             name: `${s.user.firstName} ${s.user.lastName}`,
             email: s.user.email,
+            syllabus: (() => {
+                if (!s.course?.syllabus) return null;
+                try {
+                    let parsed = JSON.parse(s.course.syllabus);
+                    while (typeof parsed === 'string') {
+                        try {
+                            parsed = JSON.parse(parsed);
+                        } catch (e) {
+                            break;
+                        }
+                    }
+                    return Array.isArray(parsed) ? parsed : null;
+                } catch (e) {
+                    return null;
+                }
+            })(),
             progress: s.softwareProgress[0] ? {
                 id: s.softwareProgress[0].id,
-                completedTopics: JSON.parse(s.softwareProgress[0].completedTopics || "[]"),
+                completedTopics: (() => {
+                    if (!s.softwareProgress[0].completedTopics) return [];
+                    try {
+                        let parsed = JSON.parse(s.softwareProgress[0].completedTopics);
+                        while (typeof parsed === 'string') {
+                            try {
+                                parsed = JSON.parse(parsed);
+                            } catch (e) {
+                                break;
+                            }
+                        }
+                        return Array.isArray(parsed) ? parsed : [];
+                    } catch (e) {
+                        return [];
+                    }
+                })(),
                 currentTopic: s.softwareProgress[0].currentTopic,
                 percentage: s.softwareProgress[0].progress
             } : null
@@ -65,6 +99,9 @@ export const getBatchProgress = async (req: AuthRequest, res: Response): Promise
                 },
                 softwareProgress: {
                     take: 1
+                },
+                course: {
+                    select: { syllabus: true }
                 }
             }
         });
@@ -74,9 +111,40 @@ export const getBatchProgress = async (req: AuthRequest, res: Response): Promise
             studentId: s.id,
             name: `${s.user.firstName} ${s.user.lastName}`,
             email: s.user.email,
+            syllabus: (() => {
+                if (!s.course?.syllabus) return null;
+                try {
+                    let parsed = JSON.parse(s.course.syllabus);
+                    while (typeof parsed === 'string') {
+                        try {
+                            parsed = JSON.parse(parsed);
+                        } catch (e) {
+                            break;
+                        }
+                    }
+                    return Array.isArray(parsed) ? parsed : null;
+                } catch (e) {
+                    return null;
+                }
+            })(),
             progress: s.softwareProgress[0] ? {
                 id: s.softwareProgress[0].id,
-                completedTopics: JSON.parse(s.softwareProgress[0].completedTopics || "[]"),
+                completedTopics: (() => {
+                    if (!s.softwareProgress[0].completedTopics) return [];
+                    try {
+                        let parsed = JSON.parse(s.softwareProgress[0].completedTopics);
+                        while (typeof parsed === 'string') {
+                            try {
+                                parsed = JSON.parse(parsed);
+                            } catch (e) {
+                                break;
+                            }
+                        }
+                        return Array.isArray(parsed) ? parsed : [];
+                    } catch (e) {
+                        return [];
+                    }
+                })(),
                 currentTopic: s.softwareProgress[0].currentTopic,
                 percentage: s.softwareProgress[0].progress
             } : null
@@ -92,7 +160,31 @@ export const getBatchProgress = async (req: AuthRequest, res: Response): Promise
 export const updateStudentProgress = async (req: AuthRequest, res: Response): Promise<Response> => {
     try {
         const { studentId } = req.params;
-        const { completedTopics, currentTopic, progress } = req.body;
+        const { completedTopics, currentTopic } = req.body;
+        let { progress } = req.body;
+
+        // If completedTopics is provided, calculate progress percentage based on course syllabus
+        if (Array.isArray(completedTopics)) {
+            const student = await (prisma as any).student.findUnique({
+                where: { id: studentId },
+                include: { course: { select: { syllabus: true } } }
+            });
+
+            if (student?.course?.syllabus) {
+                try {
+                    let syllabusTopics = JSON.parse(student.course.syllabus);
+                    while (typeof syllabusTopics === 'string') {
+                        try { syllabusTopics = JSON.parse(syllabusTopics); }
+                        catch (e) { break; }
+                    }
+                    if (Array.isArray(syllabusTopics) && syllabusTopics.length > 0) {
+                        progress = Math.round((completedTopics.length / syllabusTopics.length) * 100);
+                    }
+                } catch (e) {
+                    console.error("Failed to parse course syllabus for progress calculation:", e);
+                }
+            }
+        }
 
         const updatedProgress = await (prisma as any).softwareProgress.upsert({
             where: {
@@ -101,14 +193,14 @@ export const updateStudentProgress = async (req: AuthRequest, res: Response): Pr
             update: {
                 completedTopics: JSON.stringify(completedTopics || []),
                 currentTopic,
-                progress,
+                progress: progress !== undefined ? progress : undefined,
                 lastUpdated: new Date()
             },
             create: {
                 studentId,
                 completedTopics: JSON.stringify(completedTopics || []),
                 currentTopic,
-                progress
+                progress: progress || 0
             }
         });
 
